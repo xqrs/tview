@@ -103,12 +103,7 @@ func (b *Box) GetInnerRect() (int, int, int, int) {
 
 	x, y, width, height := b.GetRect()
 
-	if b.title != "" {
-		y++
-		height--
-	}
-
-	if b.borders.Has(BordersTop) {
+	if b.title != "" || b.borders.Has(BordersTop) {
 		y++
 		height--
 	}
