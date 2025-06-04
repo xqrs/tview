@@ -2,7 +2,6 @@ package tview
 
 import (
 	"math"
-	"os"
 	"regexp"
 
 	"github.com/gdamore/tcell/v2"
@@ -22,19 +21,7 @@ var (
 
 	// Regular expression used to unescape escaped style/region tags.
 	unescapePattern = regexp.MustCompile(`(\[[a-zA-Z0-9_,;: \-\."#]+\[*)\[\]`)
-
-	// The number of colors available in the terminal.
-	availableColors = 256
 )
-
-// Package initialization.
-func init() {
-	// Determine the number of colors available in the terminal.
-	info, err := tcell.LookupTerminfo(os.Getenv("TERM"))
-	if err == nil {
-		availableColors = info.Colors
-	}
-}
 
 // Print prints text onto the screen into the given box at (x,y,maxWidth,1),
 // not exceeding that box. The screen's background color will not be changed.

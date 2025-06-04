@@ -249,10 +249,7 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 	// Draw label.
 	_, labelBg, _ := c.labelStyle.Decompose()
 	if c.labelWidth > 0 {
-		labelWidth := c.labelWidth
-		if labelWidth > width {
-			labelWidth = width
-		}
+		labelWidth := min(c.labelWidth, width)
 		printWithStyle(screen, c.label, x, y, 0, labelWidth, AlignmentLeft, c.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth

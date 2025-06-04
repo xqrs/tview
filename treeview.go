@@ -2,6 +2,7 @@ package tview
 
 import (
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // Tree navigation events.
@@ -18,7 +19,7 @@ const (
 // TreeNode represents one node in a tree view.
 type TreeNode struct {
 	// The reference object.
-	reference interface{}
+	reference any
 
 	// This node's child nodes.
 	children []*TreeNode
@@ -97,13 +98,13 @@ func (n *TreeNode) Walk(callback func(node, parent *TreeNode) bool) *TreeNode {
 // SetReference allows you to store a reference of any type in this node. This
 // will allow you to establish a mapping between the TreeView hierarchy and your
 // internal tree structure.
-func (n *TreeNode) SetReference(reference interface{}) *TreeNode {
+func (n *TreeNode) SetReference(reference any) *TreeNode {
 	n.reference = reference
 	return n
 }
 
 // GetReference returns this node's reference object.
-func (n *TreeNode) GetReference() interface{} {
+func (n *TreeNode) GetReference() any {
 	return n.reference
 }
 
@@ -140,7 +141,7 @@ func (n *TreeNode) AddChild(node *TreeNode) *TreeNode {
 func (n *TreeNode) RemoveChild(node *TreeNode) *TreeNode {
 	for index, child := range n.children {
 		if child == node {
-			n.children = append(n.children[:index], n.children[index+1:]...)
+			n.children = slices.Delete(n.children, index, index+1)
 			break
 		}
 	}

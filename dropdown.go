@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // dropDownOption is one option that can be selected in a drop-down primitive.
@@ -163,7 +164,7 @@ func (d *DropDown) SetTextOptions(prefix, suffix, currentPrefix, currentSuffix, 
 	d.noSelection = noSelection
 	d.optionPrefix = prefix
 	d.optionSuffix = suffix
-	for index := 0; index < d.list.GetItemCount(); index++ {
+	for index := range d.list.GetItemCount() {
 		d.list.SetItemText(index, prefix+d.options[index].Text+suffix, "")
 	}
 	return d
@@ -346,7 +347,7 @@ func (d *DropDown) RemoveOption(index int) *DropDown {
 	if index == d.currentOption {
 		d.currentOption = -1
 	}
-	d.options = append(d.options[:index], d.options[index+1:]...)
+	d.options = slices.Delete(d.options, index, index+1)
 	d.list.RemoveItem(index)
 	return d
 }
@@ -393,10 +394,7 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 
 	// Draw label.
 	if d.labelWidth > 0 {
-		labelWidth := d.labelWidth
-		if labelWidth > rightLimit-x {
-			labelWidth = rightLimit - x
-		}
+		labelWidth := min(d.labelWidth, rightLimit-x)
 		printWithStyle(screen, d.label, x, y, 0, labelWidth, AlignmentLeft, d.labelStyle, true)
 		x += labelWidth
 	} else {
@@ -450,7 +448,7 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 	} else if d.HasFocus() && !d.open {
 		fieldStyle = d.focusedStyle
 	}
-	for index := 0; index < fieldWidth; index++ {
+	for index := range fieldWidth {
 		screen.SetContent(x+index, y, ' ', nil, fieldStyle)
 	}
 
@@ -508,17 +506,11 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 		// We prefer to align the left sides of the list and the main widget, but
 		// if there is no space to the right, then shift the list to the left.
 		if lx+lwidth >= swidth {
-			lx = swidth - lwidth
-			if lx < 0 {
-				lx = 0
-			}
+			lx = max(swidth-lwidth, 0)
 		}
 		// We prefer to drop down but if there is no space, maybe drop up?
 		if ly+lheight >= sheight && ly-2 > lheight-ly {
-			ly = y - lheight
-			if ly < 0 {
-				ly = 0
-			}
+			ly = max(y-lheight, 0)
 		}
 		if ly+lheight >= sheight {
 			lheight = sheight - ly

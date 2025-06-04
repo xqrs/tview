@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // listItem represents one item in a List.
@@ -191,7 +192,7 @@ func (l *List) RemoveItem(index int) *List {
 	}
 
 	// Remove item.
-	l.items = append(l.items[:index], l.items[index+1:]...)
+	l.items = slices.Delete(l.items, index, index+1)
 
 	// If there is nothing left, we're done.
 	if len(l.items) == 0 {

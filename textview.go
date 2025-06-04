@@ -437,8 +437,8 @@ func (t *TextView) GetOriginalLineCount() int {
 
 	var (
 		state *stepState
-		str       = t.text.String()
-		lines int = 1
+		str   = t.text.String()
+		lines = 1
 	)
 	for len(str) > 0 {
 		_, str, state = step(str, state, stepOptionsNone)
@@ -1023,10 +1023,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	// Draw label.
 	_, labelBg, _ := t.labelStyle.Decompose()
 	if t.labelWidth > 0 {
-		labelWidth := t.labelWidth
-		if labelWidth > width {
-			labelWidth = width
-		}
+		labelWidth := min(t.labelWidth, width)
 		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth
@@ -1050,8 +1047,8 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	// Draw the text element if necessary.
 	_, bg, _ := t.textStyle.Decompose()
 	if bg != t.backgroundColor {
-		for row := 0; row < height; row++ {
-			for column := 0; column < width; column++ {
+		for row := range height {
+			for column := range width {
 				screen.SetContent(x+column, y+row, ' ', nil, t.textStyle)
 			}
 		}
@@ -1200,10 +1197,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 				xPos = (width-info.width)/2 - t.columnOffset
 			}
 		case AlignmentRight:
-			maxWidth := width
-			if t.longestLine > width {
-				maxWidth = t.longestLine
-			}
+			maxWidth := max(t.longestLine, width)
 			skipWidth = t.columnOffset - (maxWidth - info.width)
 			if skipWidth < 0 {
 				skipWidth = 0

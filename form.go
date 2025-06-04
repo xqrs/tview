@@ -2,6 +2,7 @@ package tview
 
 import (
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 var (
@@ -367,7 +368,7 @@ func (f *Form) GetButton(index int) *Button {
 // RemoveButton removes the button at the specified position, starting with 0
 // for the button that was added first.
 func (f *Form) RemoveButton(index int) *Form {
-	f.buttons = append(f.buttons[:index], f.buttons[index+1:]...)
+	f.buttons = slices.Delete(f.buttons, index, index+1)
 	return f
 }
 
@@ -437,7 +438,7 @@ func (f *Form) GetFormItem(index int) FormItem {
 // index 0. Elements are referenced in the order they were added. Buttons are
 // not included.
 func (f *Form) RemoveFormItem(index int) *Form {
-	f.items = append(f.items[:index], f.items[index+1:]...)
+	f.items = slices.Delete(f.items, index, index+1)
 	return f
 }
 

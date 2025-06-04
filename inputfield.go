@@ -505,7 +505,7 @@ func (i *InputField) Draw(screen tcell.Screen) {
 		// How much space do we need?
 		lheight := i.autocompleteList.GetItemCount()
 		lwidth := 0
-		for index := 0; index < lheight; index++ {
+		for index := range lheight {
 			entry, _ := i.autocompleteList.GetItemText(index)
 			width := TaggedStringWidth(entry)
 			if width > lwidth {
@@ -518,10 +518,7 @@ func (i *InputField) Draw(screen tcell.Screen) {
 		ly := y + 1
 		_, sheight := screen.Size()
 		if ly+lheight >= sheight && ly-2 > lheight-ly {
-			ly = y - lheight
-			if ly < 0 {
-				ly = 0
-			}
+			ly = max(y-lheight, 0)
 		}
 		if ly+lheight >= sheight {
 			lheight = sheight - ly

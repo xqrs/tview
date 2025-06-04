@@ -2,6 +2,7 @@ package tview
 
 import (
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // Flex directions.
@@ -103,7 +104,7 @@ func (f *Flex) AddItem(item Primitive, fixedSize, proportion int, focus bool) *F
 func (f *Flex) RemoveItem(p Primitive) *Flex {
 	for index := len(f.items) - 1; index >= 0; index-- {
 		if f.items[index].Item == p {
-			f.items = append(f.items[:index], f.items[index+1:]...)
+			f.items = slices.Delete(f.items, index, index+1)
 		}
 	}
 	return f

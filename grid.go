@@ -3,6 +3,7 @@ package tview
 import (
 	"github.com/gdamore/tcell/v2"
 	"math"
+	"slices"
 )
 
 // gridItem represents one primitive and its possible position on a grid.
@@ -216,7 +217,7 @@ func (g *Grid) AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight
 func (g *Grid) RemoveItem(p Primitive) *Grid {
 	for index := len(g.items) - 1; index >= 0; index-- {
 		if g.items[index].Item == p {
-			g.items = append(g.items[:index], g.items[index+1:]...)
+			g.items = slices.Delete(g.items, index, index+1)
 		}
 	}
 	return g
@@ -290,14 +291,8 @@ ItemLoop:
 			}
 
 			// What's their minimum size?
-			itemMin := item.MinGridWidth
-			if item.MinGridHeight > itemMin {
-				itemMin = item.MinGridHeight
-			}
-			existingMin := existing.MinGridWidth
-			if existing.MinGridHeight > existingMin {
-				existingMin = existing.MinGridHeight
-			}
+			itemMin := max(item.MinGridHeight, item.MinGridWidth)
+			existingMin := max(existing.MinGridHeight, existing.MinGridWidth)
 
 			// Which one is more important?
 			if itemMin < existingMin {
@@ -380,7 +375,7 @@ ItemLoop:
 	}
 
 	// Distribute proportional rows/columns.
-	for index := 0; index < rows; index++ {
+	for index := range rows {
 		row := 0
 		if index < len(g.rows) {
 			row = g.rows[index]
@@ -400,7 +395,7 @@ ItemLoop:
 		}
 		rowHeight[index] = rowAbs
 	}
-	for index := 0; index < columns; index++ {
+	for index := range columns {
 		column := 0
 		if index < len(g.columns) {
 			column = g.columns[index]
@@ -450,10 +445,10 @@ ItemLoop:
 		px := columnPos[item.Column]
 		py := rowPos[item.Row]
 		var pw, ph int
-		for index := 0; index < item.Height; index++ {
+		for index := range item.Height {
 			ph += rowHeight[item.Row+index]
 		}
-		for index := 0; index < item.Width; index++ {
+		for index := range item.Width {
 			pw += columnWidth[item.Column+index]
 		}
 		if g.borders {

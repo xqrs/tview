@@ -2,6 +2,7 @@ package tview
 
 import (
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // page represents one page of a Pages object.
@@ -77,7 +78,7 @@ func (p *Pages) AddPage(name string, item Primitive, resize, visible bool) *Page
 	hasFocus := p.HasFocus()
 	for index, pg := range p.pages {
 		if pg.Name == name {
-			p.pages = append(p.pages[:index], p.pages[index+1:]...)
+			p.pages = slices.Delete(p.pages, index, index+1)
 			break
 		}
 	}
@@ -107,7 +108,7 @@ func (p *Pages) RemovePage(name string) *Pages {
 	for index, page := range p.pages {
 		if page.Name == name {
 			isVisible = page.Visible
-			p.pages = append(p.pages[:index], p.pages[index+1:]...)
+			p.pages = slices.Delete(p.pages, index, index+1)
 			if page.Visible && p.changed != nil {
 				p.changed()
 			}
@@ -202,7 +203,7 @@ func (p *Pages) SendToFront(name string) *Pages {
 	for index, page := range p.pages {
 		if page.Name == name {
 			if index < len(p.pages)-1 {
-				p.pages = append(append(p.pages[:index], p.pages[index+1:]...), page)
+				p.pages = append(slices.Delete(p.pages, index, index+1), page)
 			}
 			if page.Visible && p.changed != nil {
 				p.changed()

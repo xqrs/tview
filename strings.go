@@ -425,7 +425,7 @@ func parseTag(str string, state *stepState) (length int, style tcell.Style, regi
 			if ch == ']' || ch == ':' {
 				flags := tempStr.String()
 				_, _, a := tStyle.Decompose()
-				for index := 0; index < len(flags); index++ {
+				for index := range len(flags) {
 					ch := flags[index]
 					if ch >= 'a' && ch <= 'z' {
 						a |= attrs[ch-('a'-'A')]

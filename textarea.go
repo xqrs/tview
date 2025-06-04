@@ -1175,10 +1175,7 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 	// Draw label.
 	_, labelBg, _ := t.labelStyle.Decompose()
 	if t.labelWidth > 0 {
-		labelWidth := t.labelWidth
-		if labelWidth > width {
-			labelWidth = width
-		}
+		labelWidth := min(t.labelWidth, width)
 		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth
@@ -1205,8 +1202,8 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 		bg = t.backgroundColor
 	}
 	if bg != t.backgroundColor {
-		for row := 0; row < height; row++ {
-			for column := 0; column < width; column++ {
+		for row := range height {
+			for column := range width {
 				screen.SetContent(x+column, y+row, ' ', nil, t.textStyle)
 			}
 		}
@@ -1485,28 +1482,19 @@ func (t *TextArea) findCursor(clamp bool, startRow int) {
 			if t.rowOffset >= len(t.lineStarts) {
 				t.extendLines(t.lastWidth, t.rowOffset)
 				if t.rowOffset >= len(t.lineStarts) {
-					t.rowOffset = len(t.lineStarts) - 1
-					if t.rowOffset < 0 {
-						t.rowOffset = 0
-					}
+					t.rowOffset = max(len(t.lineStarts)-1, 0)
 				}
 			}
 		}
 		if !t.wrap {
 			if t.cursor.actualColumn < t.columnOffset+t.minCursorPrefix {
 				// We're left of the viewport.
-				t.columnOffset = t.cursor.actualColumn - t.minCursorPrefix
-				if t.columnOffset < 0 {
-					t.columnOffset = 0
-				}
+				t.columnOffset = max(t.cursor.actualColumn-t.minCursorPrefix, 0)
 			} else if t.cursor.actualColumn >= t.columnOffset+t.lastWidth-t.minCursorSuffix {
 				// We're right of the viewport.
 				t.columnOffset = t.cursor.actualColumn - t.lastWidth + t.minCursorSuffix
 				if t.columnOffset >= t.widestLine {
-					t.columnOffset = t.widestLine - 1
-					if t.columnOffset < 0 {
-						t.columnOffset = 0
-					}
+					t.columnOffset = max(t.widestLine-1, 0)
 				}
 			}
 		}
@@ -1515,10 +1503,7 @@ func (t *TextArea) findCursor(clamp bool, startRow int) {
 
 	// The screen position of the cursor is unknown. Find it. This can be
 	// expensive. First, find the row.
-	row := startRow
-	if row < 0 {
-		row = 0
-	}
+	row := max(startRow, 0)
 RowLoop:
 	for {
 		// Examine the current row.
@@ -2040,10 +2025,7 @@ func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 				// Just scroll.
 				t.columnOffset++
 				if t.columnOffset >= t.widestLine {
-					t.columnOffset = t.widestLine - 1
-					if t.columnOffset < 0 {
-						t.columnOffset = 0
-					}
+					t.columnOffset = max(t.widestLine-1, 0)
 				}
 			}
 		case tcell.KeyDown: // Move one row down.
@@ -2061,10 +2043,7 @@ func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 				if t.rowOffset >= len(t.lineStarts) {
 					t.extendLines(t.lastWidth, t.rowOffset)
 					if t.rowOffset >= len(t.lineStarts) {
-						t.rowOffset = len(t.lineStarts) - 1
-						if t.rowOffset < 0 {
-							t.rowOffset = 0
-						}
+						t.rowOffset = max(len(t.lineStarts)-1, 0)
 					}
 				}
 			}
@@ -2408,10 +2387,7 @@ func (t *TextArea) MouseHandler() func(action MouseAction, event *tcell.EventMou
 		case MouseScrollDown:
 			t.rowOffset++
 			if t.rowOffset >= len(t.lineStarts) {
-				t.rowOffset = len(t.lineStarts) - 1
-				if t.rowOffset < 0 {
-					t.rowOffset = 0
-				}
+				t.rowOffset = max(len(t.lineStarts)-1, 0)
 			}
 			consumed = true
 		case MouseScrollLeft:
@@ -2422,10 +2398,7 @@ func (t *TextArea) MouseHandler() func(action MouseAction, event *tcell.EventMou
 		case MouseScrollRight:
 			t.columnOffset++
 			if t.columnOffset >= t.widestLine {
-				t.columnOffset = t.widestLine - 1
-				if t.columnOffset < 0 {
-					t.columnOffset = 0
-				}
+				t.columnOffset = max(t.widestLine-1, 0)
 			}
 			consumed = true
 		}
