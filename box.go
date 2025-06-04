@@ -338,9 +338,8 @@ func (b *Box) SetTitleStyle(style tcell.Style) *Box {
 	return b
 }
 
-// SetTitleAlign sets the alignment of the title, one of AlignLeft, AlignCenter,
-// or AlignRight.
-func (b *Box) SetTitleAlign(alignment Alignment) *Box {
+// SetTitleAlignment sets the alignment of the title.
+func (b *Box) SetTitleAlignment(alignment Alignment) *Box {
 	b.titleAlignment = alignment
 	return b
 }
