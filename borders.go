@@ -10,6 +10,10 @@ type BorderSet struct {
 	TopRight    rune
 	BottomLeft  rune
 	BottomRight rune
+	TopT        rune
+	BottomT     rune
+	LeftT       rune
+	RightT      rune
 }
 
 func BorderSetPlain() BorderSet {
@@ -22,6 +26,10 @@ func BorderSetPlain() BorderSet {
 		TopRight:    BoxDrawingsLightDownAndLeft,
 		BottomLeft:  BoxDrawingsLightUpAndRight,
 		BottomRight: BoxDrawingsLightUpAndLeft,
+		TopT:        BoxDrawingsLightDownAndHorizontal,
+		BottomT:     BoxDrawingsLightUpAndHorizontal,
+		LeftT:       BoxDrawingsLightVerticalAndRight,
+		RightT:      BoxDrawingsLightVerticalAndLeft,
 	}
 }
 
@@ -35,6 +43,10 @@ func BorderSetRound() BorderSet {
 		TopRight:    BoxDrawingsLightArcDownAndLeft,
 		BottomLeft:  BoxDrawingsLightArcUpAndRight,
 		BottomRight: BoxDrawingsLightArcUpAndLeft,
+		TopT:        BoxDrawingsLightDownAndHorizontal,
+		BottomT:     BoxDrawingsLightUpAndHorizontal,
+		LeftT:       BoxDrawingsLightVerticalAndRight,
+		RightT:      BoxDrawingsLightVerticalAndLeft,
 	}
 }
 
@@ -48,6 +60,10 @@ func BorderSetThick() BorderSet {
 		TopRight:    BoxDrawingsHeavyDownAndLeft,
 		BottomLeft:  BoxDrawingsHeavyUpAndRight,
 		BottomRight: BoxDrawingsHeavyUpAndLeft,
+		TopT:        BoxDrawingsHeavyDownAndHorizontal,
+		BottomT:     BoxDrawingsHeavyUpAndHorizontal,
+		LeftT:       BoxDrawingsHeavyVerticalAndRight,
+		RightT:      BoxDrawingsHeavyVerticalAndLeft,
 	}
 }
 
@@ -61,6 +77,10 @@ func BorderSetDouble() BorderSet {
 		TopRight:    BoxDrawingsDoubleDownAndLeft,
 		BottomLeft:  BoxDrawingsDoubleUpAndRight,
 		BottomRight: BoxDrawingsDoubleUpAndLeft,
+		TopT:        BoxDrawingsDoubleDownAndHorizontal,
+		BottomT:     BoxDrawingsDoubleUpAndHorizontal,
+		LeftT:       BoxDrawingsDoubleVerticalAndRight,
+		RightT:      BoxDrawingsDoubleVerticalAndLeft,
 	}
 }
 
