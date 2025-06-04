@@ -304,15 +304,21 @@ func (b *Box) SetBackgroundColor(color tcell.Color) *Box {
 	return b
 }
 
-// SetBorder sets which borders to draw.
+// SetBorders sets which borders to draw.
 func (b *Box) SetBorders(flag Borders) *Box {
 	b.borders = flag
 	return b
 }
 
+// SetBorderSet sets the box' borderset
 func (b *Box) SetBorderSet(borderSet BorderSet) *Box {
 	b.borderSet = borderSet
 	return b
+}
+
+// GetBorderSet returns the box' borderSet
+func (b *Box) GetBorderSet() BorderSet {
+	return b.borderSet
 }
 
 // SetBorderStyle sets the box's border style.
