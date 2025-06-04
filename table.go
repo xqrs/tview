@@ -12,14 +12,13 @@ import (
 // which is black.
 type TableCell struct {
 	// The reference object.
-	Reference interface{}
+	Reference any
 
 	// The text to be displayed in the table cell.
 	Text string
 
-	// The alignment of the cell text. One of AlignLeft (default), AlignCenter,
-	// or AlignRight.
-	Align int
+	// The alignment of the cell text.
+	Alignment Alignment
 
 	// The maximum width of the cell in screen space. This is used to give a
 	// column a maximum width. Any cell text whose screen width exceeds this width
@@ -74,7 +73,7 @@ type TableCell struct {
 func NewTableCell(text string) *TableCell {
 	return &TableCell{
 		Text:        text,
-		Align:       AlignLeft,
+		Alignment:   AlignmentLeft,
 		Style:       tcell.StyleDefault.Foreground(Styles.PrimaryTextColor).Background(Styles.PrimitiveBackgroundColor),
 		Transparent: true,
 	}
@@ -86,10 +85,9 @@ func (c *TableCell) SetText(text string) *TableCell {
 	return c
 }
 
-// SetAlign sets the cell's text alignment, one of AlignLeft, AlignCenter, or
-// AlignRight.
-func (c *TableCell) SetAlign(align int) *TableCell {
-	c.Align = align
+// SetAlignment sets the cell's text alignment.
+func (c *TableCell) SetAlignment(alignment Alignment) *TableCell {
+	c.Alignment = alignment
 	return c
 }
 
@@ -190,13 +188,13 @@ func (c *TableCell) SetSelectable(selectable bool) *TableCell {
 // SetReference allows you to store a reference of any type in this cell. This
 // will allow you to establish a mapping between the cell and your
 // actual data.
-func (c *TableCell) SetReference(reference interface{}) *TableCell {
+func (c *TableCell) SetReference(reference any) *TableCell {
 	c.Reference = reference
 	return c
 }
 
 // GetReference returns this cell's reference object.
-func (c *TableCell) GetReference() interface{} {
+func (c *TableCell) GetReference() any {
 	return c.Reference
 }
 
@@ -1195,11 +1193,11 @@ func (t *Table) Draw(screen tcell.Screen) {
 			if style == tcell.StyleDefault {
 				style = tcell.StyleDefault.Background(cell.BackgroundColor).Foreground(cell.Color).Attributes(cell.Attributes)
 			}
-			start, end, _ := printWithStyle(screen, cell.Text, x+columnX, y+rowY, 0, finalWidth, cell.Align, style, true)
+			start, end, _ := printWithStyle(screen, cell.Text, x+columnX, y+rowY, 0, finalWidth, cell.Alignment, style, true)
 			printed := end - start
 			if TaggedStringWidth(cell.Text)-printed > 0 && printed > 0 {
 				_, _, style, _ := screen.GetContent(x+columnX+finalWidth-1, y+rowY)
-				printWithStyle(screen, string(SemigraphicsHorizontalEllipsis), x+columnX+finalWidth-1, y+rowY, 0, 1, AlignLeft, style, false)
+				printWithStyle(screen, string(SemigraphicsHorizontalEllipsis), x+columnX+finalWidth-1, y+rowY, 0, 1, AlignmentLeft, style, false)
 			}
 		}
 

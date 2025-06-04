@@ -39,7 +39,7 @@ type Box struct {
 	// The title style.
 	titleStyle tcell.Style
 	// The alignment of the title.
-	titleAlign int
+	titleAlignment Alignment
 
 	// Whether or not this box has focus. This is typically ignored for
 	// container primitives (e.g. Flex, Grid, Pages), as they will delegate
@@ -73,8 +73,8 @@ func NewBox() *Box {
 		backgroundColor: Styles.PrimitiveBackgroundColor,
 		borderStyle:     tcell.StyleDefault.Foreground(Styles.BorderColor).Background(Styles.PrimitiveBackgroundColor),
 
-		titleStyle: tcell.StyleDefault.Foreground(Styles.TitleColor),
-		titleAlign: AlignCenter,
+		titleStyle:     tcell.StyleDefault.Foreground(Styles.TitleColor),
+		titleAlignment: AlignmentCenter,
 	}
 	return b
 }
@@ -340,8 +340,8 @@ func (b *Box) SetTitleStyle(style tcell.Style) *Box {
 
 // SetTitleAlign sets the alignment of the title, one of AlignLeft, AlignCenter,
 // or AlignRight.
-func (b *Box) SetTitleAlign(align int) *Box {
-	b.titleAlign = align
+func (b *Box) SetTitleAlign(alignment Alignment) *Box {
+	b.titleAlignment = alignment
 	return b
 }
 
@@ -434,16 +434,16 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 
 	// Draw title.
 	if b.title != "" && b.width >= 4 {
-		start, end, _ := printWithStyle(screen, b.title, b.x+1, b.y, 0, b.width-2, b.titleAlign, b.titleStyle, true)
+		start, end, _ := printWithStyle(screen, b.title, b.x+1, b.y, 0, b.width-2, b.titleAlignment, b.titleStyle, true)
 		printed := end - start
 		if len(b.title)-printed > 0 && printed > 0 {
 			xEllipsis := b.x + b.width - 2
-			if b.titleAlign == AlignRight {
+			if b.titleAlignment == AlignmentRight {
 				xEllipsis = b.x + 1
 			}
 			_, _, style, _ := screen.GetContent(xEllipsis, b.y)
 			fg, _, _ := style.Decompose()
-			Print(screen, string(SemigraphicsHorizontalEllipsis), xEllipsis, b.y, 1, AlignLeft, fg)
+			Print(screen, string(SemigraphicsHorizontalEllipsis), xEllipsis, b.y, 1, AlignmentLeft, fg)
 		}
 	}
 

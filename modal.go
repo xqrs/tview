@@ -36,7 +36,7 @@ func NewModal() *Modal {
 		textColor: Styles.PrimaryTextColor,
 	}
 	m.form = NewForm().
-		SetButtonsAlign(AlignCenter).
+		SetButtonsAlignment(AlignmentCenter).
 		SetButtonBackgroundColor(Styles.PrimitiveBackgroundColor).
 		SetButtonTextColor(Styles.PrimaryTextColor)
 	m.form.SetBackgroundColor(Styles.ContrastBackgroundColor).SetBorderPadding(0, 0, 0, 0)
@@ -171,7 +171,7 @@ func (m *Modal) Draw(screen tcell.Screen) {
 	m.frame.Clear()
 	lines := WordWrap(m.text, width)
 	for _, line := range lines {
-		m.frame.AddText(line, true, AlignCenter, m.textColor)
+		m.frame.AddText(line, true, AlignmentCenter, m.textColor)
 	}
 
 	// Set the modal's position and size.

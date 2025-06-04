@@ -253,11 +253,11 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 		if labelWidth > width {
 			labelWidth = width
 		}
-		printWithStyle(screen, c.label, x, y, 0, labelWidth, AlignLeft, c.labelStyle, labelBg == tcell.ColorDefault)
+		printWithStyle(screen, c.label, x, y, 0, labelWidth, AlignmentLeft, c.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth
 	} else {
-		_, _, drawnWidth := printWithStyle(screen, c.label, x, y, 0, width, AlignLeft, c.labelStyle, labelBg == tcell.ColorDefault)
+		_, _, drawnWidth := printWithStyle(screen, c.label, x, y, 0, width, AlignmentLeft, c.labelStyle, labelBg == tcell.ColorDefault)
 		x += drawnWidth
 		width -= drawnWidth
 	}
@@ -275,7 +275,7 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 	if c.HasFocus() {
 		style = c.focusStyle
 	}
-	printWithStyle(screen, str, x, y, 0, width, AlignLeft, style, c.disabled)
+	printWithStyle(screen, str, x, y, 0, width, AlignmentLeft, style, c.disabled)
 }
 
 // InputHandler returns the handler for this primitive.

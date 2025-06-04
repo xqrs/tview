@@ -147,7 +147,7 @@ func (b *Button) Draw(screen tcell.Screen) {
 	x, y, width, height := b.GetInnerRect()
 	if width > 0 && height > 0 {
 		y = y + height/2
-		printWithStyle(screen, b.text, x, y, 0, width, AlignCenter, style, true)
+		printWithStyle(screen, b.text, x, y, 0, width, AlignmentCenter, style, true)
 	}
 }
 

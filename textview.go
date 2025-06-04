@@ -165,7 +165,7 @@ type TextView struct {
 	labelStyle tcell.Style
 
 	// The text alignment, one of AlignLeft, AlignCenter, or AlignRight.
-	align int
+	alignment Alignment
 
 	// Currently highlighted regions.
 	highlights map[string]struct{}
@@ -248,7 +248,7 @@ func NewTextView() *TextView {
 		highlights: make(map[string]struct{}),
 		lineOffset: -1,
 		scrollable: true,
-		align:      AlignLeft,
+		alignment:  AlignmentLeft,
 		wrap:       true,
 		wordWrap:   true,
 		textStyle:  tcell.StyleDefault.Background(Styles.PrimitiveBackgroundColor).Foreground(Styles.PrimaryTextColor),
@@ -350,8 +350,8 @@ func (t *TextView) SetMaxLines(maxLines int) *TextView {
 
 // SetTextAlign sets the text alignment within the text view. This must be
 // either AlignLeft, AlignCenter, or AlignRight.
-func (t *TextView) SetTextAlign(align int) *TextView {
-	t.align = align
+func (t *TextView) SetTextAlign(alignment Alignment) *TextView {
+	t.alignment = alignment
 	return t
 }
 
@@ -924,7 +924,7 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 		c, str, state = step(str, state, options)
 		w := state.Width()
 		if c == "\t" {
-			if t.align == AlignLeft {
+			if t.alignment == AlignmentLeft {
 				w = TabSize - leftPos%TabSize
 			} else {
 				w = TabSize
@@ -1027,11 +1027,11 @@ func (t *TextView) Draw(screen tcell.Screen) {
 		if labelWidth > width {
 			labelWidth = width
 		}
-		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignLeft, t.labelStyle, labelBg == tcell.ColorDefault)
+		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth
 	} else {
-		_, _, drawnWidth := printWithStyle(screen, t.label, x, y, 0, width, AlignLeft, t.labelStyle, labelBg == tcell.ColorDefault)
+		_, _, drawnWidth := printWithStyle(screen, t.label, x, y, 0, width, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += drawnWidth
 		width -= drawnWidth
 	}
@@ -1157,7 +1157,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	}
 
 	// Adjust column offset.
-	if t.align == AlignLeft || t.align == AlignRight {
+	if t.alignment == AlignmentLeft || t.alignment == AlignmentRight {
 		if t.columnOffset+width > t.longestLine {
 			t.columnOffset = t.longestLine - width
 		}
@@ -1190,16 +1190,16 @@ func (t *TextView) Draw(screen tcell.Screen) {
 
 		// Determine starting point of the text and the screen.
 		var skipWidth, xPos int
-		switch t.align {
-		case AlignLeft:
+		switch t.alignment {
+		case AlignmentLeft:
 			skipWidth = t.columnOffset
-		case AlignCenter:
+		case AlignmentCenter:
 			skipWidth = t.columnOffset + (info.width-width)/2
 			if skipWidth < 0 {
 				skipWidth = 0
 				xPos = (width-info.width)/2 - t.columnOffset
 			}
-		case AlignRight:
+		case AlignmentRight:
 			maxWidth := width
 			if t.longestLine > width {
 				maxWidth = t.longestLine
@@ -1221,7 +1221,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 			ch, str, state = step(str, state, options)
 			w := state.Width()
 			if ch == "\t" {
-				if t.align == AlignLeft {
+				if t.alignment == AlignmentLeft {
 					w = TabSize - xPos%TabSize
 				} else {
 					w = TabSize

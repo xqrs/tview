@@ -553,7 +553,7 @@ func (l *List) Draw(screen tcell.Screen) {
 
 		// Shortcuts.
 		if showShortcuts && item.Shortcut != 0 {
-			printWithStyle(screen, fmt.Sprintf("(%s)", string(item.Shortcut)), x-5, y, 0, 4, AlignRight, l.shortcutStyle, false)
+			printWithStyle(screen, fmt.Sprintf("(%s)", string(item.Shortcut)), x-5, y, 0, 4, AlignmentRight, l.shortcutStyle, false)
 		}
 
 		// Main text.
@@ -566,7 +566,7 @@ func (l *List) Draw(screen tcell.Screen) {
 		if !l.mainStyleTags {
 			mainText = Escape(mainText)
 		}
-		_, _, printedWidth := printWithStyle(screen, mainText, x, y, l.horizontalOffset, width, AlignLeft, style, false)
+		_, _, printedWidth := printWithStyle(screen, mainText, x, y, l.horizontalOffset, width, AlignmentLeft, style, false)
 		if printedWidth > maxWidth {
 			maxWidth = printedWidth
 		}
@@ -589,7 +589,7 @@ func (l *List) Draw(screen tcell.Screen) {
 			if !l.secondaryStyleTags {
 				secondaryText = Escape(secondaryText)
 			}
-			_, _, printedWidth := printWithStyle(screen, secondaryText, x, y, l.horizontalOffset, width, AlignLeft, l.secondaryTextStyle, false)
+			_, _, printedWidth := printWithStyle(screen, secondaryText, x, y, l.horizontalOffset, width, AlignmentLeft, l.secondaryTextStyle, false)
 			if printedWidth > maxWidth {
 				maxWidth = printedWidth
 			}

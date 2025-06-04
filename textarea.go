@@ -1179,11 +1179,11 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 		if labelWidth > width {
 			labelWidth = width
 		}
-		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignLeft, t.labelStyle, labelBg == tcell.ColorDefault)
+		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth
 	} else {
-		_, _, drawnWidth := printWithStyle(screen, t.label, x, y, 0, width, AlignLeft, t.labelStyle, labelBg == tcell.ColorDefault)
+		_, _, drawnWidth := printWithStyle(screen, t.label, x, y, 0, width, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += drawnWidth
 		width -= drawnWidth
 	}

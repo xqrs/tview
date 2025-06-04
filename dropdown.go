@@ -397,10 +397,10 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 		if labelWidth > rightLimit-x {
 			labelWidth = rightLimit - x
 		}
-		printWithStyle(screen, d.label, x, y, 0, labelWidth, AlignLeft, d.labelStyle, true)
+		printWithStyle(screen, d.label, x, y, 0, labelWidth, AlignmentLeft, d.labelStyle, true)
 		x += labelWidth
 	} else {
-		_, _, drawnWidth := printWithStyle(screen, d.label, x, y, 0, rightLimit-x, AlignLeft, d.labelStyle, true)
+		_, _, drawnWidth := printWithStyle(screen, d.label, x, y, 0, rightLimit-x, AlignmentLeft, d.labelStyle, true)
 		x += drawnWidth
 	}
 
@@ -465,10 +465,10 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 			currentOptionPrefix = Escape(currentOptionPrefix)
 			currentOptionSuffix = Escape(currentOptionSuffix)
 		}
-		_, _, copWidth := printWithStyle(screen, currentOptionPrefix, x, y, 0, fieldWidth, AlignLeft, d.fieldStyle, false)
+		_, _, copWidth := printWithStyle(screen, currentOptionPrefix, x, y, 0, fieldWidth, AlignmentLeft, d.fieldStyle, false)
 		if copWidth < fieldWidth {
 			// Then draw the prefix.
-			_, _, prefixWidth := printWithStyle(screen, prefix, x+copWidth, y, 0, fieldWidth-copWidth, AlignLeft, d.prefixStyle, false)
+			_, _, prefixWidth := printWithStyle(screen, prefix, x+copWidth, y, 0, fieldWidth-copWidth, AlignmentLeft, d.prefixStyle, false)
 			if copWidth+prefixWidth < fieldWidth {
 				// Then the current option remainder.
 				var corWidth int
@@ -478,11 +478,11 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 					if !useStyleTags {
 						text = Escape(text)
 					}
-					_, _, corWidth = printWithStyle(screen, text, x+copWidth+prefixWidth, y, prefixWidth, fieldWidth-copWidth-prefixWidth, AlignLeft, d.fieldStyle, false)
+					_, _, corWidth = printWithStyle(screen, text, x+copWidth+prefixWidth, y, prefixWidth, fieldWidth-copWidth-prefixWidth, AlignmentLeft, d.fieldStyle, false)
 				}
 				if copWidth+prefixWidth+corWidth < fieldWidth {
 					// And finally the current option suffix.
-					printWithStyle(screen, currentOptionSuffix, x+copWidth+prefixWidth+corWidth, y, 0, fieldWidth-copWidth-prefixWidth-corWidth, AlignLeft, d.fieldStyle, false)
+					printWithStyle(screen, currentOptionSuffix, x+copWidth+prefixWidth+corWidth, y, 0, fieldWidth-copWidth-prefixWidth-corWidth, AlignmentLeft, d.fieldStyle, false)
 				}
 			}
 		}
@@ -495,7 +495,7 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 		if !useStyleTags {
 			text = Escape(text)
 		}
-		printWithStyle(screen, text, x, y, 0, fieldWidth, AlignLeft, fieldStyle, false)
+		printWithStyle(screen, text, x, y, 0, fieldWidth, AlignmentLeft, fieldStyle, false)
 	}
 
 	// Draw options list.

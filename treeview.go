@@ -778,7 +778,7 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 			// Prefix.
 			var prefixWidth int
 			if len(t.prefixes) > 0 {
-				_, _, prefixWidth = printWithStyle(screen, t.prefixes[(node.level-t.topLevel)%len(t.prefixes)], x+node.textX, posY, 0, width-node.textX, AlignLeft, node.textStyle, true)
+				_, _, prefixWidth = printWithStyle(screen, t.prefixes[(node.level-t.topLevel)%len(t.prefixes)], x+node.textX, posY, 0, width-node.textX, AlignmentLeft, node.textStyle, true)
 			}
 
 			// Text.
@@ -787,7 +787,7 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 				if node == t.currentNode {
 					style = node.selectedTextStyle
 				}
-				printWithStyle(screen, node.text, x+node.textX+prefixWidth, posY, 0, width-node.textX-prefixWidth, AlignLeft, style, false)
+				printWithStyle(screen, node.text, x+node.textX+prefixWidth, posY, 0, width-node.textX-prefixWidth, AlignmentLeft, style, false)
 			}
 		}
 
