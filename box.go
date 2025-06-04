@@ -31,16 +31,13 @@ type Box struct {
 
 	// Visible borders
 	borders Borders
-
 	// The border style.
 	borderStyle tcell.Style
 
 	// The title. Only visible if there is a border, too.
 	title string
-
-	// The color of the title.
-	titleColor tcell.Color
-
+	// The title style.
+	titleStyle tcell.Style
 	// The alignment of the title.
 	titleAlign int
 
@@ -75,8 +72,9 @@ func NewBox() *Box {
 		innerX:          -1, // Mark as uninitialized.
 		backgroundColor: Styles.PrimitiveBackgroundColor,
 		borderStyle:     tcell.StyleDefault.Foreground(Styles.BorderColor).Background(Styles.PrimitiveBackgroundColor),
-		titleColor:      Styles.TitleColor,
-		titleAlign:      AlignCenter,
+
+		titleStyle: tcell.StyleDefault.Foreground(Styles.TitleColor),
+		titleAlign: AlignCenter,
 	}
 	return b
 }
@@ -318,36 +316,14 @@ func (b *Box) SetBorderStyle(style tcell.Style) *Box {
 	return b
 }
 
-// SetBorderColor sets the box's border color.
-func (b *Box) SetBorderColor(color tcell.Color) *Box {
-	b.borderStyle = b.borderStyle.Foreground(color)
-	return b
-}
-
-// SetBorderAttributes sets the border's style attributes. You can combine
-// different attributes using bitmask operations:
-//
-//	box.SetBorderAttributes(tcell.AttrUnderline | tcell.AttrBold)
-func (b *Box) SetBorderAttributes(attr tcell.AttrMask) *Box {
-	b.borderStyle = b.borderStyle.Attributes(attr)
-	return b
-}
-
-// GetBorderAttributes returns the border's style attributes.
-func (b *Box) GetBorderAttributes() tcell.AttrMask {
-	_, _, attr := b.borderStyle.Decompose()
-	return attr
-}
-
-// GetBorderColor returns the box's border color.
-func (b *Box) GetBorderColor() tcell.Color {
-	color, _, _ := b.borderStyle.Decompose()
-	return color
-}
-
 // GetBackgroundColor returns the box's background color.
 func (b *Box) GetBackgroundColor() tcell.Color {
 	return b.backgroundColor
+}
+
+// GetTitle returns the box's current title.
+func (b *Box) GetTitle() string {
+	return b.title
 }
 
 // SetTitle sets the box's title.
@@ -356,14 +332,9 @@ func (b *Box) SetTitle(title string) *Box {
 	return b
 }
 
-// GetTitle returns the box's current title.
-func (b *Box) GetTitle() string {
-	return b.title
-}
-
-// SetTitleColor sets the box's title color.
-func (b *Box) SetTitleColor(color tcell.Color) *Box {
-	b.titleColor = color
+// SetTitleStyle sets the style of the title.
+func (b *Box) SetTitleStyle(style tcell.Style) *Box {
+	b.titleStyle = style
 	return b
 }
 
@@ -463,7 +434,8 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 
 	// Draw title.
 	if b.title != "" && b.width >= 4 {
-		printed, _ := Print(screen, b.title, b.x+1, b.y, b.width-2, b.titleAlign, b.titleColor)
+		start, end, _ := printWithStyle(screen, b.title, b.x+1, b.y, 0, b.width-2, b.titleAlign, b.titleStyle, true)
+		printed := end - start
 		if len(b.title)-printed > 0 && printed > 0 {
 			xEllipsis := b.x + b.width - 2
 			if b.titleAlign == AlignRight {
