@@ -646,24 +646,21 @@ func (t *TextArea) GetWordAt(index int, f func(rune) bool) (string, rune) {
 	}
 
 	var word strings.Builder
-	var lastRune rune
+	lastRune := ' '
 	for spanIndex := t.spans[0].next; spanIndex != 1; spanIndex = t.spans[spanIndex].next {
 		span := t.spans[spanIndex]
 		length := span.length
 		var s string
 		if length < 0 {
-			length *= -1
-			s = t.initialText[span.offset : span.offset+length]
+			s = t.initialText[span.offset : span.offset-length]
 		} else {
 			s = t.editText.String()[span.offset : span.offset+length]
 		}
-		lastIndex := 0
-		for i, r := range s {
-			index -= i - lastIndex
+		for _, r := range s {
+			index--
 			if index < 0 {
 				return word.String(), lastRune
 			}
-			lastIndex = i
 			if f(r) {
 				word.WriteRune(r)
 				continue
