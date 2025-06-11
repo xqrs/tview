@@ -5,12 +5,15 @@ import (
 )
 
 // page represents one page of a Pages object.
-type Page struct {
-	index   int       // The page's index in the Pages struct.
+type page struct {
 	item    Primitive // The page's primitive.
 	resize  bool      // Whether or not to resize the page when it is drawn.
 	visible bool      // Whether or not this page is visible.
 }
+
+// API external refernce to the page (index)
+type Page int
+const NullPage = -1
 
 // Pages is a container for other primitives laid out on top of each other,
 // overlapping or not. It is often used as the application's root primitive. It
@@ -21,7 +24,7 @@ type Pages struct {
 	*Box
 
 	// The contained pages. (Visible) pages are drawn from back to front.
-	pages []*Page
+	pages []page
 
 	// We keep a reference to the function which allows us to set the focus to
 	// a newly visible page.
@@ -41,8 +44,8 @@ func NewPages() *Pages {
 }
 
 // GetVisible returns the visiblity of the given page
-func (p *Page) GetVisible() bool {
-	return p.visible
+func (p *Pages) GetVisible(pg Page) bool {
+	return p.pages[pg].visible
 }
 
 // SetChangedFunc sets a handler which is called whenever the visibility or the
@@ -57,9 +60,9 @@ func (p *Pages) GetPageCount() int {
 	return len(p.pages)
 }
 
-// GetPages returns the pages currently stored in this object.
-func (p *Pages) GetPages() []*Page {
-	return p.pages
+// Clear removes all the pages from the object.
+func (p *Pages) Clear() {
+	p.pages = []page{}
 }
 
 // AddPage adds a new page with the given primitive. 
@@ -68,22 +71,22 @@ func (p *Pages) GetPages() []*Page {
 // was changed in one of the other functions). If "resize" is set to true, the
 // primitive will be set to the size available to the Pages primitive whenever
 // the pages are drawn.
-func (p *Pages) AddPage(item Primitive, resize, visible bool) *Page {
+func (p *Pages) AddPage(item Primitive, resize, visible bool) Page {
 	hasFocus := p.HasFocus()
-	pg := &Page{index: len(p.pages), item: item, resize: resize, visible: visible}
-	p.pages = append(p.pages, pg)
+	index := len(p.pages)
+	p.pages = append(p.pages, page{item: item, resize: resize, visible: visible})
 	if p.changed != nil {
 		p.changed()
 	}
 	if hasFocus {
 		p.Focus(p.setFocus)
 	}
-	return pg
+	return Page(index)
 }
 
 // AddAndSwitchToPage calls AddPage(), then SwitchToPage() on that newly added
 // page.
-func (p *Pages) AddAndSwitchToPage(item Primitive, resize bool) *Page {
+func (p *Pages) AddAndSwitchToPage(item Primitive, resize bool) Page {
 	pg := p.AddPage(item, resize, true)
 	p.SwitchToPage(pg)
 	return pg
@@ -91,10 +94,10 @@ func (p *Pages) AddAndSwitchToPage(item Primitive, resize bool) *Page {
 
 // RemovePage removes the given page. If that page was the only
 // visible page, visibility is assigned to the last page.
-func (p *Pages) RemovePage(pg *Page) *Pages {
+func (p *Pages) RemovePage(pg Page) *Pages {
 	hasFocus := p.HasFocus()
-	p.pages = append(p.pages[:pg.index], p.pages[pg.index+1:]...)
-	if pg.visible {
+	p.pages = append(p.pages[:pg], p.pages[pg+1:]...)
+	if p.pages[pg].visible {
 		if p.changed != nil {
 			p.changed()
 		}
@@ -115,19 +118,15 @@ func (p *Pages) RemovePage(pg *Page) *Pages {
 }
 
 // HasPage returns true if a page exists in these pages.
-func (p *Pages) HasPage(pg *Page) bool {
-	for _, page := range p.pages {
-		if page == pg {
-			return true
-		}
-	}
-	return false
+// It is assumed that a Page won't be used outside its parent Pages object.
+func (p *Pages) HasPage(pg Page) bool {
+	return pg >= 0 && int(pg) < len(p.pages)
 }
 
 // ShowPage sets a page's visibility to "true" (in addition to any other pages
 // which are already visible).
-func (p *Pages) ShowPage(pg *Page) *Pages {
-	pg.visible = true
+func (p *Pages) ShowPage(pg Page) *Pages {
+	p.pages[pg].visible = true
 	if p.changed != nil {
 		p.changed()
 	}
@@ -138,8 +137,8 @@ func (p *Pages) ShowPage(pg *Page) *Pages {
 }
 
 // HidePage sets a page's visibility to "false".
-func (p *Pages) HidePage(pg *Page) *Pages {
-	pg.visible = false
+func (p *Pages) HidePage(pg Page) *Pages {
+	p.pages[pg].visible = false
 	if p.changed != nil {
 		p.changed()
 	}
@@ -151,11 +150,11 @@ func (p *Pages) HidePage(pg *Page) *Pages {
 
 // SwitchToPage sets a page's visibility to "true" and all other pages'
 // visibility to "false".
-func (p *Pages) SwitchToPage(pg *Page) *Pages {
+func (p *Pages) SwitchToPage(pg Page) *Pages {
 	for _, page := range p.pages {
 		page.visible = false
 	}
-	pg.visible = true
+	p.pages[pg].visible = true
 	if p.changed != nil {
 		p.changed()
 	}
@@ -168,11 +167,11 @@ func (p *Pages) SwitchToPage(pg *Page) *Pages {
 // SendToFront changes the order of the pages such that the page with the given
 // page comes last, causing it to be drawn last with the next update (if
 // visible).
-func (p *Pages) SendToFront(pg *Page) *Pages {
-	if pg.index < len(p.pages)-1 {
-		p.pages = append(append(p.pages[:pg.index], p.pages[pg.index+1:]...), pg)
+func (p *Pages) SendToFront(pg Page) *Pages {
+	if int(pg) < len(p.pages)-1 {
+		p.pages = append(append(p.pages[:pg], p.pages[pg+1:]...), p.pages[pg])
 	}
-	if pg.visible && p.changed != nil {
+	if p.pages[pg].visible && p.changed != nil {
 		p.changed()
 	}
 	if p.HasFocus() {
@@ -184,11 +183,11 @@ func (p *Pages) SendToFront(pg *Page) *Pages {
 // SendToBack changes the order of the pages such that the page with the given
 // page comes first, causing it to be drawn first with the next update (if
 // visible).
-func (p *Pages) SendToBack(pg *Page) *Pages {
-	if pg.index > 0 {
-		p.pages = append(append([]*Page{pg}, p.pages[:pg.index]...), p.pages[pg.index+1:]...)
+func (p *Pages) SendToBack(pg Page) *Pages {
+	if pg > 0 {
+		p.pages = append(append([]page{p.pages[pg]}, p.pages[:pg]...), p.pages[pg+1:]...)
 	}
-	if pg.visible && p.changed != nil {
+	if p.pages[pg].visible && p.changed != nil {
 		p.changed()
 	}
 	if p.HasFocus() {
@@ -198,14 +197,14 @@ func (p *Pages) SendToBack(pg *Page) *Pages {
 }
 
 // GetFrontPage returns the front-most visible page. If there are no visible
-// pages, nil is returned.
-func (p *Pages) GetFrontPage() *Page {
+// pages, NullPage is returned.
+func (p *Pages) GetFrontPage() Page {
 	for index := len(p.pages) - 1; index >= 0; index-- {
 		if p.pages[index].visible {
-			return p.pages[index]
+			return Page(index)
 		}
 	}
-	return nil
+	return NullPage
 }
 
 // HasFocus returns whether or not this primitive has focus.
