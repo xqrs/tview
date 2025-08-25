@@ -37,34 +37,34 @@ type Region struct {
 	StartRow, StartColumn, EndRow, EndColumn int
 }
 
-// TextViewWriter is a writer that can be used to write to and clear a TextView
-// in batches, i.e. multiple writes with the lock only being acquired once. Don't
-// instantiated this class directly but use the TextView's BatchWriter method
-// instead.
-type TextViewWriter struct {
-	t *TextView
+// batchWriter is a writer that can be used to write to and clear a TextView
+// in batches, i.e. multiple writes with the lock only being acquired once.
+// Don't instantiated this class directly but use the [TextView.BatchWriter]
+// method instead.
+type batchWriter struct {
+	*TextView
 }
 
 // Close implements io.Closer for the writer by unlocking the original TextView.
-func (w TextViewWriter) Close() error {
-	w.t.Unlock()
+func (w *batchWriter) Close() error {
+	w.TextView.Unlock()
 	return nil
 }
 
 // Clear removes all text from the buffer.
-func (w TextViewWriter) Clear() {
-	w.t.clear()
+func (w *batchWriter) Clear() {
+	w.TextView.clear()
 }
 
 // Write implements the io.Writer interface. It behaves like the TextView's
 // Write() method except that it does not acquire the lock.
-func (w TextViewWriter) Write(p []byte) (n int, err error) {
-	return w.t.write(p)
+func (w *batchWriter) Write(p []byte) (n int, err error) {
+	return w.TextView.write(p)
 }
 
-// HasFocus returns whether the underlying TextView has focus.
-func (w TextViewWriter) HasFocus() bool {
-	return w.t.hasFocus
+// focusChain implements the [Primitive]'s focusChain method.
+func (w *batchWriter) focusChain(chain *[]Primitive) bool {
+	return w.TextView.Box.focusChain(chain)
 }
 
 // TextView is a component to display read-only text. While the text to be
@@ -256,9 +256,9 @@ type TextView struct {
 	finished func(tcell.Key)
 }
 
-// NewTextView returns a new text view.
+// NewTextView returns a new [TextView].
 func NewTextView() *TextView {
-	return &TextView{
+	t := &TextView{
 		Box:        NewBox(),
 		labelStyle: tcell.StyleDefault.Foreground(Styles.SecondaryTextColor),
 		highlights: make(map[string]struct{}),
@@ -271,6 +271,8 @@ func NewTextView() *TextView {
 		regionTags: false,
 		styleTags:  false,
 	}
+	t.Box.Primitive = t
+	return t
 }
 
 // SetLabel sets the text to be displayed before the text view.
@@ -616,7 +618,7 @@ func (t *TextView) Clear() *TextView {
 	return t
 }
 
-// clear is the internal implementation of clear. It is used by TextViewWriter
+// clear is the internal implementation of clear. It is used by [batchWriter]
 // and anywhere that we need to perform a write without locking the buffer.
 func (t *TextView) clear() {
 	t.text.Reset()
@@ -871,13 +873,13 @@ func (t *TextView) Focus(delegate func(p Primitive)) {
 	t.Box.Focus(delegate)
 }
 
-// HasFocus returns whether or not this primitive has focus.
-func (t *TextView) HasFocus() bool {
+// focusChain implements the [Primitive]'s focusChain method.
+func (t *TextView) focusChain(chain *[]Primitive) bool {
 	// Implemented here with locking because this may be used in the "changed"
 	// callback.
 	t.Lock()
 	defer t.Unlock()
-	return t.Box.HasFocus()
+	return t.Box.focusChain(chain)
 }
 
 // Write lets us implement the io.Writer interface.
@@ -888,7 +890,7 @@ func (t *TextView) Write(p []byte) (n int, err error) {
 	return t.write(p)
 }
 
-// write is the internal implementation of Write. It is used by [TextViewWriter]
+// write is the internal implementation of Write. It is used by [batchWriter]
 // and anywhere that we need to perform a write without locking the buffer.
 func (t *TextView) write(p []byte) (n int, err error) {
 	// Notify at the end.
@@ -920,10 +922,10 @@ func (t *TextView) write(p []byte) (n int, err error) {
 // Note that using the batch writer requires you to manage any issues that may
 // arise from concurrency yourself. See package description for details on
 // dealing with concurrency.
-func (t *TextView) BatchWriter() TextViewWriter {
+func (t *TextView) BatchWriter() *batchWriter {
 	t.Lock()
-	return TextViewWriter{
-		t: t,
+	return &batchWriter{
+		TextView: t,
 	}
 }
 

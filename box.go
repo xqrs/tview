@@ -14,6 +14,9 @@ import (
 //
 // See https://github.com/ayn2op/tview/wiki/Box for an example.
 type Box struct {
+	// Points to the implementing primitive at the bottom of the hierarchy.
+	Primitive
+
 	// The position of the rect.
 	x, y, width, height int
 
@@ -40,9 +43,11 @@ type Box struct {
 	titleStyle     tcell.Style
 	titleAlignment Alignment
 
-	// Whether or not this box has focus. This is typically ignored for
-	// container primitives (e.g. Flex, Grid, Pages), as they will delegate
-	// focus to their children.
+	// Whether or not this box has focus. At any time, this must be true only
+	// for one primitive in the entire application. Such a primitive is usually
+	// a visible and enabled widget but may also be a container primitive (if
+	// no contained primitive has focus) or a primitive inaccessible to the user
+	// (e.g. a child primitive of a widget to which interaction is delegated).
 	hasFocus bool
 
 	// Optional callback functions invoked when the primitive receives or loses
@@ -63,7 +68,7 @@ type Box struct {
 	mouseCapture func(action MouseAction, event *tcell.EventMouse) (MouseAction, *tcell.EventMouse)
 }
 
-// NewBox returns a Box without a border.
+// NewBox returns a [Box] without a border.
 func NewBox() *Box {
 	b := &Box{
 		width:           15,
@@ -77,6 +82,7 @@ func NewBox() *Box {
 		titleStyle:     tcell.StyleDefault.Foreground(Styles.TitleColor),
 		titleAlignment: AlignmentCenter,
 	}
+	b.Primitive = b
 	return b
 }
 
@@ -460,11 +466,11 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 // receives focus. Container primitives such as [Flex] or [Grid] will also be
 // notified if one of their descendents receive focus directly. Note that this
 // may result in a blur notification, immediately followed by a focus
-// notification, when the focus is set to a different descendent of the
-// container primitive.
+// notification, when the focus is set to a different child primitive of the
+// same container primitive.
 //
 // At this point, the order in which the focus callbacks are invoked during one
-// draw cycle, is not defined. However, the blur callbacks are always invoked
+// draw cycle is not defined. However, the blur callbacks are always invoked
 // before the focus callbacks.
 //
 // Set to nil to remove the callback function.
@@ -477,10 +483,10 @@ func (b *Box) SetFocusFunc(callback func()) *Box {
 // loses focus. Container primitives such as [Flex] or [Grid] will also be
 // notified if one of their descendents lose focus. Note that this may result in
 // a blur notification, immediately followed by a focus notification, when the
-// focus is set to a different different descendent of the container primitive.
+// focus is set to a different child primitive of the same container primitive.
 //
 // At this point, the order in which the blur callbacks are invoked during one
-// draw cycle, is not defined. However, the blur callbacks are always invoked
+// draw cycle is not defined. However, the blur callbacks are always invoked
 // before the focus callbacks.
 //
 // Set to nil to remove the callback function.
@@ -492,6 +498,11 @@ func (b *Box) SetBlurFunc(callback func()) *Box {
 // Focus is called when this primitive directly receives focus.
 func (b *Box) Focus(delegate func(p Primitive)) {
 	b.hasFocus = true
+}
+
+// focused is called when this primitive or one of its descendents receives
+// focus.
+func (b *Box) focused() {
 	if b.focus != nil {
 		b.focus()
 	}
@@ -499,13 +510,28 @@ func (b *Box) Focus(delegate func(p Primitive)) {
 
 // Blur is called when this primitive directly loses focus.
 func (b *Box) Blur() {
+	b.hasFocus = false
+}
+
+// blurred is called when this primitive or one of its descendents loses focus.
+func (b *Box) blurred() {
 	if b.blur != nil {
 		b.blur()
 	}
-	b.hasFocus = false
 }
 
 // HasFocus returns whether or not this primitive has focus.
 func (b *Box) HasFocus() bool {
-	return b.hasFocus
+	return b.Primitive.focusChain(nil)
+}
+
+// focusChain implements the [Primitive]'s focusChain method.
+func (b *Box) focusChain(chain *[]Primitive) bool {
+	if !b.hasFocus {
+		return false
+	}
+	if chain != nil {
+		*chain = append(*chain, b)
+	}
+	return true
 }

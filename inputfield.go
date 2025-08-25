@@ -92,7 +92,7 @@ type InputField struct {
 	finished func(tcell.Key)
 }
 
-// NewInputField returns a new input field.
+// NewInputField returns a new [InputField].
 func NewInputField() *InputField {
 	i := &InputField{
 		Box:      NewBox(),
@@ -114,6 +114,7 @@ func NewInputField() *InputField {
 	i.autocompleteStyles.selected = tcell.StyleDefault.Background(Styles.PrimaryTextColor).Foreground(Styles.PrimitiveBackgroundColor)
 	i.autocompleteStyles.background = Styles.MoreContrastBackgroundColor
 	i.autocompleteStyles.useTags = true
+	i.Box.Primitive = i
 	return i
 }
 
@@ -411,17 +412,22 @@ func (i *InputField) Focus(delegate func(p Primitive)) {
 		return
 	}
 
-	i.Box.Focus(delegate)
+	delegate(i.textArea)
 }
 
-// HasFocus returns whether or not this primitive has focus.
-func (i *InputField) HasFocus() bool {
-	return i.textArea.HasFocus() || i.Box.HasFocus()
+// focusChain implements the [Primitive]'s focusChain method.
+func (i *InputField) focusChain(chain *[]Primitive) bool {
+	if hasFocus := i.textArea.focusChain(chain); hasFocus {
+		if chain != nil {
+			*chain = append(*chain, i)
+		}
+		return true
+	}
+	return i.Box.focusChain(chain)
 }
 
 // Blur is called when this primitive loses focus.
 func (i *InputField) Blur() {
-	i.textArea.Blur()
 	i.Box.Blur()
 	i.autocompleteList = nil // Hide the autocomplete drop-down.
 }

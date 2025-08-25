@@ -111,7 +111,7 @@ type Form struct {
 	cancel func()
 }
 
-// NewForm returns a new form.
+// NewForm returns a new [Form].
 func NewForm() *Form {
 	box := NewBox().SetBorderPadding(1, 1, 1, 1)
 
@@ -128,6 +128,7 @@ func NewForm() *Form {
 		lastFinishedKey:      tcell.KeyTab, // To skip over inactive elements at the beginning of the form.
 	}
 
+	f.Box.Primitive = f
 	return f
 }
 
@@ -774,6 +775,27 @@ func (f *Form) focusIndex() int {
 		}
 	}
 	return -1
+}
+
+// focusChain implements the [Primitive]'s focusChain method.
+func (f *Form) focusChain(chain *[]Primitive) bool {
+	for _, item := range f.items {
+		if hasFocus := item.focusChain(chain); hasFocus {
+			if chain != nil {
+				*chain = append(*chain, f)
+			}
+			return true
+		}
+	}
+	for _, button := range f.buttons {
+		if hasFocus := button.focusChain(chain); hasFocus {
+			if chain != nil {
+				*chain = append(*chain, f)
+			}
+			return true
+		}
+	}
+	return f.Box.focusChain(chain)
 }
 
 // HasFocus returns whether or not this primitive has focus.
