@@ -102,11 +102,6 @@ func NewInputField() *InputField {
 		if i.changed != nil {
 			i.changed(i.textArea.GetText())
 		}
-	}).SetFocusFunc(func() {
-		// Forward focus event to the input field.
-		if i.focus != nil {
-			i.focus()
-		}
 	})
 	i.textArea.textStyle = tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.PrimaryTextColor)
 	i.textArea.placeholderStyle = tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.ContrastSecondaryTextColor)
@@ -631,6 +626,12 @@ func (i *InputField) MouseHandler() func(action MouseAction, event *tcell.EventM
 
 		// Forward mouse event to the text area.
 		consumed, capture = i.textArea.MouseHandler()(action, event, setFocus)
+
+		// Focus in any case.
+		if action == MouseLeftDown && !consumed {
+			setFocus(i)
+			consumed = true
+		}
 
 		return
 	})

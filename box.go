@@ -531,7 +531,7 @@ func (b *Box) focusChain(chain *[]Primitive) bool {
 		return false
 	}
 	if chain != nil {
-		*chain = append(*chain, b)
+		*chain = append(*chain, b.Primitive)
 	}
 	return true
 }
