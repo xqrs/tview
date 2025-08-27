@@ -539,14 +539,11 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 		var skipAutocomplete bool
 		currentText := i.textArea.GetText()
 		defer func() {
-			newText := i.textArea.GetText()
-			if newText != currentText {
-				if !skipAutocomplete {
-					i.Autocomplete()
-				}
-				if i.changed != nil {
-					i.changed(newText)
-				}
+			if skipAutocomplete {
+				return
+			}
+			if i.textArea.GetText() != currentText {
+				i.Autocomplete()
 			}
 		}()
 
@@ -646,14 +643,11 @@ func (i *InputField) MouseHandler() func(action MouseAction, event *tcell.EventM
 		var skipAutocomplete bool
 		currentText := i.GetText()
 		defer func() {
-			newText := i.GetText()
-			if newText != currentText {
-				if !skipAutocomplete {
-					i.Autocomplete()
-				}
-				if i.changed != nil {
-					i.changed(newText)
-				}
+			if skipAutocomplete {
+				return
+			}
+			if i.textArea.GetText() != currentText {
+				i.Autocomplete()
 			}
 		}()
 
