@@ -106,8 +106,8 @@ func (b *Button) SetDisabled(disabled bool) *Button {
 	return b
 }
 
-// IsDisabled returns whether or not the button is disabled.
-func (b *Button) IsDisabled() bool {
+// GetDisabled returns whether or not the button is disabled.
+func (b *Button) GetDisabled() bool {
 	return b.disabled
 }
 

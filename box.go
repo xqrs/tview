@@ -495,8 +495,15 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 }
 
 // SetFocusFunc sets a callback function which is invoked when this primitive
-// receives focus. Container primitives such as [Flex] or [Grid] may not be
-// notified if one of their descendents receive focus directly.
+// receives focus. Container primitives such as [Flex] or [Grid] will also be
+// notified if one of their descendents receive focus directly. Note that this
+// may result in a blur notification, immediately followed by a focus
+// notification, when the focus is set to a different descendent of the
+// container primitive.
+//
+// At this point, the order in which the focus callbacks are invoked during one
+// draw cycle, is not defined. However, the blur callbacks are always invoked
+// before the focus callbacks.
 //
 // Set to nil to remove the callback function.
 func (b *Box) SetFocusFunc(callback func()) *Box {
@@ -505,8 +512,14 @@ func (b *Box) SetFocusFunc(callback func()) *Box {
 }
 
 // SetBlurFunc sets a callback function which is invoked when this primitive
-// loses focus. This does not apply to container primitives such as [Flex] or
-// [Grid].
+// loses focus. Container primitives such as [Flex] or [Grid] will also be
+// notified if one of their descendents lose focus. Note that this may result in
+// a blur notification, immediately followed by a focus notification, when the
+// focus is set to a different different descendent of the container primitive.
+//
+// At this point, the order in which the blur callbacks are invoked during one
+// draw cycle, is not defined. However, the blur callbacks are always invoked
+// before the focus callbacks.
 //
 // Set to nil to remove the callback function.
 func (b *Box) SetBlurFunc(callback func()) *Box {
@@ -514,7 +527,7 @@ func (b *Box) SetBlurFunc(callback func()) *Box {
 	return b
 }
 
-// Focus is called when this primitive receives focus.
+// Focus is called when this primitive directly receives focus.
 func (b *Box) Focus(delegate func(p Primitive)) {
 	b.hasFocus = true
 	if b.focus != nil {
@@ -522,7 +535,7 @@ func (b *Box) Focus(delegate func(p Primitive)) {
 	}
 }
 
-// Blur is called when this primitive loses focus.
+// Blur is called when this primitive directly loses focus.
 func (b *Box) Blur() {
 	if b.blur != nil {
 		b.blur()
