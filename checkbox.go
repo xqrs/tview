@@ -7,7 +7,7 @@ import (
 // Checkbox implements a simple box for boolean values which can be checked and
 // unchecked.
 //
-// See https://github.com/rivo/tview/wiki/Checkbox for an example.
+// See https://github.com/ayn2op/tview/wiki/Checkbox for an example.
 type Checkbox struct {
 	*Box
 
@@ -33,7 +33,7 @@ type Checkbox struct {
 	// The style of the checked checkbox.
 	checkedStyle tcell.Style
 
-	// The style of the checkbox when it is currently focused.
+	// Teh style of the checkbox when it is currently focused.
 	focusStyle tcell.Style
 
 	// The string used to display an unchecked box.
@@ -56,9 +56,9 @@ type Checkbox struct {
 	finished func(tcell.Key)
 }
 
-// NewCheckbox returns a new [Checkbox].
+// NewCheckbox returns a new input field.
 func NewCheckbox() *Checkbox {
-	c := &Checkbox{
+	return &Checkbox{
 		Box:             NewBox(),
 		labelStyle:      tcell.StyleDefault.Foreground(Styles.SecondaryTextColor),
 		uncheckedStyle:  tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.PrimaryTextColor),
@@ -67,8 +67,6 @@ func NewCheckbox() *Checkbox {
 		uncheckedString: " ",
 		checkedString:   "X",
 	}
-	c.Box.Primitive = c
-	return c
 }
 
 // SetChecked sets the state of the checkbox. This also triggers the "changed"
@@ -200,11 +198,6 @@ func (c *Checkbox) SetDisabled(disabled bool) FormItem {
 	return c
 }
 
-// GetDisabled returns whether or not the item is disabled / read-only.
-func (c *Checkbox) GetDisabled() bool {
-	return c.disabled
-}
-
 // SetChangedFunc sets a handler which is called when the checked state of this
 // checkbox was changed. The handler function receives the new state.
 func (c *Checkbox) SetChangedFunc(handler func(checked bool)) *Checkbox {
@@ -244,7 +237,7 @@ func (c *Checkbox) Focus(delegate func(p Primitive)) {
 
 // Draw draws this primitive onto the screen.
 func (c *Checkbox) Draw(screen tcell.Screen) {
-	c.Box.DrawForSubclass(screen, c)
+	c.DrawForSubclass(screen, c)
 
 	// Prepare
 	x, y, width, height := c.GetInnerRect()
@@ -256,15 +249,12 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 	// Draw label.
 	_, labelBg, _ := c.labelStyle.Decompose()
 	if c.labelWidth > 0 {
-		labelWidth := c.labelWidth
-		if labelWidth > width {
-			labelWidth = width
-		}
-		printWithStyle(screen, c.label, x, y, 0, labelWidth, AlignLeft, c.labelStyle, labelBg == tcell.ColorDefault)
+		labelWidth := min(c.labelWidth, width)
+		printWithStyle(screen, c.label, x, y, 0, labelWidth, AlignmentLeft, c.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth
 	} else {
-		_, _, drawnWidth := printWithStyle(screen, c.label, x, y, 0, width, AlignLeft, c.labelStyle, labelBg == tcell.ColorDefault)
+		_, _, drawnWidth := printWithStyle(screen, c.label, x, y, 0, width, AlignmentLeft, c.labelStyle, labelBg == tcell.ColorDefault)
 		x += drawnWidth
 		width -= drawnWidth
 	}
@@ -282,7 +272,7 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 	if c.HasFocus() {
 		style = c.focusStyle
 	}
-	printWithStyle(screen, str, x, y, 0, width, AlignLeft, style, c.disabled)
+	printWithStyle(screen, str, x, y, 0, width, AlignmentLeft, style, c.disabled)
 }
 
 // InputHandler returns the handler for this primitive.
@@ -328,10 +318,11 @@ func (c *Checkbox) MouseHandler() func(action MouseAction, event *tcell.EventMou
 
 		// Process mouse event.
 		if y == rectY {
-			if action == MouseLeftDown {
+			switch action {
+			case MouseLeftDown:
 				setFocus(c)
 				consumed = true
-			} else if action == MouseLeftClick {
+			case MouseLeftClick:
 				c.checked = !c.checked
 				if c.changed != nil {
 					c.changed(c.checked)

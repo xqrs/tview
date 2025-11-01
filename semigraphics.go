@@ -176,8 +176,8 @@ const (
 )
 
 // SemigraphicJoints is a map for joining semigraphic (or otherwise) runes.
-// So far only light lines are supported but if you want to change the border
-// styling you need to provide the joints, too.
+// So far only light and double lines are supported but if you want to change
+// the border styling you need to provide the joints, too.
 // The matching will be sorted ascending by rune value, so you don't need to
 // provide all rune combinations,
 // e.g. (─) + (│) = (┼) will also match (│) + (─) = (┼)
@@ -301,11 +301,77 @@ var SemigraphicJoints = map[string]rune{
 
 	// (┴) + (┼) = (┼)
 	string([]rune{BoxDrawingsLightUpAndHorizontal, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleVertical}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleDownAndRight}): BoxDrawingsDoubleDownAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleDownAndLeft}): BoxDrawingsDoubleDownAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleUpAndRight}): BoxDrawingsDoubleUpAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleUpAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleDownAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleUpAndHorizontal,
+	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleDownAndRight}): BoxDrawingsDoubleVerticalAndRight,
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleDownAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleUpAndRight}): BoxDrawingsDoubleVerticalAndRight,
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndRight,
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleDownAndLeft}): BoxDrawingsDoubleDownAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleUpAndRight}): BoxDrawingsDoubleVerticalAndRight,
+	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndRight,
+	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleDownAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleUpAndRight}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
+	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
+	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleDownAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleUpAndHorizontal,
+	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndRight,
+	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleUpAndHorizontal,
+	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
+	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleUpAndHorizontal,
+	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleVerticalAndRight, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleVerticalAndRight, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleVerticalAndRight, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleVerticalAndRight, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleVerticalAndLeft, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleVerticalAndLeft, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleVerticalAndLeft, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleDownAndHorizontal, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	string([]rune{BoxDrawingsDoubleDownAndHorizontal, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+
+	string([]rune{BoxDrawingsDoubleUpAndHorizontal, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
 }
 
 // PrintJoinedSemigraphics prints a semigraphics rune into the screen at the given
 // position with the given style, joining it with any existing semigraphics
-// rune.At this point, only regular single line borders are supported.
+// rune.
+// At this point, only regular single and double line borders are supported.
 func PrintJoinedSemigraphics(screen tcell.Screen, x, y int, ch rune, style tcell.Style) {
 	previous, _, _, _ := screen.GetContent(x, y)
 

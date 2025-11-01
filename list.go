@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // listItem represents one item in a List.
@@ -37,7 +38,7 @@ type listItem struct {
 // to a list item. See [List.SetSelectedFunc] for a way to be notified when a
 // list item was selected.
 //
-// See https://github.com/rivo/tview/wiki/List for an example.
+// See https://github.com/ayn2op/tview/wiki/List for an example.
 type List struct {
 	*Box
 
@@ -97,21 +98,19 @@ type List struct {
 	done func()
 }
 
-// NewList returns a new [List].
+// NewList returns a new list.
 func NewList() *List {
-	l := &List{
+	return &List{
 		Box:                NewBox(),
 		showSecondaryText:  true,
 		wrapAround:         true,
 		mainTextStyle:      tcell.StyleDefault.Foreground(Styles.PrimaryTextColor).Background(Styles.PrimitiveBackgroundColor),
 		secondaryTextStyle: tcell.StyleDefault.Foreground(Styles.TertiaryTextColor).Background(Styles.PrimitiveBackgroundColor),
 		shortcutStyle:      tcell.StyleDefault.Foreground(Styles.SecondaryTextColor).Background(Styles.PrimitiveBackgroundColor),
-		selectedStyle:      tcell.StyleDefault.Foreground(Styles.PrimitiveBackgroundColor).Background(Styles.PrimaryTextColor),
+		selectedStyle:      tcell.StyleDefault.Reverse(true),
 		mainStyleTags:      true,
 		secondaryStyleTags: true,
 	}
-	l.Box.Primitive = l
-	return l
 }
 
 // SetCurrentItem sets the currently selected item by its index, starting at 0
@@ -193,7 +192,7 @@ func (l *List) RemoveItem(index int) *List {
 	}
 
 	// Remove item.
-	l.items = append(l.items[:index], l.items[index+1:]...)
+	l.items = slices.Delete(l.items, index, index+1)
 
 	// If there is nothing left, we're done.
 	if len(l.items) == 0 {
@@ -502,7 +501,7 @@ func (l *List) Clear() *List {
 
 // Draw draws this primitive onto the screen.
 func (l *List) Draw(screen tcell.Screen) {
-	l.Box.DrawForSubclass(screen, l)
+	l.DrawForSubclass(screen, l)
 
 	// Determine the dimensions.
 	x, y, width, height := l.GetInnerRect()
@@ -555,7 +554,7 @@ func (l *List) Draw(screen tcell.Screen) {
 
 		// Shortcuts.
 		if showShortcuts && item.Shortcut != 0 {
-			printWithStyle(screen, fmt.Sprintf("(%s)", string(item.Shortcut)), x-5, y, 0, 4, AlignRight, l.shortcutStyle, false)
+			printWithStyle(screen, fmt.Sprintf("(%s)", string(item.Shortcut)), x-5, y, 0, 4, AlignmentRight, l.shortcutStyle, false)
 		}
 
 		// Main text.
@@ -568,7 +567,7 @@ func (l *List) Draw(screen tcell.Screen) {
 		if !l.mainStyleTags {
 			mainText = Escape(mainText)
 		}
-		_, _, printedWidth := printWithStyle(screen, mainText, x, y, l.horizontalOffset, width, AlignLeft, style, false)
+		_, _, printedWidth := printWithStyle(screen, mainText, x, y, l.horizontalOffset, width, AlignmentLeft, style, false)
 		if printedWidth > maxWidth {
 			maxWidth = printedWidth
 		}
@@ -591,7 +590,7 @@ func (l *List) Draw(screen tcell.Screen) {
 			if !l.secondaryStyleTags {
 				secondaryText = Escape(secondaryText)
 			}
-			_, _, printedWidth := printWithStyle(screen, secondaryText, x, y, l.horizontalOffset, width, AlignLeft, l.secondaryTextStyle, false)
+			_, _, printedWidth := printWithStyle(screen, secondaryText, x, y, l.horizontalOffset, width, AlignmentLeft, l.secondaryTextStyle, false)
 			if printedWidth > maxWidth {
 				maxWidth = printedWidth
 			}

@@ -1,9 +1,9 @@
 package tview
 
 import (
-	"math"
-
 	"github.com/gdamore/tcell/v2"
+	"math"
+	"slices"
 )
 
 // gridItem represents one primitive and its possible position on a grid.
@@ -12,7 +12,7 @@ type gridItem struct {
 	Row, Column                 int       // The top-left grid cell where the item is placed.
 	Width, Height               int       // The number of rows and columns the item occupies.
 	MinGridWidth, MinGridHeight int       // The minimum grid width/height for which this item is visible.
-	Focus                       bool      // Whether or not this item attracts the layout's focus. Only applicable for the first item for which this is set to true.
+	Focus                       bool      // Whether or not this item attracts the layout's focus.
 
 	visible    bool // Whether or not this item was visible the last time the grid was drawn.
 	x, y, w, h int  // The last position of the item relative to the top-left corner of the grid. Undefined if visible is false.
@@ -60,10 +60,10 @@ type Grid struct {
 
 // NewGrid returns a new grid-based layout container with no initial primitives.
 //
-// Note that [Box], the superclass of Grid, will be transparent so that any grid
+// Note that Box, the superclass of Grid, will be transparent so that any grid
 // areas not covered by any primitives will leave their background unchanged. To
-// clear a [Grid]'s background before any items are drawn, reset its embedded
-// [Box]:
+// clear a Grid's background before any items are drawn, reset its Box to one
+// with the desired color:
 //
 //	grid.Box = NewBox()
 func NewGrid() *Grid {
@@ -72,7 +72,6 @@ func NewGrid() *Grid {
 	}
 	g.Box = NewBox()
 	g.Box.dontClear = true
-	g.Box.Primitive = g
 	return g
 }
 
@@ -218,7 +217,7 @@ func (g *Grid) AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight
 func (g *Grid) RemoveItem(p Primitive) *Grid {
 	for index := len(g.items) - 1; index >= 0; index-- {
 		if g.items[index].Item == p {
-			g.items = append(g.items[:index], g.items[index+1:]...)
+			g.items = slices.Delete(g.items, index, index+1)
 		}
 	}
 	return g
@@ -257,20 +256,14 @@ func (g *Grid) Focus(delegate func(p Primitive)) {
 	g.Box.Focus(delegate)
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (g *Grid) focusChain(chain *[]Primitive) bool {
+// HasFocus returns whether or not this primitive has focus.
+func (g *Grid) HasFocus() bool {
 	for _, item := range g.items {
-		if !item.visible {
-			continue
-		}
-		if hasFocus := item.Item.focusChain(chain); hasFocus {
-			if chain != nil {
-				*chain = append(*chain, g)
-			}
+		if item.visible && item.Item.HasFocus() {
 			return true
 		}
 	}
-	return g.Box.focusChain(chain)
+	return g.Box.HasFocus()
 }
 
 // Draw draws this primitive onto the screen.
@@ -298,14 +291,8 @@ ItemLoop:
 			}
 
 			// What's their minimum size?
-			itemMin := item.MinGridWidth
-			if item.MinGridHeight > itemMin {
-				itemMin = item.MinGridHeight
-			}
-			existingMin := existing.MinGridWidth
-			if existing.MinGridHeight > existingMin {
-				existingMin = existing.MinGridHeight
-			}
+			itemMin := max(item.MinGridHeight, item.MinGridWidth)
+			existingMin := max(existing.MinGridHeight, existing.MinGridWidth)
 
 			// Which one is more important?
 			if itemMin < existingMin {
@@ -388,7 +375,7 @@ ItemLoop:
 	}
 
 	// Distribute proportional rows/columns.
-	for index := 0; index < rows; index++ {
+	for index := range rows {
 		row := 0
 		if index < len(g.rows) {
 			row = g.rows[index]
@@ -408,7 +395,7 @@ ItemLoop:
 		}
 		rowHeight[index] = rowAbs
 	}
-	for index := 0; index < columns; index++ {
+	for index := range columns {
 		column := 0
 		if index < len(g.columns) {
 			column = g.columns[index]
@@ -458,10 +445,10 @@ ItemLoop:
 		px := columnPos[item.Column]
 		py := rowPos[item.Row]
 		var pw, ph int
-		for index := 0; index < item.Height; index++ {
+		for index := range item.Height {
 			ph += rowHeight[item.Row+index]
 		}
-		for index := 0; index < item.Width; index++ {
+		for index := range item.Width {
 			pw += columnWidth[item.Column+index]
 		}
 		if g.borders {
@@ -598,11 +585,11 @@ ItemLoop:
 				}
 				by := item.y - 1
 				if by >= 0 && by < screenHeight {
-					PrintJoinedSemigraphics(screen, bx, by, Borders.Horizontal, borderStyle)
+					PrintJoinedSemigraphics(screen, bx, by, g.borderSet.Top, borderStyle)
 				}
 				by = item.y + item.h
 				if by >= 0 && by < screenHeight {
-					PrintJoinedSemigraphics(screen, bx, by, Borders.Horizontal, borderStyle)
+					PrintJoinedSemigraphics(screen, bx, by, g.borderSet.Bottom, borderStyle)
 				}
 			}
 			for by := item.y; by < item.y+item.h; by++ { // Left/right lines.
@@ -611,28 +598,28 @@ ItemLoop:
 				}
 				bx := item.x - 1
 				if bx >= 0 && bx < screenWidth {
-					PrintJoinedSemigraphics(screen, bx, by, Borders.Vertical, borderStyle)
+					PrintJoinedSemigraphics(screen, bx, by, g.borderSet.Left, borderStyle)
 				}
 				bx = item.x + item.w
 				if bx >= 0 && bx < screenWidth {
-					PrintJoinedSemigraphics(screen, bx, by, Borders.Vertical, borderStyle)
+					PrintJoinedSemigraphics(screen, bx, by, g.borderSet.Right, borderStyle)
 				}
 			}
 			bx, by := item.x-1, item.y-1 // Top-left corner.
 			if bx >= 0 && bx < screenWidth && by >= 0 && by < screenHeight {
-				PrintJoinedSemigraphics(screen, bx, by, Borders.TopLeft, borderStyle)
+				PrintJoinedSemigraphics(screen, bx, by, g.borderSet.TopLeft, borderStyle)
 			}
 			bx, by = item.x+item.w, item.y-1 // Top-right corner.
 			if bx >= 0 && bx < screenWidth && by >= 0 && by < screenHeight {
-				PrintJoinedSemigraphics(screen, bx, by, Borders.TopRight, borderStyle)
+				PrintJoinedSemigraphics(screen, bx, by, g.borderSet.TopRight, borderStyle)
 			}
 			bx, by = item.x-1, item.y+item.h // Bottom-left corner.
 			if bx >= 0 && bx < screenWidth && by >= 0 && by < screenHeight {
-				PrintJoinedSemigraphics(screen, bx, by, Borders.BottomLeft, borderStyle)
+				PrintJoinedSemigraphics(screen, bx, by, g.borderSet.BottomLeft, borderStyle)
 			}
 			bx, by = item.x+item.w, item.y+item.h // Bottom-right corner.
 			if bx >= 0 && bx < screenWidth && by >= 0 && by < screenHeight {
-				PrintJoinedSemigraphics(screen, bx, by, Borders.BottomRight, borderStyle)
+				PrintJoinedSemigraphics(screen, bx, by, g.borderSet.BottomRight, borderStyle)
 			}
 		}
 	}

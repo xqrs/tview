@@ -2,6 +2,7 @@ package tview
 
 import (
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // Flex directions.
@@ -29,7 +30,7 @@ type flexItem struct {
 // distributed along that dimension depends on their layout settings, which is
 // either a fixed length or a proportional length. See AddItem() for details.
 //
-// See https://github.com/rivo/tview/wiki/Flex for an example.
+// See https://github.com/ayn2op/tview/wiki/Flex for an example.
 type Flex struct {
 	*Box
 
@@ -45,12 +46,13 @@ type Flex struct {
 }
 
 // NewFlex returns a new flexbox layout container with no primitives and its
-// direction set to [FlexColumn]. To add primitives to this layout, see
-// [Flex.AddItem]. To change the direction, see [Flex.SetDirection].
+// direction set to FlexColumn. To add primitives to this layout, see AddItem().
+// To change the direction, see SetDirection().
 //
-// Note that [Box], the superclass of Flex, will not clear its contents so that
+// Note that Box, the superclass of Flex, will not clear its contents so that
 // any nil flex items will leave their background unchanged. To clear a Flex's
-// background before any items are drawn, set it to a new [Box]:
+// background before any items are drawn, set it to a box with the desired
+// color:
 //
 //	flex.Box = NewBox()
 func NewFlex() *Flex {
@@ -59,7 +61,6 @@ func NewFlex() *Flex {
 	}
 	f.Box = NewBox()
 	f.Box.dontClear = true
-	f.Box.Primitive = f
 	return f
 }
 
@@ -103,7 +104,7 @@ func (f *Flex) AddItem(item Primitive, fixedSize, proportion int, focus bool) *F
 func (f *Flex) RemoveItem(p Primitive) *Flex {
 	for index := len(f.items) - 1; index >= 0; index-- {
 		if f.items[index].Item == p {
-			f.items = append(f.items[:index], f.items[index+1:]...)
+			f.items = slices.Delete(f.items, index, index+1)
 		}
 	}
 	return f
@@ -214,20 +215,14 @@ func (f *Flex) Focus(delegate func(p Primitive)) {
 	f.Box.Focus(delegate)
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (f *Flex) focusChain(chain *[]Primitive) bool {
+// HasFocus returns whether or not this primitive has focus.
+func (f *Flex) HasFocus() bool {
 	for _, item := range f.items {
-		if item.Item == nil {
-			continue
-		}
-		if hasFocus := item.Item.focusChain(chain); hasFocus {
-			if chain != nil {
-				*chain = append(*chain, f)
-			}
+		if item.Item != nil && item.Item.HasFocus() {
 			return true
 		}
 	}
-	return f.Box.focusChain(chain)
+	return f.Box.HasFocus()
 }
 
 // MouseHandler returns the mouse handler for this primitive.
@@ -255,14 +250,12 @@ func (f *Flex) MouseHandler() func(action MouseAction, event *tcell.EventMouse, 
 // InputHandler returns the handler for this primitive.
 func (f *Flex) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
 	return f.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		for _, i := range f.items {
-			item := i.Item
-			if item == nil || !item.HasFocus() {
-				continue
-			}
-			if handler := item.InputHandler(); handler != nil {
-				handler(event, setFocus)
-				return
+		for _, item := range f.items {
+			if item.Item != nil && item.Item.HasFocus() {
+				if handler := item.Item.InputHandler(); handler != nil {
+					handler(event, setFocus)
+					return
+				}
 			}
 		}
 	})

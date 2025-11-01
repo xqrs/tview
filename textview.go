@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/gdamore/tcell/v2"
-	colorful "github.com/lucasb-eyer/go-colorful"
 )
 
 // TabSize is the number of spaces with which a tab character will be replaced.
@@ -14,58 +13,41 @@ var TabSize = 4
 
 // textViewLine contains information about a line displayed in the text view.
 type textViewLine struct {
-	offset  int        // The string position in the buffer where this line starts.
-	width   int        // The screen width of this line.
-	length  int        // The string length (in bytes) of this line.
-	state   *stepState // The parser state at the beginning of the line, before parsing the first character.
-	regions []*Region  // The regions on this line, in the order of their appearance.
+	offset  int               // The string position in the buffer where this line starts.
+	width   int               // The screen width of this line.
+	length  int               // The string length (in bytes) of this line.
+	state   *stepState        // The parser state at the beginning of the line, before parsing the first character.
+	regions map[string][2]int // The start and end columns of all regions in this line. Only valid for visible lines. May be nil.
 }
 
-// Region represents a region in a [TextView]. Note that depending on how the
-// region is retrieved, the end positions and locations may not correspond to
-// the true end of the region but to the end of the last line that was parsed.
-type Region struct {
-	// The region ID.
-	ID string
-
-	// The start and end offsets into the text string of the region. The end
-	// points to the first byte after the region.
-	Start, End int
-
-	// The start and end positions of the region in screen coordinates, relative
-	// to the position of where the first character of the text view would be
-	// drawn.
-	StartRow, StartColumn, EndRow, EndColumn int
-}
-
-// batchWriter is a writer that can be used to write to and clear a TextView
-// in batches, i.e. multiple writes with the lock only being acquired once.
-// Don't instantiated this class directly but use the [TextView.BatchWriter]
-// method instead.
-type batchWriter struct {
-	*TextView
+// TextViewWriter is a writer that can be used to write to and clear a TextView
+// in batches, i.e. multiple writes with the lock only being acquired once. Don't
+// instantiated this class directly but use the TextView's BatchWriter method
+// instead.
+type TextViewWriter struct {
+	t *TextView
 }
 
 // Close implements io.Closer for the writer by unlocking the original TextView.
-func (w *batchWriter) Close() error {
-	w.TextView.Unlock()
+func (w TextViewWriter) Close() error {
+	w.t.Unlock()
 	return nil
 }
 
 // Clear removes all text from the buffer.
-func (w *batchWriter) Clear() {
-	w.TextView.clear()
+func (w TextViewWriter) Clear() {
+	w.t.clear()
 }
 
 // Write implements the io.Writer interface. It behaves like the TextView's
 // Write() method except that it does not acquire the lock.
-func (w *batchWriter) Write(p []byte) (n int, err error) {
-	return w.TextView.write(p)
+func (w TextViewWriter) Write(p []byte) (n int, err error) {
+	return w.t.write(p)
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (w *batchWriter) focusChain(chain *[]Primitive) bool {
-	return w.TextView.Box.focusChain(chain)
+// HasFocus returns whether the underlying TextView has focus.
+func (w TextViewWriter) HasFocus() bool {
+	return w.t.hasFocus
 }
 
 // TextView is a component to display read-only text. While the text to be
@@ -149,7 +131,7 @@ func (w *batchWriter) focusChain(chain *[]Primitive) bool {
 // (using [TextView.SetScrollable]). This will cause the text view to discard
 // lines moving out of the visible area at the top.
 //
-// See https://github.com/rivo/tview/wiki/TextView for an example.
+// See https://github.com/ayn2op/tview/wiki/TextView for an example.
 type TextView struct {
 	sync.Mutex
 	*Box
@@ -182,7 +164,7 @@ type TextView struct {
 	labelStyle tcell.Style
 
 	// The text alignment, one of AlignLeft, AlignCenter, or AlignRight.
-	align int
+	alignment Alignment
 
 	// Currently highlighted regions.
 	highlights map[string]struct{}
@@ -257,23 +239,21 @@ type TextView struct {
 	finished func(tcell.Key)
 }
 
-// NewTextView returns a new [TextView].
+// NewTextView returns a new text view.
 func NewTextView() *TextView {
-	t := &TextView{
+	return &TextView{
 		Box:        NewBox(),
 		labelStyle: tcell.StyleDefault.Foreground(Styles.SecondaryTextColor),
 		highlights: make(map[string]struct{}),
 		lineOffset: -1,
 		scrollable: true,
-		align:      AlignLeft,
+		alignment:  AlignmentLeft,
 		wrap:       true,
 		wordWrap:   true,
 		textStyle:  tcell.StyleDefault.Background(Styles.PrimitiveBackgroundColor).Foreground(Styles.PrimaryTextColor),
 		regionTags: false,
 		styleTags:  false,
 	}
-	t.Box.Primitive = t
-	return t
 }
 
 // SetLabel sets the text to be displayed before the text view.
@@ -317,11 +297,6 @@ func (t *TextView) GetFieldHeight() int {
 // SetDisabled sets whether or not the item is disabled / read-only.
 func (t *TextView) SetDisabled(disabled bool) FormItem {
 	return t // Text views are always read-only.
-}
-
-// GetDisabled returns whether or not the item is disabled / read-only.
-func (t *TextView) GetDisabled() bool {
-	return true // Text views are always read-only.
 }
 
 // SetScrollable sets the flag that decides whether or not the text view is
@@ -374,8 +349,8 @@ func (t *TextView) SetMaxLines(maxLines int) *TextView {
 
 // SetTextAlign sets the text alignment within the text view. This must be
 // either AlignLeft, AlignCenter, or AlignRight.
-func (t *TextView) SetTextAlign(align int) *TextView {
-	t.align = align
+func (t *TextView) SetTextAlign(alignment Alignment) *TextView {
+	t.alignment = alignment
 	return t
 }
 
@@ -461,8 +436,8 @@ func (t *TextView) GetOriginalLineCount() int {
 
 	var (
 		state *stepState
-		str       = t.text.String()
-		lines int = 1
+		str   = t.text.String()
+		lines = 1
 	)
 	for len(str) > 0 {
 		_, str, state = step(str, state, stepOptionsNone)
@@ -619,7 +594,7 @@ func (t *TextView) Clear() *TextView {
 	return t
 }
 
-// clear is the internal implementation of clear. It is used by [batchWriter]
+// clear is the internal implementation of clear. It is used by TextViewWriter
 // and anywhere that we need to perform a write without locking the buffer.
 func (t *TextView) clear() {
 	t.text.Reset()
@@ -643,8 +618,7 @@ func (t *TextView) clear() {
 // highlights.
 //
 // This function is expensive if a specified region is in a part of the text
-// that has not yet been parsed, as is typically the case for lines below the
-// visible area.
+// that has not yet been parsed.
 func (t *TextView) Highlight(regionIDs ...string) *TextView {
 	// Make sure we know these regions.
 	t.parseAhead(t.lastWidth, func(lineNumber int, line *textViewLine) bool {
@@ -804,84 +778,29 @@ func (t *TextView) GetRegionText(regionID string) string {
 	return regionText.String()
 }
 
-// GetRegions returns the regions in this [TextView]. If tail is set to false,
-// only regions from the startRow row to the end of the currently visible area
-// are returned. If tail is set to true, the regions below the visible area of
-// the view are also included. Note that the latter will require parsing the
-// entire text and can therefore be expensive. Setting startRow to a value
-// larger than the last visible row results in nil being returned. To obtain
-// only visible regions, set startRow to the current row offset (see
-// [TextView.GetScrollOffset]) and tail to false.
-//
-// Regions are returned in the order of their appearance in the text. Do not
-// modify the returned [Region] objects. Region positions change when the text
-// view is resized or when the text changes. Such changes will render the
-// returned slice invalid.
-//
-// If this function is called before the text view was drawn for the first
-// time, the return value is undefined.
-func (t *TextView) GetRegions(startRow int, tail bool) []*Region {
-	_, _, _, height := t.GetInnerRect()
-	if !t.regionTags || !tail && startRow >= t.lineOffset+height {
-		return nil
-	}
-
-	// Parse until we have all (complete) regions we need.
-	var lastRegion *Region
-	t.parseAhead(t.lastWidth, func(lineNumber int, line *textViewLine) bool {
-		if tail || lineNumber < t.lineOffset+height {
-			if len(line.regions) > 0 {
-				lastRegion = line.regions[len(line.regions)-1]
-			}
-			return false // These must be parsed in any case.
-		}
-		return len(line.regions) == 0 || line.regions[0] != lastRegion // Keep parsing to complete the last region.
-	})
-	if startRow >= len(t.lineIndex) {
-		return nil // We don't have that many lines.
-	}
-
-	// Merge regions into a slice.
-	var regions []*Region
-	for row, line := range t.lineIndex {
-		if tail && row >= t.lineOffset+height {
-			break
-		}
-		for _, region := range line.regions {
-			if len(regions) > 0 && regions[len(regions)-1] == region {
-				continue // Already added.
-			}
-			regions = append(regions, region)
-		}
-	}
-
-	return regions
-}
-
 // Focus is called when this primitive receives focus.
 func (t *TextView) Focus(delegate func(p Primitive)) {
 	// Implemented here with locking because this is used by layout primitives.
 	t.Lock()
+	defer t.Unlock()
 
 	// But if we're part of a form and not scrollable, there's nothing the user
 	// can do here so we're finished.
-	if finished := t.finished; finished != nil && !t.scrollable {
-		t.Unlock()
-		finished(-1)
+	if t.finished != nil && !t.scrollable {
+		t.finished(-1)
 		return
 	}
 
 	t.Box.Focus(delegate)
-	t.Unlock()
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (t *TextView) focusChain(chain *[]Primitive) bool {
+// HasFocus returns whether or not this primitive has focus.
+func (t *TextView) HasFocus() bool {
 	// Implemented here with locking because this may be used in the "changed"
 	// callback.
 	t.Lock()
 	defer t.Unlock()
-	return t.Box.focusChain(chain)
+	return t.Box.HasFocus()
 }
 
 // Write lets us implement the io.Writer interface.
@@ -892,7 +811,7 @@ func (t *TextView) Write(p []byte) (n int, err error) {
 	return t.write(p)
 }
 
-// write is the internal implementation of Write. It is used by [batchWriter]
+// write is the internal implementation of Write. It is used by [TextViewWriter]
 // and anywhere that we need to perform a write without locking the buffer.
 func (t *TextView) write(p []byte) (n int, err error) {
 	// Notify at the end.
@@ -924,10 +843,10 @@ func (t *TextView) write(p []byte) (n int, err error) {
 // Note that using the batch writer requires you to manage any issues that may
 // arise from concurrency yourself. See package description for details on
 // dealing with concurrency.
-func (t *TextView) BatchWriter() *batchWriter {
+func (t *TextView) BatchWriter() TextViewWriter {
 	t.Lock()
-	return &batchWriter{
-		TextView: t,
+	return TextViewWriter{
+		t: t,
 	}
 }
 
@@ -969,11 +888,8 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 	}
 
 	// Start parsing at the last line in the index.
-	var (
-		lastLine *textViewLine
-		region   *Region
-	)
-	str := t.text.String() // The remaining text to parse.
+	var lastLine *textViewLine
+	str := t.text.String()
 	if len(t.lineIndex) == 0 {
 		// Insert the first line.
 		lastLine = &textViewLine{
@@ -990,28 +906,24 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 		lastLine.length = 0
 		str = str[lastLine.offset:]
 	}
-	if len(lastLine.regions) > 0 {
-		region = lastLine.regions[0]
-		lastLine.regions = lastLine.regions[:1]
-	}
 
 	// Parse.
 	var (
-		lastOption       int               // Text index of the last optional split point, relative to the beginning of the line.
-		lastOptionWidth  int               // Line width at last optional split point.
-		lastOptionState  *stepState        // State at last optional split point.
-		lastOptionRegion *Region           // Region at last optional split point or nil if none.
-		leftPos          int               // The current position in the line (assuming left-alignment).
-		offset           = lastLine.offset // Text index of the current position.
-		st               = *lastLine.state // Current state.
-		state            = &st             // Pointer to current state.
+		lastOption      int               // Text index of the last optional split point.
+		lastOptionWidth int               // Line width at last optional split point.
+		lastOptionState *stepState        // State at last optional split point.
+		leftPos         int               // The current position in the line (only for left-alignment).
+		offset          = lastLine.offset // Text index of the current position.
+		st              = *lastLine.state // Current state.
+		state           = &st             // Pointer to current state.
 	)
 	for len(str) > 0 {
 		var c string
+		region := state.region
 		c, str, state = step(str, state, options)
 		w := state.Width()
 		if c == "\t" {
-			if t.align == AlignLeft {
+			if t.alignment == AlignmentLeft {
 				w = TabSize - leftPos%TabSize
 			} else {
 				w = TabSize
@@ -1031,20 +943,6 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 					offset: offset,
 					state:  &st,
 				}
-				if state.region != "" {
-					if state.region == region.ID {
-						lastLine.regions = []*Region{region}
-					} else {
-						region = &Region{
-							ID:          state.region,
-							Start:       offset,
-							StartRow:    len(t.lineIndex),
-							StartColumn: 0,
-						}
-					}
-				} else {
-					region = nil
-				}
 				lastOption, lastOptionWidth, leftPos = 0, 0, 0
 			} else {
 				// Split at the last split point.
@@ -1060,32 +958,10 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 					return
 				}
 				lastLine = newLine
-				if lastOptionRegion != nil {
-					lastLine.regions = []*Region{lastOptionRegion}
-				}
-				region = lastOptionRegion
-				leftPos -= lastOptionWidth
 				lastOption, lastOptionWidth = 0, 0
+				leftPos -= lastOptionWidth
 			}
 			t.lineIndex = append(t.lineIndex, lastLine)
-		}
-
-		// Is there a region switch?
-		if state.region != "" && (region == nil || state.region != region.ID) {
-			// Start a new region.
-			region = &Region{
-				ID:          state.region,
-				Start:       offset,
-				StartRow:    len(t.lineIndex) - 1,
-				StartColumn: leftPos,
-			}
-			lastLine.regions = append(lastLine.regions, region)
-			if _, ok := t.regions[state.region]; !ok {
-				t.regions[state.region] = len(t.lineIndex) - 1
-			}
-		} else if state.region == "" && region != nil {
-			// End the previous region.
-			region = nil
 		}
 
 		// Move ahead.
@@ -1093,11 +969,6 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 		lastLine.length += length
 		offset += length
 		leftPos += w
-		if region != nil {
-			region.End = offset
-			region.EndRow = len(t.lineIndex) - 1
-			region.EndColumn = leftPos
-		}
 
 		// Do we have a new longest line?
 		if lastLine.width > t.longestLine {
@@ -1113,7 +984,6 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 					lastOptionWidth = lastLine.width
 					st := *state
 					lastOptionState = &st
-					lastOptionRegion = region
 				}
 			} else {
 				// We must split here.
@@ -1125,11 +995,15 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 					offset: offset,
 					state:  &st,
 				}
-				if region != nil {
-					lastLine.regions = []*Region{region}
-				}
 				t.lineIndex = append(t.lineIndex, lastLine)
 				lastOption, lastOptionWidth, leftPos = 0, 0, 0
+			}
+		}
+
+		// Add new regions if any.
+		if t.regionTags && state.region != "" && state.region != region {
+			if _, ok := t.regions[state.region]; !ok {
+				t.regions[state.region] = len(t.lineIndex) - 1
 			}
 		}
 	}
@@ -1148,15 +1022,12 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	// Draw label.
 	_, labelBg, _ := t.labelStyle.Decompose()
 	if t.labelWidth > 0 {
-		labelWidth := t.labelWidth
-		if labelWidth > width {
-			labelWidth = width
-		}
-		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignLeft, t.labelStyle, labelBg == tcell.ColorDefault)
+		labelWidth := min(t.labelWidth, width)
+		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth
 	} else {
-		_, _, drawnWidth := printWithStyle(screen, t.label, x, y, 0, width, AlignLeft, t.labelStyle, labelBg == tcell.ColorDefault)
+		_, _, drawnWidth := printWithStyle(screen, t.label, x, y, 0, width, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += drawnWidth
 		width -= drawnWidth
 	}
@@ -1175,8 +1046,8 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	// Draw the text element if necessary.
 	_, bg, _ := t.textStyle.Decompose()
 	if bg != t.backgroundColor {
-		for row := 0; row < height; row++ {
-			for column := 0; column < width; column++ {
+		for row := range height {
+			for column := range width {
 				screen.SetContent(x+column, y+row, ' ', nil, t.textStyle)
 			}
 		}
@@ -1282,7 +1153,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	}
 
 	// Adjust column offset.
-	if t.align == AlignLeft || t.align == AlignRight {
+	if t.alignment == AlignmentLeft || t.alignment == AlignmentRight {
 		if t.columnOffset+width > t.longestLine {
 			t.columnOffset = t.longestLine - width
 		}
@@ -1310,23 +1181,22 @@ func (t *TextView) Draw(screen tcell.Screen) {
 			break
 		}
 
+		info := t.lineIndex[line]
+		info.regions = nil
+
 		// Determine starting point of the text and the screen.
 		var skipWidth, xPos int
-		info := t.lineIndex[line]
-		switch t.align {
-		case AlignLeft:
+		switch t.alignment {
+		case AlignmentLeft:
 			skipWidth = t.columnOffset
-		case AlignCenter:
+		case AlignmentCenter:
 			skipWidth = t.columnOffset + (info.width-width)/2
 			if skipWidth < 0 {
 				skipWidth = 0
 				xPos = (width-info.width)/2 - t.columnOffset
 			}
-		case AlignRight:
-			maxWidth := width
-			if t.longestLine > width {
-				maxWidth = t.longestLine
-			}
+		case AlignmentRight:
+			maxWidth := max(t.longestLine, width)
 			skipWidth = t.columnOffset - (maxWidth - info.width)
 			if skipWidth < 0 {
 				skipWidth = 0
@@ -1344,7 +1214,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 			ch, str, state = step(str, state, options)
 			w := state.Width()
 			if ch == "\t" {
-				if t.align == AlignLeft {
+				if t.alignment == AlignmentLeft {
 					w = TabSize - xPos%TabSize
 				} else {
 					w = TabSize
@@ -1370,18 +1240,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 					}
 				}
 				if highlighted {
-					fg, bg, _ := style.Decompose()
-					if bg == t.backgroundColor {
-						r, g, b := fg.RGB()
-						c := colorful.Color{R: float64(r) / 255, G: float64(g) / 255, B: float64(b) / 255}
-						_, _, li := c.Hcl()
-						if li < .5 {
-							bg = tcell.ColorWhite
-						} else {
-							bg = tcell.ColorBlack
-						}
-					}
-					style = style.Background(fg).Foreground(bg)
+					style = style.Reverse(true)
 				}
 
 				// Paint on screen.
@@ -1392,6 +1251,25 @@ func (t *TextView) Draw(screen tcell.Screen) {
 					} else {
 						screen.SetContent(x+xPos+offset, y+line-t.lineOffset, ' ', nil, style)
 					}
+				}
+
+				// Register this region.
+				if state.region != "" {
+					if info.regions == nil {
+						info.regions = make(map[string][2]int)
+					}
+					fromTo, ok := info.regions[state.region]
+					if !ok {
+						fromTo = [2]int{xPos, xPos + w}
+					} else {
+						if xPos < fromTo[0] {
+							fromTo[0] = xPos
+						}
+						if xPos+w > fromTo[1] {
+							fromTo[1] = xPos + w
+						}
+					}
+					info.regions[state.region] = fromTo
 				}
 			}
 
@@ -1502,17 +1380,14 @@ func (t *TextView) MouseHandler() func(action MouseAction, event *tcell.EventMou
 		case MouseLeftClick:
 			if t.regionTags && t.InInnerRect(x, y) {
 				// Find a region to highlight.
-				column := x - rectX
-				row := y - rectY + t.lineOffset
+				x -= rectX
+				y -= rectY
 				var highlightedID string
-				if row < len(t.lineIndex) {
-					line := t.lineIndex[row]
-					for _, region := range line.regions {
-						if !(row < region.StartRow ||
-							row > region.EndRow ||
-							(row == region.StartRow && column < region.StartColumn) ||
-							(row == region.EndRow && column >= region.EndColumn)) {
-							highlightedID = region.ID
+				if y+t.lineOffset < len(t.lineIndex) {
+					line := t.lineIndex[y+t.lineOffset]
+					for regionID, fromTo := range line.regions {
+						if x >= fromTo[0] && x < fromTo[1] {
+							highlightedID = regionID
 							break
 						}
 					}

@@ -8,7 +8,7 @@ import (
 // for an immediate decision. It needs to have at least one button (added via
 // [Modal.AddButtons]) or it will never disappear.
 //
-// See https://github.com/rivo/tview/wiki/Modal for an example.
+// See https://github.com/ayn2op/tview/wiki/Modal for an example.
 type Modal struct {
 	*Box
 
@@ -29,16 +29,13 @@ type Modal struct {
 	done func(buttonIndex int, buttonLabel string)
 }
 
-// NewModal returns a new [Modal] message window.
+// NewModal returns a new modal message window.
 func NewModal() *Modal {
 	m := &Modal{
-		Box:       NewBox().SetBorder(true).SetBackgroundColor(Styles.ContrastBackgroundColor),
+		Box:       NewBox().SetBorders(BordersAll).SetBackgroundColor(Styles.ContrastBackgroundColor),
 		textColor: Styles.PrimaryTextColor,
 	}
-	m.form = NewForm().
-		SetButtonsAlign(AlignCenter).
-		SetButtonBackgroundColor(Styles.PrimitiveBackgroundColor).
-		SetButtonTextColor(Styles.PrimaryTextColor)
+	m.form = NewForm().SetButtonsAlignment(AlignmentCenter)
 	m.form.SetBackgroundColor(Styles.ContrastBackgroundColor).SetBorderPadding(0, 0, 0, 0)
 	m.form.SetCancelFunc(func() {
 		if m.done != nil {
@@ -48,7 +45,6 @@ func NewModal() *Modal {
 	m.frame = NewFrame(m.form).SetBorders(0, 0, 1, 0, 0, 0)
 	m.frame.SetBackgroundColor(Styles.ContrastBackgroundColor).
 		SetBorderPadding(1, 1, 1, 1)
-	m.Box.Primitive = m
 	return m
 }
 
@@ -148,15 +144,9 @@ func (m *Modal) Focus(delegate func(p Primitive)) {
 	delegate(m.form)
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (m *Modal) focusChain(chain *[]Primitive) bool {
-	if hasFocus := m.form.focusChain(chain); hasFocus {
-		if chain != nil {
-			*chain = append(*chain, m)
-		}
-		return true
-	}
-	return m.Box.focusChain(chain)
+// HasFocus returns whether or not this primitive has focus.
+func (m *Modal) HasFocus() bool {
+	return m.form.HasFocus()
 }
 
 // Draw draws this primitive onto the screen.
@@ -168,17 +158,14 @@ func (m *Modal) Draw(screen tcell.Screen) {
 	}
 	buttonsWidth -= 2
 	screenWidth, screenHeight := screen.Size()
-	width := screenWidth / 3
-	if width < buttonsWidth {
-		width = buttonsWidth
-	}
+	width := max(screenWidth/3, buttonsWidth)
 	// width is now without the box border.
 
 	// Reset the text and find out how wide it is.
 	m.frame.Clear()
 	lines := WordWrap(m.text, width)
 	for _, line := range lines {
-		m.frame.AddText(line, true, AlignCenter, m.textColor)
+		m.frame.AddText(line, true, AlignmentCenter, m.textColor)
 	}
 
 	// Set the modal's position and size.

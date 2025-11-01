@@ -81,6 +81,9 @@ type Application struct {
 	// that is added.
 	title string
 
+	// The primitive which currently has the keyboard focus.
+	focus Primitive
+
 	// The root primitive to be seen on the screen.
 	root Primitive
 
@@ -302,6 +305,7 @@ func (a *Application) Run() error {
 		} else {
 			a.screen.DisablePaste()
 		}
+
 		if a.title != "" {
 			a.screen.SetTitle(a.title)
 		}
@@ -677,7 +681,7 @@ func (a *Application) Suspend(f func()) bool {
 // buffer. It is almost never necessary to call this function. It can actually
 // deadlock your application if you call it from the main thread (e.g. in a
 // callback function of a widget). Please see
-// https://github.com/rivo/tview/wiki/Concurrency for details.
+// https://github.com/ayn2op/tview/wiki/Concurrency for details.
 func (a *Application) Draw() *Application {
 	a.QueueUpdate(func() {
 		a.draw()
@@ -830,55 +834,22 @@ func (a *Application) ResizeToFullScreen(p Primitive) *Application {
 // down the hierarchy (starting at the root) until a primitive handles them,
 // which per default goes towards the focused primitive.
 //
-// Blur will be called on the previously focused [Primitive] and all of its
-// parents (including the root). Then Focus will be called on the new
-// [Primitive] and all of its parents (including the root).
+// Blur() will be called on the previously focused primitive. Focus() will be
+// called on the new primitive.
 func (a *Application) SetFocus(p Primitive) *Application {
-	a.RLock()
-	root := a.root
-	screen := a.screen
-	a.RUnlock()
-
-	// We make a focus chain with some pre-allocated space.
-	chain := make([]Primitive, 0, 10)
-
-	// Send blur events along the focus chain.
-	if root != nil && root.focusChain(&chain) {
-		for index, pr := range chain {
-			if index == 0 {
-				pr.Blur()
-			}
-			pr.blurred()
-		}
-
-		// Hide the cursor. If it's needed, the new focused primitive will show it
-		// again.
-		if screen != nil {
-			screen.HideCursor()
-		}
-	} // At this point, no primitive has focus.
-
-	// Focus the new primitive.
-	var delegated bool
+	a.Lock()
+	if a.focus != nil {
+		a.focus.Blur()
+	}
+	a.focus = p
+	if a.screen != nil {
+		a.screen.HideCursor()
+	}
+	a.Unlock()
 	if p != nil {
 		p.Focus(func(p Primitive) {
-			delegated = true // Avoids multiple focus notifications.
 			a.SetFocus(p)
 		})
-	}
-
-	// If the primitive delegated focus to a child, that call has already
-	// notified the focus listeners.
-	if delegated {
-		return a
-	}
-
-	// Send focus events along the new focus chain.
-	chain = chain[:0]
-	if root != nil && root.focusChain(&chain) {
-		for _, pr := range chain {
-			pr.focused()
-		}
 	}
 
 	return a
@@ -889,14 +860,7 @@ func (a *Application) SetFocus(p Primitive) *Application {
 func (a *Application) GetFocus() Primitive {
 	a.RLock()
 	defer a.RUnlock()
-	if a.root == nil {
-		return nil
-	}
-	chain := make([]Primitive, 0, 10)
-	if a.root.focusChain(&chain) && len(chain) > 0 {
-		return chain[0]
-	}
-	return nil
+	return a.focus
 }
 
 // QueueUpdate is used to synchronize access to primitives from non-main

@@ -346,7 +346,7 @@ type TextArea struct {
 	finished func(tcell.Key)
 }
 
-// NewTextArea returns a new [TextArea]. Use [TextArea.SetText] to set the
+// NewTextArea returns a new text area. Use [TextArea.SetText] to set the
 // initial text.
 func NewTextArea() *TextArea {
 	t := &TextArea{
@@ -370,7 +370,7 @@ func NewTextArea() *TextArea {
 	t.cursor.pos = [3]int{1, 0, -1}
 	t.selectionStart = t.cursor
 	t.SetClipboard(nil, nil)
-	t.Box.Primitive = t
+
 	return t
 }
 
@@ -610,6 +610,62 @@ func (t *TextArea) GetCursor() (fromRow, fromColumn, toRow, toColumn int) {
 		toColumn = 0
 	}
 	return
+}
+
+// GetWordUnderCursor returns the absolute cursor position and the word under
+// the cursor (upto but not including the character under the cursor).
+// A word is something that all of its runes satisfy f(r).
+// The last rune that didn't satisfy f(r) is also returned.
+func (t *TextArea) GetWordUnderCursor(f func(rune) bool) (int, string, rune) {
+	if t.length == 0 || t.cursor.pos[0] == t.spans[0].next && t.cursor.pos[1] == 0 {
+		return 0, "", 0
+	}
+
+	pos := t.cursor.pos[1]
+	var word strings.Builder
+	var lastRune rune
+	var s string
+	for spanIndex := t.spans[0].next; spanIndex != 1; spanIndex = t.spans[spanIndex].next {
+		span := t.spans[spanIndex]
+		length := span.length
+		if length < 0 {
+			s = t.initialText[span.offset : span.offset-length]
+		} else {
+			s = t.editText.String()[span.offset : span.offset+length]
+		}
+		if t.cursor.pos[0] == spanIndex {
+			index := t.cursor.pos[1]
+			for _, r := range s {
+				index--
+				if index < 0 {
+					break
+				}
+				if f(r) {
+					word.WriteRune(r)
+				} else {
+					lastRune = r
+					word.Reset()
+				}
+			}
+			return pos, word.String(), lastRune
+		}
+		if length < 0 {
+			pos -= length
+		} else {
+			pos += length
+		}
+		for _, r := range s {
+			if f(r) {
+				word.WriteRune(r)
+			} else {
+				lastRune = r
+				word.Reset()
+			}
+		}
+	}
+	// Opps, we couldn't actually find the cursor
+	// Possible causes: it's at the end of text or at an unknown location
+	return pos, word.String(), lastRune
 }
 
 // GetTextLength returns the string length of the text in the text area.
@@ -1175,15 +1231,12 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 	// Draw label.
 	_, labelBg, _ := t.labelStyle.Decompose()
 	if t.labelWidth > 0 {
-		labelWidth := t.labelWidth
-		if labelWidth > width {
-			labelWidth = width
-		}
-		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignLeft, t.labelStyle, labelBg == tcell.ColorDefault)
+		labelWidth := min(t.labelWidth, width)
+		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += labelWidth
 		width -= labelWidth
 	} else {
-		_, _, drawnWidth := printWithStyle(screen, t.label, x, y, 0, width, AlignLeft, t.labelStyle, labelBg == tcell.ColorDefault)
+		_, _, drawnWidth := printWithStyle(screen, t.label, x, y, 0, width, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
 		x += drawnWidth
 		width -= drawnWidth
 	}
@@ -1205,8 +1258,8 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 		bg = t.backgroundColor
 	}
 	if bg != t.backgroundColor {
-		for row := 0; row < height; row++ {
-			for column := 0; column < width; column++ {
+		for row := range height {
+			for column := range width {
 				screen.SetContent(x+column, y+row, ' ', nil, t.textStyle)
 			}
 		}
@@ -1485,28 +1538,19 @@ func (t *TextArea) findCursor(clamp bool, startRow int) {
 			if t.rowOffset >= len(t.lineStarts) {
 				t.extendLines(t.lastWidth, t.rowOffset)
 				if t.rowOffset >= len(t.lineStarts) {
-					t.rowOffset = len(t.lineStarts) - 1
-					if t.rowOffset < 0 {
-						t.rowOffset = 0
-					}
+					t.rowOffset = max(len(t.lineStarts)-1, 0)
 				}
 			}
 		}
 		if !t.wrap {
 			if t.cursor.actualColumn < t.columnOffset+t.minCursorPrefix {
 				// We're left of the viewport.
-				t.columnOffset = t.cursor.actualColumn - t.minCursorPrefix
-				if t.columnOffset < 0 {
-					t.columnOffset = 0
-				}
+				t.columnOffset = max(t.cursor.actualColumn-t.minCursorPrefix, 0)
 			} else if t.cursor.actualColumn >= t.columnOffset+t.lastWidth-t.minCursorSuffix {
 				// We're right of the viewport.
 				t.columnOffset = t.cursor.actualColumn - t.lastWidth + t.minCursorSuffix
 				if t.columnOffset >= t.widestLine {
-					t.columnOffset = t.widestLine - 1
-					if t.columnOffset < 0 {
-						t.columnOffset = 0
-					}
+					t.columnOffset = max(t.widestLine-1, 0)
 				}
 			}
 		}
@@ -1515,10 +1559,7 @@ func (t *TextArea) findCursor(clamp bool, startRow int) {
 
 	// The screen position of the cursor is unknown. Find it. This can be
 	// expensive. First, find the row.
-	row := startRow
-	if row < 0 {
-		row = 0
-	}
+	row := max(startRow, 0)
 RowLoop:
 	for {
 		// Examine the current row.
@@ -2040,10 +2081,7 @@ func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 				// Just scroll.
 				t.columnOffset++
 				if t.columnOffset >= t.widestLine {
-					t.columnOffset = t.widestLine - 1
-					if t.columnOffset < 0 {
-						t.columnOffset = 0
-					}
+					t.columnOffset = max(t.widestLine-1, 0)
 				}
 			}
 		case tcell.KeyDown: // Move one row down.
@@ -2061,10 +2099,7 @@ func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 				if t.rowOffset >= len(t.lineStarts) {
 					t.extendLines(t.lastWidth, t.rowOffset)
 					if t.rowOffset >= len(t.lineStarts) {
-						t.rowOffset = len(t.lineStarts) - 1
-						if t.rowOffset < 0 {
-							t.rowOffset = 0
-						}
+						t.rowOffset = max(len(t.lineStarts)-1, 0)
 					}
 				}
 			}
@@ -2408,10 +2443,7 @@ func (t *TextArea) MouseHandler() func(action MouseAction, event *tcell.EventMou
 		case MouseScrollDown:
 			t.rowOffset++
 			if t.rowOffset >= len(t.lineStarts) {
-				t.rowOffset = len(t.lineStarts) - 1
-				if t.rowOffset < 0 {
-					t.rowOffset = 0
-				}
+				t.rowOffset = max(len(t.lineStarts)-1, 0)
 			}
 			consumed = true
 		case MouseScrollLeft:
@@ -2422,10 +2454,7 @@ func (t *TextArea) MouseHandler() func(action MouseAction, event *tcell.EventMou
 		case MouseScrollRight:
 			t.columnOffset++
 			if t.columnOffset >= t.widestLine {
-				t.columnOffset = t.widestLine - 1
-				if t.columnOffset < 0 {
-					t.columnOffset = 0
-				}
+				t.columnOffset = max(t.widestLine-1, 0)
 			}
 			consumed = true
 		}

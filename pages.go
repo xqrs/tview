@@ -6,10 +6,10 @@ import (
 
 // page represents one page of a Pages object.
 type page struct {
-	Name    string    // The page's name.
-	Item    Primitive // The page's primitive.
-	Resize  bool      // Whether or not to resize the page when it is drawn.
-	Visible bool      // Whether or not this page is visible.
+	name    string    // The page's name.
+	item    Primitive // The page's primitive.
+	resize  bool      // Whether or not to resize the page when it is drawn.
+	visible bool      // Whether or not this page is visible.
 }
 
 // Pages is a container for other primitives laid out on top of each other,
@@ -32,12 +32,11 @@ type Pages struct {
 	changed func()
 }
 
-// NewPages returns a new [Pages] object.
+// NewPages returns a new Pages object.
 func NewPages() *Pages {
 	p := &Pages{
 		Box: NewBox(),
 	}
-	p.Box.Primitive = p
 	return p
 }
 
@@ -58,11 +57,21 @@ func (p *Pages) GetPageCount() int {
 func (p *Pages) GetPageNames(visibleOnly bool) []string {
 	var names []string
 	for index := len(p.pages) - 1; index >= 0; index-- {
-		if !visibleOnly || p.pages[index].Visible {
-			names = append(names, p.pages[index].Name)
+		if !visibleOnly || p.pages[index].visible {
+			names = append(names, p.pages[index].name)
 		}
 	}
 	return names
+}
+
+func (p *Pages) GetVisibile(name string) bool {
+	for _, page := range p.pages {
+		if name == page.name {
+			return page.visible
+		}
+	}
+
+	return false
 }
 
 // Clear removes all pages.
@@ -73,22 +82,22 @@ func (p *Pages) Clear() *Pages {
 
 // AddPage adds a new page with the given name and primitive. If there was
 // previously a page with the same name, it is overwritten. Leaving the name
-// empty may cause conflicts in other functions so you should always specify a
-// non-empty name.
+// empty may cause conflicts in other functions so always specify a non-empty
+// name.
 //
 // Visible pages will be drawn in the order they were added (unless that order
 // was changed in one of the other functions). If "resize" is set to true, the
-// primitive will be set to the size available to the [Pages] primitive whenever
+// primitive will be set to the size available to the Pages primitive whenever
 // the pages are drawn.
 func (p *Pages) AddPage(name string, item Primitive, resize, visible bool) *Pages {
 	hasFocus := p.HasFocus()
 	for index, pg := range p.pages {
-		if pg.Name == name {
+		if pg.name == name {
 			p.pages = append(p.pages[:index], p.pages[index+1:]...)
 			break
 		}
 	}
-	p.pages = append(p.pages, &page{Item: item, Name: name, Resize: resize, Visible: visible})
+	p.pages = append(p.pages, &page{item: item, name: name, resize: resize, visible: visible})
 	if p.changed != nil {
 		p.changed()
 	}
@@ -112,10 +121,10 @@ func (p *Pages) RemovePage(name string) *Pages {
 	var isVisible bool
 	hasFocus := p.HasFocus()
 	for index, page := range p.pages {
-		if page.Name == name {
-			isVisible = page.Visible
+		if page.name == name {
+			isVisible = page.visible
 			p.pages = append(p.pages[:index], p.pages[index+1:]...)
-			if page.Visible && p.changed != nil {
+			if page.visible && p.changed != nil {
 				p.changed()
 			}
 			break
@@ -124,11 +133,11 @@ func (p *Pages) RemovePage(name string) *Pages {
 	if isVisible {
 		for index, page := range p.pages {
 			if index < len(p.pages)-1 {
-				if page.Visible {
+				if page.visible {
 					break // There is a remaining visible page.
 				}
 			} else {
-				page.Visible = true // We need at least one visible page.
+				page.visible = true // We need at least one visible page.
 			}
 		}
 	}
@@ -141,7 +150,7 @@ func (p *Pages) RemovePage(name string) *Pages {
 // HasPage returns true if a page with the given name exists in this object.
 func (p *Pages) HasPage(name string) bool {
 	for _, page := range p.pages {
-		if page.Name == name {
+		if page.name == name {
 			return true
 		}
 	}
@@ -152,8 +161,8 @@ func (p *Pages) HasPage(name string) bool {
 // which are already visible).
 func (p *Pages) ShowPage(name string) *Pages {
 	for _, page := range p.pages {
-		if page.Name == name {
-			page.Visible = true
+		if page.name == name {
+			page.visible = true
 			if p.changed != nil {
 				p.changed()
 			}
@@ -169,8 +178,8 @@ func (p *Pages) ShowPage(name string) *Pages {
 // HidePage sets a page's visibility to "false".
 func (p *Pages) HidePage(name string) *Pages {
 	for _, page := range p.pages {
-		if page.Name == name {
-			page.Visible = false
+		if page.name == name {
+			page.visible = false
 			if p.changed != nil {
 				p.changed()
 			}
@@ -187,10 +196,10 @@ func (p *Pages) HidePage(name string) *Pages {
 // visibility to "false".
 func (p *Pages) SwitchToPage(name string) *Pages {
 	for _, page := range p.pages {
-		if page.Name == name {
-			page.Visible = true
+		if page.name == name {
+			page.visible = true
 		} else {
-			page.Visible = false
+			page.visible = false
 		}
 	}
 	if p.changed != nil {
@@ -207,11 +216,11 @@ func (p *Pages) SwitchToPage(name string) *Pages {
 // visible).
 func (p *Pages) SendToFront(name string) *Pages {
 	for index, page := range p.pages {
-		if page.Name == name {
+		if page.name == name {
 			if index < len(p.pages)-1 {
 				p.pages = append(append(p.pages[:index], p.pages[index+1:]...), page)
 			}
-			if page.Visible && p.changed != nil {
+			if page.visible && p.changed != nil {
 				p.changed()
 			}
 			break
@@ -228,11 +237,11 @@ func (p *Pages) SendToFront(name string) *Pages {
 // visible).
 func (p *Pages) SendToBack(name string) *Pages {
 	for index, pg := range p.pages {
-		if pg.Name == name {
+		if pg.name == name {
 			if index > 0 {
 				p.pages = append(append([]*page{pg}, p.pages[:index]...), p.pages[index+1:]...)
 			}
-			if pg.Visible && p.changed != nil {
+			if pg.visible && p.changed != nil {
 				p.changed()
 			}
 			break
@@ -248,44 +257,33 @@ func (p *Pages) SendToBack(name string) *Pages {
 // pages, ("", nil) is returned.
 func (p *Pages) GetFrontPage() (name string, item Primitive) {
 	for index := len(p.pages) - 1; index >= 0; index-- {
-		if p.pages[index].Visible {
-			return p.pages[index].Name, p.pages[index].Item
+		if p.pages[index].visible {
+			return p.pages[index].name, p.pages[index].item
 		}
 	}
 	return
 }
 
-// GetPage returns the page with the given name. If no such page exists, nil is
-// returned.
-func (p *Pages) GetPage(name string) Primitive {
+// HasFocus returns whether or not this primitive has focus.
+func (p *Pages) HasFocus() bool {
 	for _, page := range p.pages {
-		if page.Name == name {
-			return page.Item
-		}
-	}
-	return nil
-}
-
-// focusChain implements the [Primitive]'s focusChain method.
-func (p *Pages) focusChain(chain *[]Primitive) bool {
-	for _, page := range p.pages {
-		if hasFocus := page.Item.focusChain(chain); hasFocus {
-			if chain != nil {
-				*chain = append(*chain, p)
-			}
+		if page.item.HasFocus() {
 			return true
 		}
 	}
-	return p.Box.focusChain(chain)
+	return p.Box.HasFocus()
 }
 
 // Focus is called by the application when the primitive receives focus.
 func (p *Pages) Focus(delegate func(p Primitive)) {
+	if delegate == nil {
+		return // We cannot delegate so we cannot focus.
+	}
 	p.setFocus = delegate
 	var topItem Primitive
 	for _, page := range p.pages {
-		if page.Visible {
-			topItem = page.Item
+		if page.visible {
+			topItem = page.item
 		}
 	}
 	if topItem != nil {
@@ -299,14 +297,14 @@ func (p *Pages) Focus(delegate func(p Primitive)) {
 func (p *Pages) Draw(screen tcell.Screen) {
 	p.Box.DrawForSubclass(screen, p)
 	for _, page := range p.pages {
-		if !page.Visible {
+		if !page.visible {
 			continue
 		}
-		if page.Resize {
+		if page.resize {
 			x, y, width, height := p.GetInnerRect()
-			page.Item.SetRect(x, y, width, height)
+			page.item.SetRect(x, y, width, height)
 		}
-		page.Item.Draw(screen)
+		page.item.Draw(screen)
 	}
 }
 
@@ -320,8 +318,8 @@ func (p *Pages) MouseHandler() func(action MouseAction, event *tcell.EventMouse,
 		// Pass mouse events along to the last visible page item that takes it.
 		for index := len(p.pages) - 1; index >= 0; index-- {
 			page := p.pages[index]
-			if page.Visible {
-				consumed, capture = page.Item.MouseHandler()(action, event, setFocus)
+			if page.visible {
+				consumed, capture = page.item.MouseHandler()(action, event, setFocus)
 				if consumed {
 					return
 				}
@@ -336,8 +334,8 @@ func (p *Pages) MouseHandler() func(action MouseAction, event *tcell.EventMouse,
 func (p *Pages) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
 	return p.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
 		for _, page := range p.pages {
-			if page.Item.HasFocus() {
-				if handler := page.Item.InputHandler(); handler != nil {
+			if page.item.HasFocus() {
+				if handler := page.item.InputHandler(); handler != nil {
 					handler(event, setFocus)
 					return
 				}
@@ -350,8 +348,8 @@ func (p *Pages) InputHandler() func(event *tcell.EventKey, setFocus func(p Primi
 func (p *Pages) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
 	return p.WrapPasteHandler(func(pastedText string, setFocus func(p Primitive)) {
 		for _, page := range p.pages {
-			if page.Item.HasFocus() {
-				if handler := page.Item.PasteHandler(); handler != nil {
+			if page.item.HasFocus() {
+				if handler := page.item.PasteHandler(); handler != nil {
 					handler(pastedText, setFocus)
 					return
 				}

@@ -2,6 +2,7 @@ package tview
 
 import (
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // Tree navigation events.
@@ -18,7 +19,7 @@ const (
 // TreeNode represents one node in a tree view.
 type TreeNode struct {
 	// The reference object.
-	reference interface{}
+	reference any
 
 	// This node's child nodes.
 	children []*TreeNode
@@ -60,7 +61,7 @@ func NewTreeNode(text string) *TreeNode {
 	return &TreeNode{
 		text:              text,
 		textStyle:         tcell.StyleDefault.Foreground(Styles.PrimaryTextColor).Background(Styles.PrimitiveBackgroundColor),
-		selectedTextStyle: tcell.StyleDefault.Foreground(Styles.PrimitiveBackgroundColor).Background(Styles.PrimaryTextColor),
+		selectedTextStyle: tcell.StyleDefault.Reverse(true),
 		indent:            2,
 		expanded:          true,
 		selectable:        true,
@@ -97,13 +98,13 @@ func (n *TreeNode) Walk(callback func(node, parent *TreeNode) bool) *TreeNode {
 // SetReference allows you to store a reference of any type in this node. This
 // will allow you to establish a mapping between the TreeView hierarchy and your
 // internal tree structure.
-func (n *TreeNode) SetReference(reference interface{}) *TreeNode {
+func (n *TreeNode) SetReference(reference any) *TreeNode {
 	n.reference = reference
 	return n
 }
 
 // GetReference returns this node's reference object.
-func (n *TreeNode) GetReference() interface{} {
+func (n *TreeNode) GetReference() any {
 	return n.reference
 }
 
@@ -140,7 +141,7 @@ func (n *TreeNode) AddChild(node *TreeNode) *TreeNode {
 func (n *TreeNode) RemoveChild(node *TreeNode) *TreeNode {
 	for index, child := range n.children {
 		if child == node {
-			n.children = append(n.children[:index], n.children[index+1:]...)
+			n.children = slices.Delete(n.children, index, index+1)
 			break
 		}
 	}
@@ -295,7 +296,7 @@ func (n *TreeNode) GetLevel() int {
 // using SetPrefixes() for different levels, for example to display hierarchical
 // bullet point lists.
 //
-// See https://github.com/rivo/tview/wiki/TreeView for an example.
+// See https://github.com/ayn2op/tview/wiki/TreeView for an example.
 type TreeView struct {
 	*Box
 
@@ -354,15 +355,13 @@ type TreeView struct {
 	stableNodes bool
 }
 
-// NewTreeView returns a new [TreeView].
+// NewTreeView returns a new tree view.
 func NewTreeView() *TreeView {
-	t := &TreeView{
+	return &TreeView{
 		Box:           NewBox(),
 		graphics:      true,
 		graphicsColor: Styles.GraphicsColor,
 	}
-	t.Box.Primitive = t
-	return t
 }
 
 // SetRoot sets the root node of the tree.
@@ -750,10 +749,10 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 				// Draw a branch if this ancestor is not a last child.
 				if ancestor.parent.children[len(ancestor.parent.children)-1] != ancestor {
 					if posY-1 >= y && ancestor.textX > ancestor.graphicsX {
-						PrintJoinedSemigraphics(screen, x+ancestor.graphicsX, posY-1, Borders.Vertical, lineStyle)
+						PrintJoinedSemigraphics(screen, x+ancestor.graphicsX, posY-1, t.borderSet.Left, lineStyle)
 					}
 					if posY < y+height {
-						screen.SetContent(x+ancestor.graphicsX, posY, Borders.Vertical, nil, lineStyle)
+						screen.SetContent(x+ancestor.graphicsX, posY, t.borderSet.Right, nil, lineStyle)
 					}
 				}
 				ancestor = ancestor.parent
@@ -762,14 +761,14 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 			if node.textX > node.graphicsX && node.graphicsX < width {
 				// Connect to the node above.
 				if posY-1 >= y && t.nodes[index-1].graphicsX <= node.graphicsX && t.nodes[index-1].textX > node.graphicsX {
-					PrintJoinedSemigraphics(screen, x+node.graphicsX, posY-1, Borders.TopLeft, lineStyle)
+					PrintJoinedSemigraphics(screen, x+node.graphicsX, posY-1, t.borderSet.TopLeft, lineStyle)
 				}
 
 				// Join this node.
 				if posY < y+height {
-					screen.SetContent(x+node.graphicsX, posY, Borders.BottomLeft, nil, lineStyle)
+					screen.SetContent(x+node.graphicsX, posY, t.borderSet.BottomLeft, nil, lineStyle)
 					for pos := node.graphicsX + 1; pos < node.textX && pos < width; pos++ {
-						screen.SetContent(x+pos, posY, Borders.Horizontal, nil, lineStyle)
+						screen.SetContent(x+pos, posY, t.borderSet.Top, nil, lineStyle)
 					}
 				}
 			}
@@ -780,7 +779,7 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 			// Prefix.
 			var prefixWidth int
 			if len(t.prefixes) > 0 {
-				_, _, prefixWidth = printWithStyle(screen, t.prefixes[(node.level-t.topLevel)%len(t.prefixes)], x+node.textX, posY, 0, width-node.textX, AlignLeft, node.textStyle, true)
+				_, _, prefixWidth = printWithStyle(screen, t.prefixes[(node.level-t.topLevel)%len(t.prefixes)], x+node.textX, posY, 0, width-node.textX, AlignmentLeft, node.textStyle, true)
 			}
 
 			// Text.
@@ -789,7 +788,7 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 				if node == t.currentNode {
 					style = node.selectedTextStyle
 				}
-				printWithStyle(screen, node.text, x+node.textX+prefixWidth, posY, 0, width-node.textX-prefixWidth, AlignLeft, style, false)
+				printWithStyle(screen, node.text, x+node.textX+prefixWidth, posY, 0, width-node.textX-prefixWidth, AlignmentLeft, style, false)
 			}
 		}
 

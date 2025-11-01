@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell/v2"
+	"slices"
 )
 
 // dropDownOption is one option that can be selected in a drop-down primitive.
@@ -16,7 +17,7 @@ type dropDownOption struct {
 // DropDown implements a selection widget whose options become visible in a
 // drop-down list when activated.
 //
-// See https://github.com/rivo/tview/wiki/DropDown for an example.
+// See https://github.com/ayn2op/tview/wiki/DropDown for an example.
 type DropDown struct {
 	*Box
 
@@ -92,7 +93,7 @@ type DropDown struct {
 	dragging bool // Set to true when mouse dragging is in progress.
 }
 
-// NewDropDown returns a new [DropDown].
+// NewDropDown returns a new drop-down.
 func NewDropDown() *DropDown {
 	list := NewList()
 	list.ShowSecondaryText(false).
@@ -116,7 +117,6 @@ func NewDropDown() *DropDown {
 		prefixStyle:   tcell.StyleDefault.Background(Styles.PrimaryTextColor).Foreground(Styles.ContrastBackgroundColor),
 	}
 
-	d.Box.Primitive = d
 	return d
 }
 
@@ -164,7 +164,7 @@ func (d *DropDown) SetTextOptions(prefix, suffix, currentPrefix, currentSuffix, 
 	d.noSelection = noSelection
 	d.optionPrefix = prefix
 	d.optionSuffix = suffix
-	for index := 0; index < d.list.GetItemCount(); index++ {
+	for index := range d.list.GetItemCount() {
 		d.list.SetItemText(index, prefix+d.options[index].Text+suffix, "")
 	}
 	return d
@@ -313,11 +313,6 @@ func (d *DropDown) SetDisabled(disabled bool) FormItem {
 	return d
 }
 
-// GetDisabled returns whether or not the item is disabled / read-only.
-func (d *DropDown) GetDisabled() bool {
-	return d.disabled
-}
-
 // AddOption adds a new selectable option to this drop-down. The "selected"
 // callback is called when this option was selected. It may be nil.
 func (d *DropDown) AddOption(text string, selected func()) *DropDown {
@@ -352,7 +347,7 @@ func (d *DropDown) RemoveOption(index int) *DropDown {
 	if index == d.currentOption {
 		d.currentOption = -1
 	}
-	d.options = append(d.options[:index], d.options[index+1:]...)
+	d.options = slices.Delete(d.options, index, index+1)
 	d.list.RemoveItem(index)
 	return d
 }
@@ -399,14 +394,11 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 
 	// Draw label.
 	if d.labelWidth > 0 {
-		labelWidth := d.labelWidth
-		if labelWidth > rightLimit-x {
-			labelWidth = rightLimit - x
-		}
-		printWithStyle(screen, d.label, x, y, 0, labelWidth, AlignLeft, d.labelStyle, true)
+		labelWidth := min(d.labelWidth, rightLimit-x)
+		printWithStyle(screen, d.label, x, y, 0, labelWidth, AlignmentLeft, d.labelStyle, true)
 		x += labelWidth
 	} else {
-		_, _, drawnWidth := printWithStyle(screen, d.label, x, y, 0, rightLimit-x, AlignLeft, d.labelStyle, true)
+		_, _, drawnWidth := printWithStyle(screen, d.label, x, y, 0, rightLimit-x, AlignmentLeft, d.labelStyle, true)
 		x += drawnWidth
 	}
 
@@ -456,7 +448,7 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 	} else if d.HasFocus() && !d.open {
 		fieldStyle = d.focusedStyle
 	}
-	for index := 0; index < fieldWidth; index++ {
+	for index := range fieldWidth {
 		screen.SetContent(x+index, y, ' ', nil, fieldStyle)
 	}
 
@@ -471,10 +463,10 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 			currentOptionPrefix = Escape(currentOptionPrefix)
 			currentOptionSuffix = Escape(currentOptionSuffix)
 		}
-		_, _, copWidth := printWithStyle(screen, currentOptionPrefix, x, y, 0, fieldWidth, AlignLeft, d.fieldStyle, false)
+		_, _, copWidth := printWithStyle(screen, currentOptionPrefix, x, y, 0, fieldWidth, AlignmentLeft, d.fieldStyle, false)
 		if copWidth < fieldWidth {
 			// Then draw the prefix.
-			_, _, prefixWidth := printWithStyle(screen, prefix, x+copWidth, y, 0, fieldWidth-copWidth, AlignLeft, d.prefixStyle, false)
+			_, _, prefixWidth := printWithStyle(screen, prefix, x+copWidth, y, 0, fieldWidth-copWidth, AlignmentLeft, d.prefixStyle, false)
 			if copWidth+prefixWidth < fieldWidth {
 				// Then the current option remainder.
 				var corWidth int
@@ -484,11 +476,11 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 					if !useStyleTags {
 						text = Escape(text)
 					}
-					_, _, corWidth = printWithStyle(screen, text, x+copWidth+prefixWidth, y, prefixWidth, fieldWidth-copWidth-prefixWidth, AlignLeft, d.fieldStyle, false)
+					_, _, corWidth = printWithStyle(screen, text, x+copWidth+prefixWidth, y, prefixWidth, fieldWidth-copWidth-prefixWidth, AlignmentLeft, d.fieldStyle, false)
 				}
 				if copWidth+prefixWidth+corWidth < fieldWidth {
 					// And finally the current option suffix.
-					printWithStyle(screen, currentOptionSuffix, x+copWidth+prefixWidth+corWidth, y, 0, fieldWidth-copWidth-prefixWidth-corWidth, AlignLeft, d.fieldStyle, false)
+					printWithStyle(screen, currentOptionSuffix, x+copWidth+prefixWidth+corWidth, y, 0, fieldWidth-copWidth-prefixWidth-corWidth, AlignmentLeft, d.fieldStyle, false)
 				}
 			}
 		}
@@ -501,7 +493,7 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 		if !useStyleTags {
 			text = Escape(text)
 		}
-		printWithStyle(screen, text, x, y, 0, fieldWidth, AlignLeft, fieldStyle, false)
+		printWithStyle(screen, text, x, y, 0, fieldWidth, AlignmentLeft, fieldStyle, false)
 	}
 
 	// Draw options list.
@@ -514,17 +506,11 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 		// We prefer to align the left sides of the list and the main widget, but
 		// if there is no space to the right, then shift the list to the left.
 		if lx+lwidth >= swidth {
-			lx = swidth - lwidth
-			if lx < 0 {
-				lx = 0
-			}
+			lx = max(swidth-lwidth, 0)
 		}
 		// We prefer to drop down but if there is no space, maybe drop up?
 		if ly+lheight >= sheight && ly-2 > lheight-ly {
-			ly = y - lheight
-			if ly < 0 {
-				ly = 0
-			}
+			ly = max(y-lheight, 0)
 		}
 		if ly+lheight >= sheight {
 			lheight = sheight - ly
@@ -648,9 +634,6 @@ func (d *DropDown) openList(setFocus func(Primitive)) {
 // closeList closes the embedded List element by hiding it and removing focus
 // from it.
 func (d *DropDown) closeList(setFocus func(Primitive)) {
-	if !d.open {
-		return
-	}
 	d.open = false
 	if d.list.HasFocus() {
 		setFocus(d)
@@ -678,17 +661,12 @@ func (d *DropDown) Focus(delegate func(p Primitive)) {
 	}
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (d *DropDown) focusChain(chain *[]Primitive) bool {
+// HasFocus returns whether or not this primitive has focus.
+func (d *DropDown) HasFocus() bool {
 	if d.open {
-		if hasFocus := d.list.focusChain(chain); hasFocus {
-			if chain != nil {
-				*chain = append(*chain, d)
-			}
-			return true
-		}
+		return d.list.HasFocus()
 	}
-	return d.Box.focusChain(chain)
+	return d.Box.HasFocus()
 }
 
 // MouseHandler returns the mouse handler for this primitive.

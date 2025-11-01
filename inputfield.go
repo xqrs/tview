@@ -74,7 +74,7 @@ var (
 //   - Down arrow: Open the autocomplete drop-down.
 //   - Tab, Enter: Select the current autocomplete entry.
 //
-// See https://github.com/rivo/tview/wiki/InputField for an example.
+// See https://github.com/ayn2op/tview/wiki/InputField for an example.
 type InputField struct {
 	*Box
 
@@ -127,7 +127,7 @@ type InputField struct {
 	finished func(tcell.Key)
 }
 
-// NewInputField returns a new [InputField].
+// NewInputField returns a new input field.
 func NewInputField() *InputField {
 	i := &InputField{
 		Box:      NewBox(),
@@ -137,6 +137,11 @@ func NewInputField() *InputField {
 		if i.changed != nil {
 			i.changed(i.textArea.GetText())
 		}
+	}).SetFocusFunc(func() {
+		// Forward focus event to the input field.
+		if i.Box.focus != nil {
+			i.Box.focus()
+		}
 	})
 	i.textArea.textStyle = tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.PrimaryTextColor)
 	i.textArea.placeholderStyle = tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.ContrastSecondaryTextColor)
@@ -144,7 +149,6 @@ func NewInputField() *InputField {
 	i.autocompleteStyles.selected = tcell.StyleDefault.Background(Styles.PrimaryTextColor).Foreground(Styles.PrimitiveBackgroundColor)
 	i.autocompleteStyles.background = Styles.MoreContrastBackgroundColor
 	i.autocompleteStyles.useTags = true
-	i.Box.Primitive = i
 	return i
 }
 
@@ -292,11 +296,6 @@ func (i *InputField) SetDisabled(disabled bool) FormItem {
 		i.finished(-1)
 	}
 	return i
-}
-
-// GetDisabled returns whether or not the item is disabled / read-only.
-func (i *InputField) GetDisabled() bool {
-	return i.textArea.GetDisabled()
 }
 
 // SetMaskCharacter sets a character that masks user input on a screen. A value
@@ -458,22 +457,17 @@ func (i *InputField) Focus(delegate func(p Primitive)) {
 		return
 	}
 
-	delegate(i.textArea)
+	i.Box.Focus(delegate)
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (i *InputField) focusChain(chain *[]Primitive) bool {
-	if hasFocus := i.textArea.focusChain(chain); hasFocus {
-		if chain != nil {
-			*chain = append(*chain, i)
-		}
-		return true
-	}
-	return i.Box.focusChain(chain)
+// HasFocus returns whether or not this primitive has focus.
+func (i *InputField) HasFocus() bool {
+	return i.textArea.HasFocus() || i.Box.HasFocus()
 }
 
 // Blur is called when this primitive loses focus.
 func (i *InputField) Blur() {
+	i.textArea.Blur()
 	i.Box.Blur()
 	i.autocompleteList = nil // Hide the autocomplete drop-down.
 }
@@ -511,7 +505,7 @@ func (i *InputField) Draw(screen tcell.Screen) {
 		// How much space do we need?
 		lheight := i.autocompleteList.GetItemCount()
 		lwidth := 0
-		for index := 0; index < lheight; index++ {
+		for index := range lheight {
 			entry, _ := i.autocompleteList.GetItemText(index)
 			width := TaggedStringWidth(entry)
 			if width > lwidth {
@@ -524,10 +518,7 @@ func (i *InputField) Draw(screen tcell.Screen) {
 		ly := y + 1
 		_, sheight := screen.Size()
 		if ly+lheight >= sheight && ly-2 > lheight-ly {
-			ly = y - lheight
-			if ly < 0 {
-				ly = 0
-			}
+			ly = max(y-lheight, 0)
 		}
 		if ly+lheight >= sheight {
 			lheight = sheight - ly
@@ -548,11 +539,14 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 		var skipAutocomplete bool
 		currentText := i.textArea.GetText()
 		defer func() {
-			if skipAutocomplete {
-				return
-			}
-			if i.textArea.GetText() != currentText {
-				i.Autocomplete()
+			newText := i.textArea.GetText()
+			if newText != currentText {
+				if !skipAutocomplete {
+					i.Autocomplete()
+				}
+				if i.changed != nil {
+					i.changed(newText)
+				}
 			}
 		}()
 
@@ -652,11 +646,14 @@ func (i *InputField) MouseHandler() func(action MouseAction, event *tcell.EventM
 		var skipAutocomplete bool
 		currentText := i.GetText()
 		defer func() {
-			if skipAutocomplete {
-				return
-			}
-			if i.textArea.GetText() != currentText {
-				i.Autocomplete()
+			newText := i.GetText()
+			if newText != currentText {
+				if !skipAutocomplete {
+					i.Autocomplete()
+				}
+				if i.changed != nil {
+					i.changed(newText)
+				}
 			}
 		}()
 
@@ -692,12 +689,6 @@ func (i *InputField) MouseHandler() func(action MouseAction, event *tcell.EventM
 
 		// Forward mouse event to the text area.
 		consumed, capture = i.textArea.MouseHandler()(action, event, setFocus)
-
-		// Focus in any case.
-		if action == MouseLeftDown && !consumed {
-			setFocus(i)
-			consumed = true
-		}
 
 		return
 	})

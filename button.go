@@ -6,7 +6,7 @@ import (
 
 // Button is labeled box that triggers an action when selected.
 //
-// See https://github.com/rivo/tview/wiki/Button for an example.
+// See https://github.com/ayn2op/tview/wiki/Button for an example.
 type Button struct {
 	*Box
 
@@ -34,19 +34,17 @@ type Button struct {
 	exit func(tcell.Key)
 }
 
-// NewButton returns a new [Button].
+// NewButton returns a new input field.
 func NewButton(label string) *Button {
 	box := NewBox()
 	box.SetRect(0, 0, TaggedStringWidth(label)+4, 1)
-	b := &Button{
+	return &Button{
 		Box:            box,
 		text:           label,
 		style:          tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.PrimaryTextColor),
 		activatedStyle: tcell.StyleDefault.Background(Styles.PrimaryTextColor).Foreground(Styles.InverseTextColor),
 		disabledStyle:  tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.ContrastSecondaryTextColor),
 	}
-	b.Box.Primitive = b
-	return b
 }
 
 // SetLabel sets the button text.
@@ -108,15 +106,9 @@ func (b *Button) SetDisabled(disabled bool) *Button {
 	return b
 }
 
-// GetDisabled returns whether or not the button is disabled.
-func (b *Button) GetDisabled() bool {
-	return b.disabled
-}
-
-// IsDisabled is an alias for [Button.GetDisabled]. Only here for backwards
-// compatibility.
+// IsDisabled returns whether or not the button is disabled.
 func (b *Button) IsDisabled() bool {
-	return b.GetDisabled()
+	return b.disabled
 }
 
 // SetSelectedFunc sets a handler which is called when the button was selected.
@@ -149,13 +141,13 @@ func (b *Button) Draw(screen tcell.Screen) {
 	}
 	_, backgroundColor, _ := style.Decompose()
 	b.SetBackgroundColor(backgroundColor)
-	b.Box.DrawForSubclass(screen, b)
+	b.DrawForSubclass(screen, b)
 
 	// Draw label.
 	x, y, width, height := b.GetInnerRect()
 	if width > 0 && height > 0 {
 		y = y + height/2
-		printWithStyle(screen, b.text, x, y, 0, width, AlignCenter, style, true)
+		printWithStyle(screen, b.text, x, y, 0, width, AlignmentCenter, style, true)
 	}
 }
 
@@ -192,10 +184,11 @@ func (b *Button) MouseHandler() func(action MouseAction, event *tcell.EventMouse
 		}
 
 		// Process mouse event.
-		if action == MouseLeftDown {
+		switch action {
+		case MouseLeftDown:
 			setFocus(b)
 			consumed = true
-		} else if action == MouseLeftClick {
+		case MouseLeftClick:
 			if b.selected != nil {
 				b.selected()
 			}
