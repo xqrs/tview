@@ -268,8 +268,8 @@ func (p *Pages) GetFrontPage() (name string, item Primitive) {
 // returned.
 func (p *Pages) GetPage(name string) Primitive {
 	for _, page := range p.pages {
-		if page.Name == name {
-			return page.Item
+		if page.name == name {
+			return page.item
 		}
 	}
 	return nil
