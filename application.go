@@ -703,13 +703,12 @@ func (a *Application) ForceDraw() *Application {
 // draw actually does what Draw() promises to do.
 func (a *Application) draw() *Application {
 	a.Lock()
-	defer a.Unlock()
-
 	screen := a.screen
 	root := a.root
 	fullscreen := a.rootFullscreen
 	before := a.beforeDraw
 	after := a.afterDraw
+	a.Unlock()
 
 	// Maybe we're not ready yet or not anymore.
 	if screen == nil || root == nil {
