@@ -327,9 +327,7 @@ func (a *Application) Run() error {
 
 	// Separate loop to wait for screen events.
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		for {
 			a.RLock()
 			screen := a.screen
@@ -382,7 +380,7 @@ func (a *Application) Run() error {
 			}
 			a.draw()
 		}
-	}()
+	})
 
 	// Start event loop.
 	var (
@@ -483,14 +481,7 @@ EventLoop:
 						a.events <- event
 					})
 				}
-				a.RLock()
-				screen := a.screen
-				a.RUnlock()
-				if screen == nil {
-					break
-				}
 				lastRedraw = time.Now()
-				screen.Clear()
 				a.draw()
 			case *tcell.EventMouse:
 				consumed, isMouseDownAction := a.fireMouseActions(event)
