@@ -419,7 +419,6 @@ func (f *Form) ClearButtons() *Form {
 //   - The field text color
 //   - The field background color
 func (f *Form) AddFormItem(item FormItem) *Form {
-	item.SetFinishedFunc(f.finished)
 	f.items = append(f.items, item)
 	return f
 }
