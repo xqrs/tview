@@ -109,17 +109,11 @@ type Application struct {
 	// was drawn.
 	afterDraw func(screen tcell.Screen)
 
-	// Used to send screen events from separate goroutine to main event loop
 	events chan tcell.Event
+	quit   chan struct{}
 
 	// Functions queued from goroutines, used to serialize updates to primitives.
 	updates chan queuedUpdate
-
-	// An object that the screen variable will be set to after Fini() was called.
-	// Use this channel to set a new screen object for the application
-	// (screen.Init() and draw() will be called implicitly). A value of nil will
-	// stop the application.
-	screenReplacement chan tcell.Screen
 
 	// An optional capture function which receives a mouse event and returns the
 	// event to be forwarded to the default mouse handler (nil if nothing should
@@ -136,9 +130,9 @@ type Application struct {
 // NewApplication creates and returns a new application.
 func NewApplication() *Application {
 	return &Application{
-		events:            make(chan tcell.Event, queueSize),
-		updates:           make(chan queuedUpdate, queueSize),
-		screenReplacement: make(chan tcell.Screen, 1),
+		events:  make(chan tcell.Event, queueSize),
+		quit:    make(chan struct{}),
+		updates: make(chan queuedUpdate, queueSize),
 	}
 }
 
@@ -187,37 +181,6 @@ func (a *Application) SetMouseCapture(capture func(event *tcell.EventMouse, acti
 // if no such function has been installed.
 func (a *Application) GetMouseCapture() func(event *tcell.EventMouse, action MouseAction) (*tcell.EventMouse, MouseAction) {
 	return a.mouseCapture
-}
-
-// SetScreen allows you to provide your own tcell.Screen object. For most
-// applications, this is not needed and you should be familiar with
-// tcell.Screen when using this function. As the tcell.Screen interface may
-// change in the future, you may need to update your code when this package
-// updates to a new tcell version.
-//
-// This function is typically called before the first call to Run(). Init() need
-// not be called on the screen.
-func (a *Application) SetScreen(screen tcell.Screen) *Application {
-	if screen == nil {
-		return a // Invalid input. Do nothing.
-	}
-
-	a.Lock()
-	if a.screen == nil {
-		// Run() has not been called yet.
-		a.screen = screen
-		a.Unlock()
-		screen.Init()
-		return a
-	}
-
-	// Run() is already in progress. Exchange screen.
-	oldScreen := a.screen
-	a.Unlock()
-	oldScreen.Fini()
-	a.screenReplacement <- screen
-
-	return a
 }
 
 // SetTitle sets the title of the terminal window, to the extent that the
@@ -314,9 +277,7 @@ func (a *Application) Run() error {
 	// We catch panics to clean up because they mess up the terminal.
 	defer func() {
 		if p := recover(); p != nil {
-			if a.screen != nil {
-				a.screen.Fini()
-			}
+			a.Stop()
 			panic(p)
 		}
 	}()
@@ -325,62 +286,10 @@ func (a *Application) Run() error {
 	a.Unlock()
 	a.draw()
 
-	// Separate loop to wait for screen events.
-	var wg sync.WaitGroup
-	wg.Go(func() {
-		for {
-			a.RLock()
-			screen := a.screen
-			a.RUnlock()
-			if screen == nil {
-				// We have no screen. Let's stop.
-				a.QueueEvent(nil)
-				break
-			}
-
-			// Wait for next event and queue it.
-			event := screen.PollEvent()
-			if event != nil {
-				// Regular event. Queue.
-				a.QueueEvent(event)
-				continue
-			}
-
-			// A screen was finalized (event is nil). Wait for a new screen.
-			screen = <-a.screenReplacement
-			if screen == nil {
-				// No new screen. We're done.
-				a.QueueEvent(nil) // Stop the event loop.
-				return
-			}
-
-			// We have a new screen. Keep going.
-			a.Lock()
-			a.screen = screen
-			enableMouse := a.enableMouse
-			enablePaste := a.enablePaste
-			a.Unlock()
-
-			// Initialize and draw this screen.
-			if err := screen.Init(); err != nil {
-				panic(err)
-			}
-			if enableMouse {
-				screen.EnableMouse()
-			} else {
-				screen.DisableMouse()
-			}
-			if enablePaste {
-				screen.EnablePaste()
-			} else {
-				screen.DisablePaste()
-			}
-			if a.title != "" {
-				screen.SetTitle(a.title)
-			}
-			a.draw()
-		}
-	})
+	a.RLock()
+	screen := a.screen
+	a.RUnlock()
+	go screen.ChannelEvents(a.events, a.quit)
 
 	// Start event loop.
 	var (
@@ -506,10 +415,6 @@ EventLoop:
 		}
 	}
 
-	// Wait for the event loop to finish.
-	wg.Wait()
-	a.screen = nil
-
 	return appErr
 }
 
@@ -620,9 +525,9 @@ func (a *Application) Stop() {
 	if screen == nil {
 		return
 	}
-	a.screen = nil
 	screen.Fini()
-	a.screenReplacement <- nil
+	close(a.quit)
+	a.screen = nil
 }
 
 // Suspend temporarily suspends the application by exiting terminal UI mode and
