@@ -49,13 +49,6 @@ type Box struct {
 	// focus.
 	focus, blur func()
 
-	// Callback function invoked when the box itself is resized, nil if not set.
-	boxResize func()
-
-	// Callback function invoked when the box's inner content area is resized,
-	// nil if not set.
-	contentResize func()
-
 	// An optional capture function which receives a key event and returns the
 	// event to be forwarded to the primitive's default input handler (nil if
 	// nothing should be forwarded).
@@ -151,14 +144,6 @@ func (b *Box) SetRect(x, y, width, height int) {
 	b.y = y
 	b.width, width = width, b.width
 	b.height, height = height, b.height
-	if b.width != width || b.height != height {
-		if b.boxResize != nil {
-			b.boxResize()
-		}
-		if b.contentResize != nil {
-			b.contentResize()
-		}
-	}
 	b.innerX = -1 // Mark inner rect as uninitialized.
 }
 
@@ -179,23 +164,6 @@ func (b *Box) SetDrawFunc(handler func(screen tcell.Screen, x, y, width, height 
 // SetDrawFunc() or nil if no such function has been installed.
 func (b *Box) GetDrawFunc() func(screen tcell.Screen, x, y, width, height int) (int, int, int, int) {
 	return b.draw
-}
-
-// SetBoxResizeFunc sets a callback function which is invoked when the size of
-// the box itself changes. Note that this is not called when the box is moved
-// (i.e. when only x and y change). Set to nil to remove the callback function.
-func (b *Box) SetBoxResizeFunc(handler func()) *Box {
-	b.boxResize = handler
-	return b
-}
-
-// SetContentResizeFunc sets a callback function which is invoked when the size
-// of the box's inner content area changes. Note that this is not called when
-// the area is moved (i.e. when only x and y change). Set to nil to remove the
-// callback function.
-func (b *Box) SetContentResizeFunc(handler func()) *Box {
-	b.contentResize = handler
-	return b
 }
 
 // WrapInputHandler wraps an input handler (see [Box.InputHandler]) with the
@@ -344,12 +312,6 @@ func (b *Box) GetBorders() Borders {
 
 // SetBorders sets which borders to draw.
 func (b *Box) SetBorders(flag Borders) *Box {
-	b.borders, flag = flag, b.borders
-	if b.borders != flag {
-		if b.contentResize != nil {
-			b.contentResize()
-		}
-	}
 	b.borders = flag
 	return b
 }
