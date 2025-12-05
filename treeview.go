@@ -1,8 +1,9 @@
 package tview
 
 import (
-	"github.com/gdamore/tcell/v2"
 	"slices"
+
+	"github.com/gdamore/tcell/v2"
 )
 
 // Tree navigation events.
@@ -759,14 +760,17 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 			}
 
 			if node.textX > node.graphicsX && node.graphicsX < width {
-				// Connect to the node above.
-				if posY-1 >= y && t.nodes[index-1].graphicsX <= node.graphicsX && t.nodes[index-1].textX > node.graphicsX {
-					PrintJoinedSemigraphics(screen, x+node.graphicsX, posY-1, t.borderSet.TopLeft, lineStyle)
+				// BottomLeft for last child; LeftT for non-last siblings.
+				connector := t.borderSet.BottomLeft
+				if node.parent != nil {
+					if siblings := node.parent.children; len(siblings) > 0 && siblings[len(siblings)-1] != node {
+						connector = t.borderSet.LeftT
+					}
 				}
 
 				// Join this node.
 				if posY < y+height {
-					screen.SetContent(x+node.graphicsX, posY, t.borderSet.BottomLeft, nil, lineStyle)
+					PrintJoinedSemigraphics(screen, x+node.graphicsX, posY, connector, lineStyle)
 					for pos := node.graphicsX + 1; pos < node.textX && pos < width; pos++ {
 						screen.SetContent(x+pos, posY, t.borderSet.Top, nil, lineStyle)
 					}
