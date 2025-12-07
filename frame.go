@@ -102,7 +102,7 @@ func (f *Frame) SetBorders(top, bottom, header, footer, left, right int) *Frame 
 
 // Draw draws this primitive onto the screen.
 func (f *Frame) Draw(screen tcell.Screen) {
-	f.Box.DrawForSubclass(screen, f)
+	f.DrawForSubclass(screen, f)
 
 	// Calculate start positions.
 	x, top, width, height := f.GetInnerRect()

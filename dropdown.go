@@ -387,7 +387,7 @@ func (d *DropDown) SetFinishedFunc(handler func(key tcell.Key)) FormItem {
 
 // Draw draws this primitive onto the screen.
 func (d *DropDown) Draw(screen tcell.Screen) {
-	d.Box.DrawForSubclass(screen, d)
+	d.DrawForSubclass(screen, d)
 
 	// Prepare.
 	x, y, width, height := d.GetInnerRect()
@@ -454,7 +454,7 @@ func (d *DropDown) Draw(screen tcell.Screen) {
 		fieldStyle = d.focusedStyle
 	}
 	for index := range fieldWidth {
-		screen.SetContent(x+index, y, ' ', nil, fieldStyle)
+		screen.Put(x+index, y, " ", fieldStyle)
 	}
 
 	// Draw selected text.

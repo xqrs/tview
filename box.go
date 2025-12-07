@@ -142,8 +142,8 @@ func (b *Box) GetInnerRect() (int, int, int, int) {
 func (b *Box) SetRect(x, y, width, height int) {
 	b.x = x
 	b.y = y
-	b.width, width = width, b.width
-	b.height, height = height, b.height
+	b.width = width
+	b.height = height
 	b.innerX = -1 // Mark inner rect as uninitialized.
 }
 
@@ -383,7 +383,7 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 	if !b.dontClear {
 		for y := b.y; y < b.y+b.height; y++ {
 			for x := b.x; x < b.x+b.width; x++ {
-				screen.SetContent(x, y, ' ', nil, background)
+				screen.Put(x, y, " ", background)
 			}
 		}
 	}
@@ -440,7 +440,7 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 			if b.titleAlignment == AlignmentRight {
 				xEllipsis = b.x + 1
 			}
-			_, _, style, _ := screen.GetContent(xEllipsis, b.y)
+			_, style, _ := screen.Get(xEllipsis, b.y)
 			fg, _, _ := style.Decompose()
 			Print(screen, string(SemigraphicsHorizontalEllipsis), xEllipsis, b.y, 1, AlignmentLeft, fg)
 		}

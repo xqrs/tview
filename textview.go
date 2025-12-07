@@ -1133,7 +1133,7 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 
 // Draw draws this primitive onto the screen.
 func (t *TextView) Draw(screen tcell.Screen) {
-	t.Box.DrawForSubclass(screen, t)
+	t.DrawForSubclass(screen, t)
 	t.Lock()
 	defer t.Unlock()
 
@@ -1170,7 +1170,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	if bg != t.backgroundColor {
 		for row := range height {
 			for column := range width {
-				screen.SetContent(x+column, y+row, ' ', nil, t.textStyle)
+				screen.Put(x+column, y+row, " ", t.textStyle)
 			}
 		}
 	}
@@ -1369,7 +1369,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 					if offset == 0 {
 						screen.SetContent(x+xPos+offset, y+line-t.lineOffset, runes[0], runes[1:], style)
 					} else {
-						screen.SetContent(x+xPos+offset, y+line-t.lineOffset, ' ', nil, style)
+						screen.Put(x+xPos+offset, y+line-t.lineOffset, " ", style)
 					}
 				}
 			}

@@ -575,7 +575,7 @@ func (l *List) Draw(screen tcell.Screen) {
 		// Draw until the end of the line if requested.
 		if selected && l.highlightFullLine {
 			for bx := printedWidth; bx < width; bx++ {
-				screen.SetContent(x+bx, y, ' ', nil, style)
+				screen.Put(x+bx, y, " ", style)
 			}
 		}
 

@@ -139,8 +139,8 @@ func NewInputField() *InputField {
 		}
 	}).SetFocusFunc(func() {
 		// Forward focus event to the input field.
-		if i.Box.focus != nil {
-			i.Box.focus()
+		if i.focus != nil {
+			i.focus()
 		}
 	})
 	i.textArea.textStyle = tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.PrimaryTextColor)
@@ -479,7 +479,7 @@ func (i *InputField) Blur() {
 
 // Draw draws this primitive onto the screen.
 func (i *InputField) Draw(screen tcell.Screen) {
-	i.Box.DrawForSubclass(screen, i)
+	i.DrawForSubclass(screen, i)
 
 	// Prepare
 	x, y, width, height := i.GetInnerRect()

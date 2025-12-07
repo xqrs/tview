@@ -1216,7 +1216,7 @@ func (t *TextArea) replace(deleteStart, deleteEnd [3]int, insert string, continu
 
 // Draw draws this primitive onto the screen.
 func (t *TextArea) Draw(screen tcell.Screen) {
-	t.Box.DrawForSubclass(screen, t)
+	t.DrawForSubclass(screen, t)
 
 	// Prepare
 	x, y, width, height := t.GetInnerRect()
@@ -1260,7 +1260,7 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 	if bg != t.backgroundColor {
 		for row := range height {
 			for column := range width {
-				screen.SetContent(x+column, y+row, ' ', nil, t.textStyle)
+				screen.Put(x+column, y+row, " ", t.textStyle)
 			}
 		}
 	}
@@ -1348,7 +1348,7 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 		// Selected tabs are a bit special.
 		if cluster == "\t" && style == t.selectedStyle {
 			for colX := 0; colX < clusterWidth && posX+colX-columnOffset < width; colX++ {
-				screen.SetContent(x+posX+colX-columnOffset, y+posY, ' ', nil, style)
+				screen.Put(x+posX+colX-columnOffset, y+posY, " ", style)
 			}
 		}
 

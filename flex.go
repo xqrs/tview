@@ -60,7 +60,7 @@ func NewFlex() *Flex {
 		direction: FlexColumn,
 	}
 	f.Box = NewBox()
-	f.Box.dontClear = true
+	f.dontClear = true
 	return f
 }
 
@@ -144,7 +144,7 @@ func (f *Flex) ResizeItem(p Primitive, fixedSize, proportion int) *Flex {
 
 // Draw draws this primitive onto the screen.
 func (f *Flex) Draw(screen tcell.Screen) {
-	f.Box.DrawForSubclass(screen, f)
+	f.DrawForSubclass(screen, f)
 
 	// Calculate size and position of the items.
 

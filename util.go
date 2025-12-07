@@ -114,7 +114,7 @@ func printWithStyle(screen tcell.Screen, text string, x, y, skipWidth, maxWidth 
 			if maintainBackground {
 				_, backgroundColor, _ := finalStyle.Decompose()
 				if backgroundColor == tcell.ColorDefault {
-					_, _, existingStyle, _ := screen.GetContent(x, y)
+					_, existingStyle, _ := screen.Get(x, y)
 					_, background, _ := existingStyle.Decompose()
 					finalStyle = finalStyle.Background(background)
 				}
@@ -123,9 +123,9 @@ func printWithStyle(screen tcell.Screen, text string, x, y, skipWidth, maxWidth 
 				// To avoid undesired effects, we populate all cells.
 				runes := []rune(c)
 				if offset == 0 {
-					screen.SetContent(x+offset, y, runes[0], runes[1:], finalStyle)
+					screen.PutStrStyled(x+offset, y, string(runes), finalStyle)
 				} else {
-					screen.SetContent(x+offset, y, ' ', nil, finalStyle)
+					screen.Put(x+offset, y, " ", finalStyle)
 				}
 			}
 		}
