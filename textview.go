@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v3"
 )
 
 // TabSize is the number of spaces with which a tab character will be replaced.
@@ -1142,7 +1142,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	t.pageSize = height
 
 	// Draw label.
-	_, labelBg, _ := t.labelStyle.Decompose()
+	labelBg := t.labelStyle.GetBackground()
 	if t.labelWidth > 0 {
 		labelWidth := min(t.labelWidth, width)
 		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
@@ -1166,7 +1166,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	}
 
 	// Draw the text element if necessary.
-	_, bg, _ := t.textStyle.Decompose()
+	bg := t.textStyle.GetBackground()
 	if bg != t.backgroundColor {
 		for row := range height {
 			for column := range width {
@@ -1422,22 +1422,22 @@ func (t *TextView) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 
 		switch key {
 		case tcell.KeyRune:
-			switch event.Rune() {
-			case 'g': // Home.
+			switch event.Str() {
+			case "g": // Home.
 				t.trackEnd = false
 				t.lineOffset = 0
 				t.columnOffset = 0
-			case 'G': // End.
+			case "G": // End.
 				t.trackEnd = true
 				t.columnOffset = 0
-			case 'j': // Down.
+			case "j": // Down.
 				t.lineOffset++
-			case 'k': // Up.
+			case "k": // Up.
 				t.trackEnd = false
 				t.lineOffset--
-			case 'h': // Left.
+			case "h": // Left.
 				t.columnOffset--
-			case 'l': // Right.
+			case "l": // Right.
 				t.columnOffset++
 			}
 		case tcell.KeyHome:

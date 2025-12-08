@@ -1,7 +1,7 @@
 package tview
 
 import (
-	"github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v3"
 )
 
 // Checkbox implements a simple box for boolean values which can be checked and
@@ -252,7 +252,7 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 	}
 
 	// Draw label.
-	_, labelBg, _ := c.labelStyle.Decompose()
+	labelBg := c.labelStyle.GetBackground()
 	if c.labelWidth > 0 {
 		labelWidth := min(c.labelWidth, width)
 		printWithStyle(screen, c.label, x, y, 0, labelWidth, AlignmentLeft, c.labelStyle, labelBg == tcell.ColorDefault)
@@ -290,7 +290,7 @@ func (c *Checkbox) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 		// Process key event.
 		switch key := event.Key(); key {
 		case tcell.KeyRune, tcell.KeyEnter: // Check.
-			if key == tcell.KeyRune && event.Rune() != ' ' {
+			if key == tcell.KeyRune && event.Str() != " " {
 				break
 			}
 			c.checked = !c.checked

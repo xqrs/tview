@@ -3,7 +3,7 @@ package tview
 import (
 	"slices"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v3"
 )
 
 // Tree navigation events.
@@ -212,7 +212,7 @@ func (n *TreeNode) SetText(text string) *TreeNode {
 
 // GetColor returns the node's text color.
 func (n *TreeNode) GetColor() tcell.Color {
-	color, _, _ := n.textStyle.Decompose()
+	color := n.textStyle.GetForeground()
 	return color
 }
 
@@ -843,22 +843,22 @@ func (t *TreeView) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 			t.movement = treeMove
 			t.step = -height
 		case tcell.KeyRune:
-			switch event.Rune() {
-			case 'g':
+			switch event.Str() {
+			case "g":
 				t.movement = treeHome
-			case 'G':
+			case "G":
 				t.movement = treeEnd
-			case 'j':
+			case "j":
 				t.movement = treeMove
 				t.step = 1
-			case 'J':
+			case "J":
 				t.movement = treeChild
-			case 'k':
+			case "k":
 				t.movement = treeMove
 				t.step = -1
-			case 'K':
+			case "K":
 				t.movement = treeParent
-			case ' ':
+			case " ":
 				selectNode()
 			}
 		case tcell.KeyEnter:

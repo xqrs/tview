@@ -3,7 +3,7 @@ package tview
 import (
 	"slices"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v3"
 )
 
 var (
@@ -542,7 +542,8 @@ func (f *Form) Draw(screen tcell.Screen) {
 		if x+itemWidth >= rightLimit {
 			itemWidth = rightLimit - x
 		}
-		fieldTextColor, fieldBackgroundColor, _ := f.fieldStyle.Decompose()
+		fieldTextColor := f.fieldStyle.GetForeground()
+		fieldBackgroundColor := f.fieldStyle.GetBackground()
 		item.SetFormAttributes(
 			labelWidth,
 			f.labelColor,

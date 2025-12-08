@@ -4,7 +4,7 @@ import (
 	"math"
 	"regexp"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v3"
 )
 
 type Alignment int
@@ -112,10 +112,10 @@ func printWithStyle(screen tcell.Screen, text string, x, y, skipWidth, maxWidth 
 		if width > 0 {
 			finalStyle := state.Style()
 			if maintainBackground {
-				_, backgroundColor, _ := finalStyle.Decompose()
+				backgroundColor := finalStyle.GetBackground()
 				if backgroundColor == tcell.ColorDefault {
 					_, existingStyle, _ := screen.Get(x, y)
-					_, background, _ := existingStyle.Decompose()
+					background := existingStyle.GetBackground()
 					finalStyle = finalStyle.Background(background)
 				}
 			}

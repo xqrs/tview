@@ -1,7 +1,7 @@
 package tview
 
 import (
-	"github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v3"
 )
 
 // Button is labeled box that triggers an action when selected.
@@ -139,7 +139,7 @@ func (b *Button) Draw(screen tcell.Screen) {
 	if b.HasFocus() && !b.disabled {
 		style = b.activatedStyle
 	}
-	_, backgroundColor, _ := style.Decompose()
+	backgroundColor := style.GetBackground()
 	b.SetBackgroundColor(backgroundColor)
 	b.DrawForSubclass(screen, b)
 

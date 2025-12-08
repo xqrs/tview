@@ -6,7 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/gdamore/tcell/v2"
+	"github.com/gdamore/tcell/v3"
 	"github.com/rivo/uniseg"
 )
 
@@ -1172,7 +1172,7 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 	}
 
 	// Draw label.
-	_, labelBg, _ := t.labelStyle.Decompose()
+	labelBg := t.labelStyle.GetBackground()
 	if t.labelWidth > 0 {
 		labelWidth := min(t.labelWidth, width)
 		printWithStyle(screen, t.label, x, y, 0, labelWidth, AlignmentLeft, t.labelStyle, labelBg == tcell.ColorDefault)
@@ -1196,7 +1196,7 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 	}
 
 	// Draw the input element if necessary.
-	_, bg, _ := t.textStyle.Decompose()
+	bg := t.textStyle.GetBackground()
 	if t.disabled {
 		bg = t.backgroundColor
 	}
@@ -2116,15 +2116,15 @@ func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 		case tcell.KeyRune:
 			if event.Modifiers()&tcell.ModAlt > 0 {
 				// We accept some Alt- key combinations.
-				switch event.Rune() {
-				case 'f':
+				switch event.Str() {
+				case "f":
 					if event.Modifiers()&tcell.ModShift == 0 {
 						t.moveWordRight(false, true)
 						t.selectionStart = t.cursor
 					} else {
 						t.moveWordRight(true, true)
 					}
-				case 'b':
+				case "b":
 					t.moveWordLeft(true)
 					if event.Modifiers()&tcell.ModShift == 0 {
 						t.selectionStart = t.cursor
@@ -2132,13 +2132,13 @@ func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 				}
 			} else {
 				// Other keys are simply accepted as regular characters.
-				r := event.Rune()
+				str := event.Str()
 				from, to, row := t.getSelection()
 				newLastAction = taActionTypeNonSpace
-				if unicode.IsSpace(r) {
+				if str == " " {
 					newLastAction = taActionTypeSpace
 				}
-				t.cursor.pos = t.replace(from, to, string(r), newLastAction == t.lastAction || t.lastAction == taActionTypeNonSpace && newLastAction == taActionTypeSpace)
+				t.cursor.pos = t.replace(from, to, str, newLastAction == t.lastAction || t.lastAction == taActionTypeNonSpace && newLastAction == taActionTypeSpace)
 				t.cursor.row = -1
 				t.truncateLines(row - 1)
 				t.findCursor(true, row)
