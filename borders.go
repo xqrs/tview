@@ -2,34 +2,34 @@ package tview
 
 // BorderSet defines various borders used when primitives are drawn.
 type BorderSet struct {
-	Top         rune
-	Bottom      rune
-	Left        rune
-	Right       rune
-	TopLeft     rune
-	TopRight    rune
-	BottomLeft  rune
-	BottomRight rune
-	TopT        rune
-	BottomT     rune
-	LeftT       rune
-	RightT      rune
+	Top         string
+	Bottom      string
+	Left        string
+	Right       string
+	TopLeft     string
+	TopRight    string
+	BottomLeft  string
+	BottomRight string
+	TopT        string
+	BottomT     string
+	LeftT       string
+	RightT      string
 }
 
 func BorderSetHidden() BorderSet {
 	return BorderSet{
-		Top:         ' ',
-		Bottom:      ' ',
-		Left:        ' ',
-		Right:       ' ',
-		TopLeft:     ' ',
-		TopRight:    ' ',
-		BottomLeft:  ' ',
-		BottomRight: ' ',
-		TopT:        ' ',
-		BottomT:     ' ',
-		LeftT:       ' ',
-		RightT:      ' ',
+		Top:         " ",
+		Bottom:      " ",
+		Left:        " ",
+		Right:       " ",
+		TopLeft:     " ",
+		TopRight:    " ",
+		BottomLeft:  " ",
+		BottomRight: " ",
+		TopT:        " ",
+		BottomT:     " ",
+		LeftT:       " ",
+		RightT:      " ",
 	}
 }
 

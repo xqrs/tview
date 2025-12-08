@@ -753,7 +753,7 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 						PrintJoinedSemigraphics(screen, x+ancestor.graphicsX, posY-1, t.borderSet.Left, lineStyle)
 					}
 					if posY < y+height {
-						screen.SetContent(x+ancestor.graphicsX, posY, t.borderSet.Right, nil, lineStyle)
+						screen.Put(x+ancestor.graphicsX, posY, t.borderSet.Right, lineStyle)
 					}
 				}
 				ancestor = ancestor.parent
@@ -771,8 +771,9 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 				// Join this node.
 				if posY < y+height {
 					PrintJoinedSemigraphics(screen, x+node.graphicsX, posY, connector, lineStyle)
+
 					for pos := node.graphicsX + 1; pos < node.textX && pos < width; pos++ {
-						screen.SetContent(x+pos, posY, t.borderSet.Top, nil, lineStyle)
+						screen.Put(x+pos, posY, t.borderSet.Top, lineStyle)
 					}
 				}
 			}

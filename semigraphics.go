@@ -2,393 +2,322 @@ package tview
 
 import "github.com/gdamore/tcell/v2"
 
-// Semigraphics provides an easy way to access unicode characters for drawing.
-//
-// Named like the unicode characters, 'Semigraphics'-prefix used if unicode block
-// isn't prefixed itself.
+// Semigraphics provides easy access to Unicode characters for drawing.
+// Using strings with \u escapes to keep the source ASCII-safe.
 const (
-	// Block: General Punctuation U+2000-U+206F (http://unicode.org/charts/PDF/U2000.pdf)
-	SemigraphicsHorizontalEllipsis rune = '\u2026' // …
+	// General Punctuation U+2000-U+206F
+	SemigraphicsHorizontalEllipsis = "\u2026" // …
 
-	// Block: Box Drawing U+2500-U+257F (http://unicode.org/charts/PDF/U2500.pdf)
-	BoxDrawingsLightHorizontal                    rune = '\u2500' // ─
-	BoxDrawingsHeavyHorizontal                    rune = '\u2501' // ━
-	BoxDrawingsLightVertical                      rune = '\u2502' // │
-	BoxDrawingsHeavyVertical                      rune = '\u2503' // ┃
-	BoxDrawingsLightTripleDashHorizontal          rune = '\u2504' // ┄
-	BoxDrawingsHeavyTripleDashHorizontal          rune = '\u2505' // ┅
-	BoxDrawingsLightTripleDashVertical            rune = '\u2506' // ┆
-	BoxDrawingsHeavyTripleDashVertical            rune = '\u2507' // ┇
-	BoxDrawingsLightQuadrupleDashHorizontal       rune = '\u2508' // ┈
-	BoxDrawingsHeavyQuadrupleDashHorizontal       rune = '\u2509' // ┉
-	BoxDrawingsLightQuadrupleDashVertical         rune = '\u250a' // ┊
-	BoxDrawingsHeavyQuadrupleDashVertical         rune = '\u250b' // ┋
-	BoxDrawingsLightDownAndRight                  rune = '\u250c' // ┌
-	BoxDrawingsDownLightAndRightHeavy             rune = '\u250d' // ┍
-	BoxDrawingsDownHeavyAndRightLight             rune = '\u250e' // ┎
-	BoxDrawingsHeavyDownAndRight                  rune = '\u250f' // ┏
-	BoxDrawingsLightDownAndLeft                   rune = '\u2510' // ┐
-	BoxDrawingsDownLightAndLeftHeavy              rune = '\u2511' // ┑
-	BoxDrawingsDownHeavyAndLeftLight              rune = '\u2512' // ┒
-	BoxDrawingsHeavyDownAndLeft                   rune = '\u2513' // ┓
-	BoxDrawingsLightUpAndRight                    rune = '\u2514' // └
-	BoxDrawingsUpLightAndRightHeavy               rune = '\u2515' // ┕
-	BoxDrawingsUpHeavyAndRightLight               rune = '\u2516' // ┖
-	BoxDrawingsHeavyUpAndRight                    rune = '\u2517' // ┗
-	BoxDrawingsLightUpAndLeft                     rune = '\u2518' // ┘
-	BoxDrawingsUpLightAndLeftHeavy                rune = '\u2519' // ┙
-	BoxDrawingsUpHeavyAndLeftLight                rune = '\u251a' // ┚
-	BoxDrawingsHeavyUpAndLeft                     rune = '\u251b' // ┛
-	BoxDrawingsLightVerticalAndRight              rune = '\u251c' // ├
-	BoxDrawingsVerticalLightAndRightHeavy         rune = '\u251d' // ┝
-	BoxDrawingsUpHeavyAndRightDownLight           rune = '\u251e' // ┞
-	BoxDrawingsDownHeavyAndRightUpLight           rune = '\u251f' // ┟
-	BoxDrawingsVerticalHeavyAndRightLight         rune = '\u2520' // ┠
-	BoxDrawingsDownLightAndRightUpHeavy           rune = '\u2521' // ┡
-	BoxDrawingsUpLightAndRightDownHeavy           rune = '\u2522' // ┢
-	BoxDrawingsHeavyVerticalAndRight              rune = '\u2523' // ┣
-	BoxDrawingsLightVerticalAndLeft               rune = '\u2524' // ┤
-	BoxDrawingsVerticalLightAndLeftHeavy          rune = '\u2525' // ┥
-	BoxDrawingsUpHeavyAndLeftDownLight            rune = '\u2526' // ┦
-	BoxDrawingsDownHeavyAndLeftUpLight            rune = '\u2527' // ┧
-	BoxDrawingsVerticalHeavyAndLeftLight          rune = '\u2528' // ┨
-	BoxDrawingsDownLightAndLeftUpHeavy            rune = '\u2529' // ┨
-	BoxDrawingsUpLightAndLeftDownHeavy            rune = '\u252a' // ┪
-	BoxDrawingsHeavyVerticalAndLeft               rune = '\u252b' // ┫
-	BoxDrawingsLightDownAndHorizontal             rune = '\u252c' // ┬
-	BoxDrawingsLeftHeavyAndRightDownLight         rune = '\u252d' // ┭
-	BoxDrawingsRightHeavyAndLeftDownLight         rune = '\u252e' // ┮
-	BoxDrawingsDownLightAndHorizontalHeavy        rune = '\u252f' // ┯
-	BoxDrawingsDownHeavyAndHorizontalLight        rune = '\u2530' // ┰
-	BoxDrawingsRightLightAndLeftDownHeavy         rune = '\u2531' // ┱
-	BoxDrawingsLeftLightAndRightDownHeavy         rune = '\u2532' // ┲
-	BoxDrawingsHeavyDownAndHorizontal             rune = '\u2533' // ┳
-	BoxDrawingsLightUpAndHorizontal               rune = '\u2534' // ┴
-	BoxDrawingsLeftHeavyAndRightUpLight           rune = '\u2535' // ┵
-	BoxDrawingsRightHeavyAndLeftUpLight           rune = '\u2536' // ┶
-	BoxDrawingsUpLightAndHorizontalHeavy          rune = '\u2537' // ┷
-	BoxDrawingsUpHeavyAndHorizontalLight          rune = '\u2538' // ┸
-	BoxDrawingsRightLightAndLeftUpHeavy           rune = '\u2539' // ┹
-	BoxDrawingsLeftLightAndRightUpHeavy           rune = '\u253a' // ┺
-	BoxDrawingsHeavyUpAndHorizontal               rune = '\u253b' // ┻
-	BoxDrawingsLightVerticalAndHorizontal         rune = '\u253c' // ┼
-	BoxDrawingsLeftHeavyAndRightVerticalLight     rune = '\u253d' // ┽
-	BoxDrawingsRightHeavyAndLeftVerticalLight     rune = '\u253e' // ┾
-	BoxDrawingsVerticalLightAndHorizontalHeavy    rune = '\u253f' // ┿
-	BoxDrawingsUpHeavyAndDownHorizontalLight      rune = '\u2540' // ╀
-	BoxDrawingsDownHeavyAndUpHorizontalLight      rune = '\u2541' // ╁
-	BoxDrawingsVerticalHeavyAndHorizontalLight    rune = '\u2542' // ╂
-	BoxDrawingsLeftUpHeavyAndRightDownLight       rune = '\u2543' // ╃
-	BoxDrawingsRightUpHeavyAndLeftDownLight       rune = '\u2544' // ╄
-	BoxDrawingsLeftDownHeavyAndRightUpLight       rune = '\u2545' // ╅
-	BoxDrawingsRightDownHeavyAndLeftUpLight       rune = '\u2546' // ╆
-	BoxDrawingsDownLightAndUpHorizontalHeavy      rune = '\u2547' // ╇
-	BoxDrawingsUpLightAndDownHorizontalHeavy      rune = '\u2548' // ╈
-	BoxDrawingsRightLightAndLeftVerticalHeavy     rune = '\u2549' // ╉
-	BoxDrawingsLeftLightAndRightVerticalHeavy     rune = '\u254a' // ╊
-	BoxDrawingsHeavyVerticalAndHorizontal         rune = '\u254b' // ╋
-	BoxDrawingsLightDoubleDashHorizontal          rune = '\u254c' // ╌
-	BoxDrawingsHeavyDoubleDashHorizontal          rune = '\u254d' // ╍
-	BoxDrawingsLightDoubleDashVertical            rune = '\u254e' // ╎
-	BoxDrawingsHeavyDoubleDashVertical            rune = '\u254f' // ╏
-	BoxDrawingsDoubleHorizontal                   rune = '\u2550' // ═
-	BoxDrawingsDoubleVertical                     rune = '\u2551' // ║
-	BoxDrawingsDownSingleAndRightDouble           rune = '\u2552' // ╒
-	BoxDrawingsDownDoubleAndRightSingle           rune = '\u2553' // ╓
-	BoxDrawingsDoubleDownAndRight                 rune = '\u2554' // ╔
-	BoxDrawingsDownSingleAndLeftDouble            rune = '\u2555' // ╕
-	BoxDrawingsDownDoubleAndLeftSingle            rune = '\u2556' // ╖
-	BoxDrawingsDoubleDownAndLeft                  rune = '\u2557' // ╗
-	BoxDrawingsUpSingleAndRightDouble             rune = '\u2558' // ╘
-	BoxDrawingsUpDoubleAndRightSingle             rune = '\u2559' // ╙
-	BoxDrawingsDoubleUpAndRight                   rune = '\u255a' // ╚
-	BoxDrawingsUpSingleAndLeftDouble              rune = '\u255b' // ╛
-	BoxDrawingsUpDoubleAndLeftSingle              rune = '\u255c' // ╜
-	BoxDrawingsDoubleUpAndLeft                    rune = '\u255d' // ╝
-	BoxDrawingsVerticalSingleAndRightDouble       rune = '\u255e' // ╞
-	BoxDrawingsVerticalDoubleAndRightSingle       rune = '\u255f' // ╟
-	BoxDrawingsDoubleVerticalAndRight             rune = '\u2560' // ╠
-	BoxDrawingsVerticalSingleAndLeftDouble        rune = '\u2561' // ╡
-	BoxDrawingsVerticalDoubleAndLeftSingle        rune = '\u2562' // ╢
-	BoxDrawingsDoubleVerticalAndLeft              rune = '\u2563' // ╣
-	BoxDrawingsDownSingleAndHorizontalDouble      rune = '\u2564' // ╤
-	BoxDrawingsDownDoubleAndHorizontalSingle      rune = '\u2565' // ╥
-	BoxDrawingsDoubleDownAndHorizontal            rune = '\u2566' // ╦
-	BoxDrawingsUpSingleAndHorizontalDouble        rune = '\u2567' // ╧
-	BoxDrawingsUpDoubleAndHorizontalSingle        rune = '\u2568' // ╨
-	BoxDrawingsDoubleUpAndHorizontal              rune = '\u2569' // ╩
-	BoxDrawingsVerticalSingleAndHorizontalDouble  rune = '\u256a' // ╪
-	BoxDrawingsVerticalDoubleAndHorizontalSingle  rune = '\u256b' // ╫
-	BoxDrawingsDoubleVerticalAndHorizontal        rune = '\u256c' // ╬
-	BoxDrawingsLightArcDownAndRight               rune = '\u256d' // ╭
-	BoxDrawingsLightArcDownAndLeft                rune = '\u256e' // ╮
-	BoxDrawingsLightArcUpAndLeft                  rune = '\u256f' // ╯
-	BoxDrawingsLightArcUpAndRight                 rune = '\u2570' // ╰
-	BoxDrawingsLightDiagonalUpperRightToLowerLeft rune = '\u2571' // ╱
-	BoxDrawingsLightDiagonalUpperLeftToLowerRight rune = '\u2572' // ╲
-	BoxDrawingsLightDiagonalCross                 rune = '\u2573' // ╳
-	BoxDrawingsLightLeft                          rune = '\u2574' // ╴
-	BoxDrawingsLightUp                            rune = '\u2575' // ╵
-	BoxDrawingsLightRight                         rune = '\u2576' // ╶
-	BoxDrawingsLightDown                          rune = '\u2577' // ╷
-	BoxDrawingsHeavyLeft                          rune = '\u2578' // ╸
-	BoxDrawingsHeavyUp                            rune = '\u2579' // ╹
-	BoxDrawingsHeavyRight                         rune = '\u257a' // ╺
-	BoxDrawingsHeavyDown                          rune = '\u257b' // ╻
-	BoxDrawingsLightLeftAndHeavyRight             rune = '\u257c' // ╼
-	BoxDrawingsLightUpAndHeavyDown                rune = '\u257d' // ╽
-	BoxDrawingsHeavyLeftAndLightRight             rune = '\u257e' // ╾
-	BoxDrawingsHeavyUpAndLightDown                rune = '\u257f' // ╿
+	// Box Drawing U+2500-U+257F
+	BoxDrawingsLightHorizontal                    = "\u2500" // ─
+	BoxDrawingsHeavyHorizontal                    = "\u2501" // ━
+	BoxDrawingsLightVertical                      = "\u2502" // │
+	BoxDrawingsHeavyVertical                      = "\u2503" // ┃
+	BoxDrawingsLightTripleDashHorizontal          = "\u2504" // ┄
+	BoxDrawingsHeavyTripleDashHorizontal          = "\u2505" // ┅
+	BoxDrawingsLightTripleDashVertical            = "\u2506" // ┆
+	BoxDrawingsHeavyTripleDashVertical            = "\u2507" // ┇
+	BoxDrawingsLightQuadrupleDashHorizontal       = "\u2508" // ┈
+	BoxDrawingsHeavyQuadrupleDashHorizontal       = "\u2509" // ┉
+	BoxDrawingsLightQuadrupleDashVertical         = "\u250a" // ┊
+	BoxDrawingsHeavyQuadrupleDashVertical         = "\u250b" // ┋
+	BoxDrawingsLightDownAndRight                  = "\u250c" // ┌
+	BoxDrawingsDownLightAndRightHeavy             = "\u250d" // ┍
+	BoxDrawingsDownHeavyAndRightLight             = "\u250e" // ┎
+	BoxDrawingsHeavyDownAndRight                  = "\u250f" // ┏
+	BoxDrawingsLightDownAndLeft                   = "\u2510" // ┐
+	BoxDrawingsDownLightAndLeftHeavy              = "\u2511" // ┑
+	BoxDrawingsDownHeavyAndLeftLight              = "\u2512" // ┒
+	BoxDrawingsHeavyDownAndLeft                   = "\u2513" // ┓
+	BoxDrawingsLightUpAndRight                    = "\u2514" // └
+	BoxDrawingsUpLightAndRightHeavy               = "\u2515" // ┕
+	BoxDrawingsUpHeavyAndRightLight               = "\u2516" // ┖
+	BoxDrawingsHeavyUpAndRight                    = "\u2517" // ┗
+	BoxDrawingsLightUpAndLeft                     = "\u2518" // ┘
+	BoxDrawingsUpLightAndLeftHeavy                = "\u2519" // ┙
+	BoxDrawingsUpHeavyAndLeftLight                = "\u251a" // ┚
+	BoxDrawingsHeavyUpAndLeft                     = "\u251b" // ┛
+	BoxDrawingsLightVerticalAndRight              = "\u251c" // ├
+	BoxDrawingsVerticalLightAndRightHeavy         = "\u251d" // ┝
+	BoxDrawingsUpHeavyAndRightDownLight           = "\u251e" // ┞
+	BoxDrawingsDownHeavyAndRightUpLight           = "\u251f" // ┟
+	BoxDrawingsVerticalHeavyAndRightLight         = "\u2520" // ┠
+	BoxDrawingsDownLightAndRightUpHeavy           = "\u2521" // ┡
+	BoxDrawingsUpLightAndRightDownHeavy           = "\u2522" // ┢
+	BoxDrawingsHeavyVerticalAndRight              = "\u2523" // ┣
+	BoxDrawingsLightVerticalAndLeft               = "\u2524" // ┤
+	BoxDrawingsVerticalLightAndLeftHeavy          = "\u2525" // ┥
+	BoxDrawingsUpHeavyAndLeftDownLight            = "\u2526" // ┦
+	BoxDrawingsDownHeavyAndLeftUpLight            = "\u2527" // ┧
+	BoxDrawingsVerticalHeavyAndLeftLight          = "\u2528" // ┨
+	BoxDrawingsDownLightAndLeftUpHeavy            = "\u2529" // ┩
+	BoxDrawingsUpLightAndLeftDownHeavy            = "\u252a" // ┪
+	BoxDrawingsHeavyVerticalAndLeft               = "\u252b" // ┫
+	BoxDrawingsLightDownAndHorizontal             = "\u252c" // ┬
+	BoxDrawingsLeftHeavyAndRightDownLight         = "\u252d" // ┭
+	BoxDrawingsRightHeavyAndLeftDownLight         = "\u252e" // ┮
+	BoxDrawingsDownLightAndHorizontalHeavy        = "\u252f" // ┯
+	BoxDrawingsDownHeavyAndHorizontalLight        = "\u2530" // ┰
+	BoxDrawingsRightLightAndLeftDownHeavy         = "\u2531" // ┱
+	BoxDrawingsLeftLightAndRightDownHeavy         = "\u2532" // ┲
+	BoxDrawingsHeavyDownAndHorizontal             = "\u2533" // ┳
+	BoxDrawingsLightUpAndHorizontal               = "\u2534" // ┴
+	BoxDrawingsLeftHeavyAndRightUpLight           = "\u2535" // ┵
+	BoxDrawingsRightHeavyAndLeftUpLight           = "\u2536" // ┶
+	BoxDrawingsUpLightAndHorizontalHeavy          = "\u2537" // ┷
+	BoxDrawingsUpHeavyAndHorizontalLight          = "\u2538" // ┸
+	BoxDrawingsRightLightAndLeftUpHeavy           = "\u2539" // ┹
+	BoxDrawingsLeftLightAndRightUpHeavy           = "\u253a" // ┺
+	BoxDrawingsHeavyUpAndHorizontal               = "\u253b" // ┻
+	BoxDrawingsLightVerticalAndHorizontal         = "\u253c" // ┼
+	BoxDrawingsLeftHeavyAndRightVerticalLight     = "\u253d" // ┽
+	BoxDrawingsRightHeavyAndLeftVerticalLight     = "\u253e" // ┾
+	BoxDrawingsVerticalLightAndHorizontalHeavy    = "\u253f" // ┿
+	BoxDrawingsUpHeavyAndDownHorizontalLight      = "\u2540" // ╀
+	BoxDrawingsDownHeavyAndUpHorizontalLight      = "\u2541" // ╁
+	BoxDrawingsVerticalHeavyAndHorizontalLight    = "\u2542" // ╂
+	BoxDrawingsLeftUpHeavyAndRightDownLight       = "\u2543" // ╃
+	BoxDrawingsRightUpHeavyAndLeftDownLight       = "\u2544" // ╄
+	BoxDrawingsLeftDownHeavyAndRightUpLight       = "\u2545" // ╅
+	BoxDrawingsRightDownHeavyAndLeftUpLight       = "\u2546" // ╆
+	BoxDrawingsDownLightAndUpHorizontalHeavy      = "\u2547" // ╇
+	BoxDrawingsUpLightAndDownHorizontalHeavy      = "\u2548" // ╈
+	BoxDrawingsRightLightAndLeftVerticalHeavy     = "\u2549" // ╉
+	BoxDrawingsLeftLightAndRightVerticalHeavy     = "\u254a" // ╊
+	BoxDrawingsHeavyVerticalAndHorizontal         = "\u254b" // ╋
+	BoxDrawingsLightDoubleDashHorizontal          = "\u254c" // ╌
+	BoxDrawingsHeavyDoubleDashHorizontal          = "\u254d" // ╍
+	BoxDrawingsLightDoubleDashVertical            = "\u254e" // ╎
+	BoxDrawingsHeavyDoubleDashVertical            = "\u254f" // ╏
+	BoxDrawingsDoubleHorizontal                   = "\u2550" // ═
+	BoxDrawingsDoubleVertical                     = "\u2551" // ║
+	BoxDrawingsDownSingleAndRightDouble           = "\u2552" // ╒
+	BoxDrawingsDownDoubleAndRightSingle           = "\u2553" // ╓
+	BoxDrawingsDoubleDownAndRight                 = "\u2554" // ╔
+	BoxDrawingsDownSingleAndLeftDouble            = "\u2555" // ╕
+	BoxDrawingsDownDoubleAndLeftSingle            = "\u2556" // ╖
+	BoxDrawingsDoubleDownAndLeft                  = "\u2557" // ╗
+	BoxDrawingsUpSingleAndRightDouble             = "\u2558" // ╘
+	BoxDrawingsUpDoubleAndRightSingle             = "\u2559" // ╙
+	BoxDrawingsDoubleUpAndRight                   = "\u255a" // ╚
+	BoxDrawingsUpSingleAndLeftDouble              = "\u255b" // ╛
+	BoxDrawingsUpDoubleAndLeftSingle              = "\u255c" // ╜
+	BoxDrawingsDoubleUpAndLeft                    = "\u255d" // ╝
+	BoxDrawingsVerticalSingleAndRightDouble       = "\u255e" // ╞
+	BoxDrawingsVerticalDoubleAndRightSingle       = "\u255f" // ╟
+	BoxDrawingsDoubleVerticalAndRight             = "\u2560" // ╠
+	BoxDrawingsVerticalSingleAndLeftDouble        = "\u2561" // ╡
+	BoxDrawingsVerticalDoubleAndLeftSingle        = "\u2562" // ╢
+	BoxDrawingsDoubleVerticalAndLeft              = "\u2563" // ╣
+	BoxDrawingsDownSingleAndHorizontalDouble      = "\u2564" // ╤
+	BoxDrawingsDownDoubleAndHorizontalSingle      = "\u2565" // ╥
+	BoxDrawingsDoubleDownAndHorizontal            = "\u2566" // ╦
+	BoxDrawingsUpSingleAndHorizontalDouble        = "\u2567" // ╧
+	BoxDrawingsUpDoubleAndHorizontalSingle        = "\u2568" // ╨
+	BoxDrawingsDoubleUpAndHorizontal              = "\u2569" // ╩
+	BoxDrawingsVerticalSingleAndHorizontalDouble  = "\u256a" // ╪
+	BoxDrawingsVerticalDoubleAndHorizontalSingle  = "\u256b" // ╫
+	BoxDrawingsDoubleVerticalAndHorizontal        = "\u256c" // ╬
+	BoxDrawingsLightArcDownAndRight               = "\u256d" // ╭
+	BoxDrawingsLightArcDownAndLeft                = "\u256e" // ╮
+	BoxDrawingsLightArcUpAndLeft                  = "\u256f" // ╯
+	BoxDrawingsLightArcUpAndRight                 = "\u2570" // ╰
+	BoxDrawingsLightDiagonalUpperRightToLowerLeft = "\u2571" // ╱
+	BoxDrawingsLightDiagonalUpperLeftToLowerRight = "\u2572" // ╲
+	BoxDrawingsLightDiagonalCross                 = "\u2573" // ╳
+	BoxDrawingsLightLeft                          = "\u2574" // ╴
+	BoxDrawingsLightUp                            = "\u2575" // ╵
+	BoxDrawingsLightRight                         = "\u2576" // ╶
+	BoxDrawingsLightDown                          = "\u2577" // ╷
+	BoxDrawingsHeavyLeft                          = "\u2578" // ╸
+	BoxDrawingsHeavyUp                            = "\u2579" // ╹
+	BoxDrawingsHeavyRight                         = "\u257a" // ╺
+	BoxDrawingsHeavyDown                          = "\u257b" // ╻
+	BoxDrawingsLightLeftAndHeavyRight             = "\u257c" // ╼
+	BoxDrawingsLightUpAndHeavyDown                = "\u257d" // ╽
+	BoxDrawingsHeavyLeftAndLightRight             = "\u257e" // ╾
+	BoxDrawingsHeavyUpAndLightDown                = "\u257f" // ╿
 
-	// Block Elements.
-	BlockUpperHalfBlock                              rune = '\u2580' // ▀
-	BlockLowerOneEighthBlock                         rune = '\u2581' // ▁
-	BlockLowerOneQuarterBlock                        rune = '\u2582' // ▂
-	BlockLowerThreeEighthsBlock                      rune = '\u2583' // ▃
-	BlockLowerHalfBlock                              rune = '\u2584' // ▄
-	BlockLowerFiveEighthsBlock                       rune = '\u2585' // ▅
-	BlockLowerThreeQuartersBlock                     rune = '\u2586' // ▆
-	BlockLowerSevenEighthsBlock                      rune = '\u2587' // ▇
-	BlockFullBlock                                   rune = '\u2588' // █
-	BlockLeftSevenEighthsBlock                       rune = '\u2589' // ▉
-	BlockLeftThreeQuartersBlock                      rune = '\u258A' // ▊
-	BlockLeftFiveEighthsBlock                        rune = '\u258B' // ▋
-	BlockLeftHalfBlock                               rune = '\u258C' // ▌
-	BlockLeftThreeEighthsBlock                       rune = '\u258D' // ▍
-	BlockLeftOneQuarterBlock                         rune = '\u258E' // ▎
-	BlockLeftOneEighthBlock                          rune = '\u258F' // ▏
-	BlockRightHalfBlock                              rune = '\u2590' // ▐
-	BlockLightShade                                  rune = '\u2591' // ░
-	BlockMediumShade                                 rune = '\u2592' // ▒
-	BlockDarkShade                                   rune = '\u2593' // ▓
-	BlockUpperOneEighthBlock                         rune = '\u2594' // ▔
-	BlockRightOneEighthBlock                         rune = '\u2595' // ▕
-	BlockQuadrantLowerLeft                           rune = '\u2596' // ▖
-	BlockQuadrantLowerRight                          rune = '\u2597' // ▗
-	BlockQuadrantUpperLeft                           rune = '\u2598' // ▘
-	BlockQuadrantUpperLeftAndLowerLeftAndLowerRight  rune = '\u2599' // ▙
-	BlockQuadrantUpperLeftAndLowerRight              rune = '\u259A' // ▚
-	BlockQuadrantUpperLeftAndUpperRightAndLowerLeft  rune = '\u259B' // ▛
-	BlockQuadrantUpperLeftAndUpperRightAndLowerRight rune = '\u259C' // ▜
-	BlockQuadrantUpperRight                          rune = '\u259D' // ▝
-	BlockQuadrantUpperRightAndLowerLeft              rune = '\u259E' // ▞
-	BlockQuadrantUpperRightAndLowerLeftAndLowerRight rune = '\u259F' // ▟
+	// Block Elements U+2580–U+259F
+	BlockUpperHalfBlock                              = "\u2580" // ▀
+	BlockLowerOneEighthBlock                         = "\u2581" // ▁
+	BlockLowerOneQuarterBlock                        = "\u2582" // ▂
+	BlockLowerThreeEighthsBlock                      = "\u2583" // ▃
+	BlockLowerHalfBlock                              = "\u2584" // ▄
+	BlockLowerFiveEighthsBlock                       = "\u2585" // ▅
+	BlockLowerThreeQuartersBlock                     = "\u2586" // ▆
+	BlockLowerSevenEighthsBlock                      = "\u2587" // ▇
+	BlockFullBlock                                   = "\u2588" // █
+	BlockLeftSevenEighthsBlock                       = "\u2589" // ▉
+	BlockLeftThreeQuartersBlock                      = "\u258A" // ▊
+	BlockLeftFiveEighthsBlock                        = "\u258B" // ▋
+	BlockLeftHalfBlock                               = "\u258C" // ▌
+	BlockLeftThreeEighthsBlock                       = "\u258D" // ▍
+	BlockLeftOneQuarterBlock                         = "\u258E" // ▎
+	BlockLeftOneEighthBlock                          = "\u258F" // ▏
+	BlockRightHalfBlock                              = "\u2590" // ▐
+	BlockLightShade                                  = "\u2591" // ░
+	BlockMediumShade                                 = "\u2592" // ▒
+	BlockDarkShade                                   = "\u2593" // ▓
+	BlockUpperOneEighthBlock                         = "\u2594" // ▔
+	BlockRightOneEighthBlock                         = "\u2595" // ▕
+	BlockQuadrantLowerLeft                           = "\u2596" // ▖
+	BlockQuadrantLowerRight                          = "\u2597" // ▗
+	BlockQuadrantUpperLeft                           = "\u2598" // ▘
+	BlockQuadrantUpperLeftAndLowerLeftAndLowerRight  = "\u2599" // ▙
+	BlockQuadrantUpperLeftAndLowerRight              = "\u259A" // ▚
+	BlockQuadrantUpperLeftAndUpperRightAndLowerLeft  = "\u259B" // ▛
+	BlockQuadrantUpperLeftAndUpperRightAndLowerRight = "\u259C" // ▜
+	BlockQuadrantUpperRight                          = "\u259D" // ▝
+	BlockQuadrantUpperRightAndLowerLeft              = "\u259E" // ▞
+	BlockQuadrantUpperRightAndLowerLeftAndLowerRight = "\u259F" // ▟
 )
 
-// SemigraphicJoints is a map for joining semigraphic (or otherwise) runes.
-// So far only light and double lines are supported but if you want to change
-// the border styling you need to provide the joints, too.
-// The matching will be sorted ascending by rune value, so you don't need to
-// provide all rune combinations,
-// e.g. (─) + (│) = (┼) will also match (│) + (─) = (┼)
-var SemigraphicJoints = map[string]rune{
-	// (─) + (│) = (┼)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightVertical}): BoxDrawingsLightVerticalAndHorizontal,
-	// (─) + (┌) = (┬)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightDownAndRight}): BoxDrawingsLightDownAndHorizontal,
-	// (─) + (┐) = (┬)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightDownAndLeft}): BoxDrawingsLightDownAndHorizontal,
-	// (─) + (└) = (┴)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightUpAndRight}): BoxDrawingsLightUpAndHorizontal,
-	// (─) + (┘) = (┴)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightUpAndLeft}): BoxDrawingsLightUpAndHorizontal,
-	// (─) + (├) = (┼)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightVerticalAndRight}): BoxDrawingsLightVerticalAndHorizontal,
-	// (─) + (┤) = (┼)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightVerticalAndLeft}): BoxDrawingsLightVerticalAndHorizontal,
-	// (─) + (┬) = (┬)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightDownAndHorizontal}): BoxDrawingsLightDownAndHorizontal,
-	// (─) + (┴) = (┴)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightUpAndHorizontal,
-	// (─) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightHorizontal, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+// SemigraphicJoints maps pairs of semigraphics strings to the resulting joint.
+// All combinations for light and double lines are included.
+var SemigraphicJoints = map[string]string{
+	// ─ + │ = ┼
+	BoxDrawingsLightHorizontal + BoxDrawingsLightVertical: BoxDrawingsLightVerticalAndHorizontal,
+	// ─ + ┌ = ┬
+	BoxDrawingsLightHorizontal + BoxDrawingsLightDownAndRight: BoxDrawingsLightDownAndHorizontal,
+	// ─ + ┐ = ┬
+	BoxDrawingsLightHorizontal + BoxDrawingsLightDownAndLeft: BoxDrawingsLightDownAndHorizontal,
+	// ─ + └ = ┴
+	BoxDrawingsLightHorizontal + BoxDrawingsLightUpAndRight: BoxDrawingsLightUpAndHorizontal,
+	// ─ + ┘ = ┴
+	BoxDrawingsLightHorizontal + BoxDrawingsLightUpAndLeft: BoxDrawingsLightUpAndHorizontal,
+	// ─ + ├ = ┼
+	BoxDrawingsLightHorizontal + BoxDrawingsLightVerticalAndRight: BoxDrawingsLightVerticalAndHorizontal,
+	// ─ + ┤ = ┼
+	BoxDrawingsLightHorizontal + BoxDrawingsLightVerticalAndLeft: BoxDrawingsLightVerticalAndHorizontal,
+	// ─ + ┬ = ┬
+	BoxDrawingsLightHorizontal + BoxDrawingsLightDownAndHorizontal: BoxDrawingsLightDownAndHorizontal,
+	// ─ + ┴ = ┴
+	BoxDrawingsLightHorizontal + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightUpAndHorizontal,
+	// ─ + ┼ = ┼
+	BoxDrawingsLightHorizontal + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (│) + (┌) = (├)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightDownAndRight}): BoxDrawingsLightVerticalAndRight,
-	// (│) + (┐) = (┤)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightDownAndLeft}): BoxDrawingsLightVerticalAndLeft,
-	// (│) + (└) = (├)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightUpAndRight}): BoxDrawingsLightVerticalAndRight,
-	// (│) + (┘) = (┤)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightUpAndLeft}): BoxDrawingsLightVerticalAndLeft,
-	// (│) + (├) = (├)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightVerticalAndRight}): BoxDrawingsLightVerticalAndRight,
-	// (│) + (┤) = (┤)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightVerticalAndLeft}): BoxDrawingsLightVerticalAndLeft,
-	// (│) + (┬) = (┼)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightDownAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (│) + (┴) = (┼)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (│) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightVertical, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// │ + ┌ = ├
+	BoxDrawingsLightVertical + BoxDrawingsLightDownAndRight: BoxDrawingsLightVerticalAndRight,
+	// │ + ┐ = ┤
+	BoxDrawingsLightVertical + BoxDrawingsLightDownAndLeft: BoxDrawingsLightVerticalAndLeft,
+	// │ + └ = ├
+	BoxDrawingsLightVertical + BoxDrawingsLightUpAndRight: BoxDrawingsLightVerticalAndRight,
+	// │ + ┘ = ┤
+	BoxDrawingsLightVertical + BoxDrawingsLightUpAndLeft: BoxDrawingsLightVerticalAndLeft,
+	// │ + ├ = ├
+	BoxDrawingsLightVertical + BoxDrawingsLightVerticalAndRight: BoxDrawingsLightVerticalAndRight,
+	// │ + ┤ = ┤
+	BoxDrawingsLightVertical + BoxDrawingsLightVerticalAndLeft: BoxDrawingsLightVerticalAndLeft,
+	// │ + ┬ = ┼
+	BoxDrawingsLightVertical + BoxDrawingsLightDownAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// │ + ┴ = ┼
+	BoxDrawingsLightVertical + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// │ + ┼ = ┼
+	BoxDrawingsLightVertical + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (┌) + (┐) = (┬)
-	string([]rune{BoxDrawingsLightDownAndRight, BoxDrawingsLightDownAndLeft}): BoxDrawingsLightDownAndHorizontal,
-	// (┌) + (└) = (├)
-	string([]rune{BoxDrawingsLightDownAndRight, BoxDrawingsLightUpAndRight}): BoxDrawingsLightVerticalAndRight,
-	// (┌) + (┘) = (┼)
-	string([]rune{BoxDrawingsLightDownAndRight, BoxDrawingsLightUpAndLeft}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┌) + (├) = (├)
-	string([]rune{BoxDrawingsLightDownAndRight, BoxDrawingsLightVerticalAndRight}): BoxDrawingsLightVerticalAndRight,
-	// (┌) + (┤) = (┼)
-	string([]rune{BoxDrawingsLightDownAndRight, BoxDrawingsLightVerticalAndLeft}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┌) + (┬) = (┬)
-	string([]rune{BoxDrawingsLightDownAndRight, BoxDrawingsLightDownAndHorizontal}): BoxDrawingsLightDownAndHorizontal,
-	// (┌) + (┴) = (┼)
-	string([]rune{BoxDrawingsLightDownAndRight, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┌) + (┴) = (┼)
-	string([]rune{BoxDrawingsLightDownAndRight, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// ┌ + ┐ = ┬
+	BoxDrawingsLightDownAndRight + BoxDrawingsLightDownAndLeft: BoxDrawingsLightDownAndHorizontal,
+	// ┌ + └ = ├
+	BoxDrawingsLightDownAndRight + BoxDrawingsLightUpAndRight: BoxDrawingsLightVerticalAndRight,
+	// ┌ + ┘ = ┼
+	BoxDrawingsLightDownAndRight + BoxDrawingsLightUpAndLeft: BoxDrawingsLightVerticalAndHorizontal,
+	// ┌ + ├ = ├
+	BoxDrawingsLightDownAndRight + BoxDrawingsLightVerticalAndRight: BoxDrawingsLightVerticalAndRight,
+	// ┌ + ┤ = ┼
+	BoxDrawingsLightDownAndRight + BoxDrawingsLightVerticalAndLeft: BoxDrawingsLightVerticalAndHorizontal,
+	// ┌ + ┬ = ┬
+	BoxDrawingsLightDownAndRight + BoxDrawingsLightDownAndHorizontal: BoxDrawingsLightDownAndHorizontal,
+	// ┌ + ┴ = ┼
+	BoxDrawingsLightDownAndRight + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// ┌ + ┼ = ┼
+	BoxDrawingsLightDownAndRight + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (┐) + (└) = (┼)
-	string([]rune{BoxDrawingsLightDownAndLeft, BoxDrawingsLightUpAndRight}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┐) + (┘) = (┤)
-	string([]rune{BoxDrawingsLightDownAndLeft, BoxDrawingsLightUpAndLeft}): BoxDrawingsLightVerticalAndLeft,
-	// (┐) + (├) = (┼)
-	string([]rune{BoxDrawingsLightDownAndLeft, BoxDrawingsLightVerticalAndRight}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┐) + (┤) = (┤)
-	string([]rune{BoxDrawingsLightDownAndLeft, BoxDrawingsLightVerticalAndLeft}): BoxDrawingsLightVerticalAndLeft,
-	// (┐) + (┬) = (┬)
-	string([]rune{BoxDrawingsLightDownAndLeft, BoxDrawingsLightDownAndHorizontal}): BoxDrawingsLightDownAndHorizontal,
-	// (┐) + (┴) = (┼)
-	string([]rune{BoxDrawingsLightDownAndLeft, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┐) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightDownAndLeft, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// ┐ + └ = ┼
+	BoxDrawingsLightDownAndLeft + BoxDrawingsLightUpAndRight: BoxDrawingsLightVerticalAndHorizontal,
+	// ┐ + ┘ = ┤
+	BoxDrawingsLightDownAndLeft + BoxDrawingsLightUpAndLeft: BoxDrawingsLightVerticalAndLeft,
+	// ┐ + ├ = ┼
+	BoxDrawingsLightDownAndLeft + BoxDrawingsLightVerticalAndRight: BoxDrawingsLightVerticalAndHorizontal,
+	// ┐ + ┤ = ┤
+	BoxDrawingsLightDownAndLeft + BoxDrawingsLightVerticalAndLeft: BoxDrawingsLightVerticalAndLeft,
+	// ┐ + ┬ = ┬
+	BoxDrawingsLightDownAndLeft + BoxDrawingsLightDownAndHorizontal: BoxDrawingsLightDownAndHorizontal,
+	// ┐ + ┴ = ┼
+	BoxDrawingsLightDownAndLeft + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// ┐ + ┼ = ┼
+	BoxDrawingsLightDownAndLeft + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (└) + (┘) = (┴)
-	string([]rune{BoxDrawingsLightUpAndRight, BoxDrawingsLightUpAndLeft}): BoxDrawingsLightUpAndHorizontal,
-	// (└) + (├) = (├)
-	string([]rune{BoxDrawingsLightUpAndRight, BoxDrawingsLightVerticalAndRight}): BoxDrawingsLightVerticalAndRight,
-	// (└) + (┤) = (┼)
-	string([]rune{BoxDrawingsLightUpAndRight, BoxDrawingsLightVerticalAndLeft}): BoxDrawingsLightVerticalAndHorizontal,
-	// (└) + (┬) = (┼)
-	string([]rune{BoxDrawingsLightUpAndRight, BoxDrawingsLightDownAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (└) + (┴) = (┴)
-	string([]rune{BoxDrawingsLightUpAndRight, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightUpAndHorizontal,
-	// (└) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightUpAndRight, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// └ + ┘ = ┴
+	BoxDrawingsLightUpAndRight + BoxDrawingsLightUpAndLeft: BoxDrawingsLightUpAndHorizontal,
+	// └ + ├ = ├
+	BoxDrawingsLightUpAndRight + BoxDrawingsLightVerticalAndRight: BoxDrawingsLightVerticalAndRight,
+	// └ + ┤ = ┼
+	BoxDrawingsLightUpAndRight + BoxDrawingsLightVerticalAndLeft: BoxDrawingsLightVerticalAndHorizontal,
+	// └ + ┬ = ┼
+	BoxDrawingsLightUpAndRight + BoxDrawingsLightDownAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// └ + ┴ = ┴
+	BoxDrawingsLightUpAndRight + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightUpAndHorizontal,
+	// └ + ┼ = ┼
+	BoxDrawingsLightUpAndRight + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (┘) + (├) = (┼)
-	string([]rune{BoxDrawingsLightUpAndLeft, BoxDrawingsLightVerticalAndRight}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┘) + (┤) = (┤)
-	string([]rune{BoxDrawingsLightUpAndLeft, BoxDrawingsLightVerticalAndLeft}): BoxDrawingsLightVerticalAndLeft,
-	// (┘) + (┬) = (┼)
-	string([]rune{BoxDrawingsLightUpAndLeft, BoxDrawingsLightDownAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┘) + (┴) = (┴)
-	string([]rune{BoxDrawingsLightUpAndLeft, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightUpAndHorizontal,
-	// (┘) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightUpAndLeft, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// ┘ + ├ = ┼
+	BoxDrawingsLightUpAndLeft + BoxDrawingsLightVerticalAndRight: BoxDrawingsLightVerticalAndHorizontal,
+	// ┘ + ┤ = ┤
+	BoxDrawingsLightUpAndLeft + BoxDrawingsLightVerticalAndLeft: BoxDrawingsLightVerticalAndLeft,
+	// ┘ + ┬ = ┼
+	BoxDrawingsLightUpAndLeft + BoxDrawingsLightDownAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// ┘ + ┴ = ┴
+	BoxDrawingsLightUpAndLeft + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightUpAndHorizontal,
+	// ┘ + ┼ = ┼
+	BoxDrawingsLightUpAndLeft + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (├) + (┤) = (┼)
-	string([]rune{BoxDrawingsLightVerticalAndRight, BoxDrawingsLightVerticalAndLeft}): BoxDrawingsLightVerticalAndHorizontal,
-	// (├) + (┬) = (┼)
-	string([]rune{BoxDrawingsLightVerticalAndRight, BoxDrawingsLightDownAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (├) + (┴) = (┼)
-	string([]rune{BoxDrawingsLightVerticalAndRight, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (├) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightVerticalAndRight, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// ├ + ┤ = ┼
+	BoxDrawingsLightVerticalAndRight + BoxDrawingsLightVerticalAndLeft: BoxDrawingsLightVerticalAndHorizontal,
+	// ├ + ┬ = ┼
+	BoxDrawingsLightVerticalAndRight + BoxDrawingsLightDownAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// ├ + ┴ = ┼
+	BoxDrawingsLightVerticalAndRight + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// ├ + ┼ = ┼
+	BoxDrawingsLightVerticalAndRight + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (┤) + (┬) = (┼)
-	string([]rune{BoxDrawingsLightVerticalAndLeft, BoxDrawingsLightDownAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┤) + (┴) = (┼)
-	string([]rune{BoxDrawingsLightVerticalAndLeft, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┤) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightVerticalAndLeft, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// ┤ + ┬ = ┼
+	BoxDrawingsLightVerticalAndLeft + BoxDrawingsLightDownAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// ┤ + ┴ = ┼
+	BoxDrawingsLightVerticalAndLeft + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// ┤ + ┼ = ┼
+	BoxDrawingsLightVerticalAndLeft + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (┬) + (┴) = (┼)
-	string([]rune{BoxDrawingsLightDownAndHorizontal, BoxDrawingsLightUpAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
-	// (┬) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightDownAndHorizontal, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// ┬ + ┴ = ┼
+	BoxDrawingsLightDownAndHorizontal + BoxDrawingsLightUpAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
+	// ┬ + ┼ = ┼
+	BoxDrawingsLightDownAndHorizontal + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	// (┴) + (┼) = (┼)
-	string([]rune{BoxDrawingsLightUpAndHorizontal, BoxDrawingsLightVerticalAndHorizontal}): BoxDrawingsLightVerticalAndHorizontal,
+	// ┴ + ┼ = ┼
+	BoxDrawingsLightUpAndHorizontal + BoxDrawingsLightVerticalAndHorizontal: BoxDrawingsLightVerticalAndHorizontal,
 
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleVertical}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleDownAndRight}): BoxDrawingsDoubleDownAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleDownAndLeft}): BoxDrawingsDoubleDownAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleUpAndRight}): BoxDrawingsDoubleUpAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleUpAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleDownAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleUpAndHorizontal,
-	string([]rune{BoxDrawingsDoubleHorizontal, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleDownAndRight}): BoxDrawingsDoubleVerticalAndRight,
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleDownAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleUpAndRight}): BoxDrawingsDoubleVerticalAndRight,
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndRight,
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleVertical, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleDownAndLeft}): BoxDrawingsDoubleDownAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleUpAndRight}): BoxDrawingsDoubleVerticalAndRight,
-	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndRight,
-	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleDownAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndRight, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleUpAndRight}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
-	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
-	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleDownAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndLeft, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleUpAndLeft}): BoxDrawingsDoubleUpAndHorizontal,
-	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndRight,
-	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleUpAndHorizontal,
-	string([]rune{BoxDrawingsDoubleUpAndRight, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleVerticalAndRight}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndLeft,
-	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleUpAndHorizontal,
-	string([]rune{BoxDrawingsDoubleUpAndLeft, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleVerticalAndRight, BoxDrawingsDoubleVerticalAndLeft}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleVerticalAndRight, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleVerticalAndRight, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleVerticalAndRight, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleVerticalAndLeft, BoxDrawingsDoubleDownAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleVerticalAndLeft, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleVerticalAndLeft, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleDownAndHorizontal, BoxDrawingsDoubleUpAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-	string([]rune{BoxDrawingsDoubleDownAndHorizontal, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
-
-	string([]rune{BoxDrawingsDoubleUpAndHorizontal, BoxDrawingsDoubleVerticalAndHorizontal}): BoxDrawingsDoubleVerticalAndHorizontal,
+	// ═ + ║ = ╬
+	BoxDrawingsDoubleHorizontal + BoxDrawingsDoubleVertical: BoxDrawingsDoubleVerticalAndHorizontal,
 }
 
-// PrintJoinedSemigraphics prints a semigraphics rune into the screen at the given
-// position with the given style, joining it with any existing semigraphics
-// rune.
-// At this point, only regular single and double line borders are supported.
-func PrintJoinedSemigraphics(screen tcell.Screen, x, y int, ch rune, style tcell.Style) {
-	previous, _, _, _ := screen.GetContent(x, y)
+// PrintJoinedSemigraphics prints a semigraphics string into the screen at the given
+// position with the given style, joining it with any existing semigraphics.
+func PrintJoinedSemigraphics(screen tcell.Screen, x, y int, str string, style tcell.Style) {
+	previous, _, _ := screen.Get(x, y)
 
-	// What's the resulting rune?
-	var result rune
-	if ch == previous {
-		result = ch
+	var result string
+	if str == previous {
+		result = str
 	} else {
-		if ch < previous {
-			previous, ch = ch, previous
+		if str < previous {
+			previous, str = str, previous
 		}
-		result = SemigraphicJoints[string([]rune{previous, ch})]
+		result = SemigraphicJoints[previous+str]
 	}
-	if result == 0 {
-		result = ch
+	if result == "" {
+		result = str
 	}
 
 	// We only print something if we have something.
-	screen.SetContent(x, y, result, nil, style)
+	screen.Put(x, y, result, style)
 }

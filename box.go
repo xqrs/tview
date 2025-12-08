@@ -392,42 +392,42 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 	if b.borders != BordersNone && b.width >= 2 && b.height >= 2 {
 		if b.borders.Has(BordersTop) {
 			for x := b.x + 1; x < b.x+b.width-1; x++ {
-				screen.SetContent(x, b.y, b.borderSet.Top, nil, b.borderStyle)
+				screen.Put(x, b.y, b.borderSet.Top, b.borderStyle)
 			}
 		}
 
 		if b.borders.Has(BordersBottom) {
 			for x := b.x + 1; x < b.x+b.width-1; x++ {
-				screen.SetContent(x, b.y+b.height-1, b.borderSet.Bottom, nil, b.borderStyle)
+				screen.Put(x, b.y+b.height-1, b.borderSet.Bottom, b.borderStyle)
 			}
 		}
 
 		if b.borders.Has(BordersLeft) {
 			for y := b.y + 1; y < b.y+b.height-1; y++ {
-				screen.SetContent(b.x, y, b.borderSet.Left, nil, b.borderStyle)
+				screen.Put(b.x, y, b.borderSet.Left, b.borderStyle)
 			}
 		}
 
 		if b.borders.Has(BordersRight) {
 			for y := b.y + 1; y < b.y+b.height-1; y++ {
-				screen.SetContent(b.x+b.width-1, y, b.borderSet.Right, nil, b.borderStyle)
+				screen.Put(b.x+b.width-1, y, b.borderSet.Right, b.borderStyle)
 			}
 		}
 
 		if b.borders.Has(BordersTop | BordersLeft) {
-			screen.SetContent(b.x, b.y, b.borderSet.TopLeft, nil, b.borderStyle)
+			screen.Put(b.x, b.y, b.borderSet.TopLeft, b.borderStyle)
 		}
 
 		if b.borders.Has(BordersTop | BordersRight) {
-			screen.SetContent(b.x+b.width-1, b.y, b.borderSet.TopRight, nil, b.borderStyle)
+			screen.Put(b.x+b.width-1, b.y, b.borderSet.TopRight, b.borderStyle)
 		}
 
 		if b.borders.Has(BordersBottom | BordersLeft) {
-			screen.SetContent(b.x, b.y+b.height-1, b.borderSet.BottomLeft, nil, b.borderStyle)
+			screen.Put(b.x, b.y+b.height-1, b.borderSet.BottomLeft, b.borderStyle)
 		}
 
 		if b.borders.Has(BordersBottom | BordersRight) {
-			screen.SetContent(b.x+b.width-1, b.y+b.height-1, b.borderSet.BottomRight, nil, b.borderStyle)
+			screen.Put(b.x+b.width-1, b.y+b.height-1, b.borderSet.BottomRight, b.borderStyle)
 		}
 	}
 
