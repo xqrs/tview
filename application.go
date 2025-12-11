@@ -110,7 +110,6 @@ type Application struct {
 	afterDraw func(screen tcell.Screen)
 
 	events chan tcell.Event
-	quit   chan struct{}
 
 	// Functions queued from goroutines, used to serialize updates to primitives.
 	updates chan queuedUpdate
@@ -131,7 +130,6 @@ type Application struct {
 func NewApplication() *Application {
 	return &Application{
 		events:  make(chan tcell.Event, queueSize),
-		quit:    make(chan struct{}),
 		updates: make(chan queuedUpdate, queueSize),
 	}
 }
@@ -526,7 +524,6 @@ func (a *Application) Stop() {
 		return
 	}
 	screen.Fini()
-	close(a.quit)
 	a.screen = nil
 }
 
