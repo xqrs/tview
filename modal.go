@@ -29,7 +29,7 @@ type Modal struct {
 	done func(buttonIndex int, buttonLabel string)
 }
 
-// NewModal returns a new [Modal] message window.
+// NewModal returns a new modal message window.
 func NewModal() *Modal {
 	m := &Modal{
 		Box:       NewBox().SetBorders(BordersAll).SetBackgroundColor(Styles.ContrastBackgroundColor),
@@ -45,7 +45,6 @@ func NewModal() *Modal {
 	m.frame = NewFrame(m.form).SetBorders(0, 0, 1, 0, 0, 0)
 	m.frame.SetBackgroundColor(Styles.ContrastBackgroundColor).
 		SetBorderPadding(1, 1, 1, 1)
-	m.Box.Primitive = m
 	return m
 }
 
@@ -145,15 +144,9 @@ func (m *Modal) Focus(delegate func(p Primitive)) {
 	delegate(m.form)
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (m *Modal) focusChain(chain *[]Primitive) bool {
-	if hasFocus := m.form.focusChain(chain); hasFocus {
-		if chain != nil {
-			*chain = append(*chain, m)
-		}
-		return true
-	}
-	return m.Box.focusChain(chain)
+// HasFocus returns whether or not this primitive has focus.
+func (m *Modal) HasFocus() bool {
+	return m.form.HasFocus()
 }
 
 // Draw draws this primitive onto the screen.

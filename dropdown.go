@@ -93,7 +93,7 @@ type DropDown struct {
 	dragging bool // Set to true when mouse dragging is in progress.
 }
 
-// NewDropDown returns a new [DropDown].
+// NewDropDown returns a new drop-down.
 func NewDropDown() *DropDown {
 	list := NewList()
 	list.ShowSecondaryText(false).
@@ -117,7 +117,6 @@ func NewDropDown() *DropDown {
 		prefixStyle:   tcell.StyleDefault.Background(Styles.PrimaryTextColor).Foreground(Styles.ContrastBackgroundColor),
 	}
 
-	d.Box.Primitive = d
 	return d
 }
 
@@ -670,17 +669,12 @@ func (d *DropDown) Focus(delegate func(p Primitive)) {
 	}
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (d *DropDown) focusChain(chain *[]Primitive) bool {
+// HasFocus returns whether or not this primitive has focus.
+func (d *DropDown) HasFocus() bool {
 	if d.open {
-		if hasFocus := d.list.focusChain(chain); hasFocus {
-			if chain != nil {
-				*chain = append(*chain, d)
-			}
-			return true
-		}
+		return d.list.HasFocus()
 	}
-	return d.Box.focusChain(chain)
+	return d.Box.HasFocus()
 }
 
 // MouseHandler returns the mouse handler for this primitive.

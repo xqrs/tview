@@ -32,7 +32,7 @@ type Frame struct {
 	setFocus func(p Primitive)
 }
 
-// NewFrame returns a new [Frame] around the given primitive. The primitive's
+// NewFrame returns a new frame around the given primitive. The primitive's
 // size will be changed to fit within this frame. The primitive may be nil, in
 // which case no other primitive is embedded in the frame.
 func NewFrame(primitive Primitive) *Frame {
@@ -49,7 +49,6 @@ func NewFrame(primitive Primitive) *Frame {
 		right:     1,
 	}
 
-	f.Box.Primitive = f
 	return f
 }
 
@@ -175,17 +174,12 @@ func (f *Frame) Focus(delegate func(p Primitive)) {
 	}
 }
 
-// focusChain implements the [Primitive]'s focusChain method.
-func (f *Frame) focusChain(chain *[]Primitive) bool {
-	if f.primitive != nil {
-		if hasFocus := f.primitive.focusChain(chain); hasFocus {
-			if chain != nil {
-				*chain = append(*chain, f)
-			}
-			return true
-		}
+// HasFocus returns whether or not this primitive has focus.
+func (f *Frame) HasFocus() bool {
+	if f.primitive == nil {
+		return f.Box.HasFocus()
 	}
-	return f.Box.focusChain(chain)
+	return f.primitive.HasFocus()
 }
 
 // MouseHandler returns the mouse handler for this primitive.

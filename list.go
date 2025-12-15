@@ -99,9 +99,9 @@ type List struct {
 	done func()
 }
 
-// NewList returns a new [List].
+// NewList returns a new list.
 func NewList() *List {
-	l := &List{
+	return &List{
 		Box:                NewBox(),
 		showSecondaryText:  true,
 		wrapAround:         true,
@@ -112,8 +112,6 @@ func NewList() *List {
 		mainStyleTags:      true,
 		secondaryStyleTags: true,
 	}
-	l.Box.Primitive = l
-	return l
 }
 
 // SetCurrentItem sets the currently selected item by its index, starting at 0
