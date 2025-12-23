@@ -1271,7 +1271,6 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 		cluster, text, _, clusterWidth, pos, endPos = t.step(text, pos, endPos)
 
 		// Prepare drawing.
-		runes := []rune(cluster)
 		style := t.selectedStyle
 		fromRow, fromColumn := t.cursor.row, t.cursor.actualColumn
 		toRow, toColumn := t.selectionStart.row, t.selectionStart.actualColumn
@@ -1297,7 +1296,7 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 
 		// Draw character.
 		if posX+clusterWidth-columnOffset <= width && posX-columnOffset >= 0 && clusterWidth > 0 {
-			screen.SetContent(x+posX-columnOffset, y+posY, runes[0], runes[1:], style)
+			screen.PutStrStyled(x+posX-columnOffset, y+posY, cluster, style)
 		}
 
 		// Advance.
