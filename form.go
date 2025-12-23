@@ -312,20 +312,6 @@ func (f *Form) AddPasswordField(label, value string, fieldWidth int, mask rune, 
 	return f
 }
 
-// AddDropDown adds a drop-down element to the form. It has a label, options,
-// and an (optional) callback function which is invoked when an option was
-// selected. The initial option may be a negative value to indicate that no
-// option is currently selected.
-func (f *Form) AddDropDown(label string, options []string, initialOption int, selected func(option string, optionIndex int)) *Form {
-	dropDown := NewDropDown().
-		SetLabel(label).
-		SetOptions(options, selected).
-		SetCurrentOption(initialOption)
-	dropDown.SetFinishedFunc(f.finished)
-	f.items = append(f.items, dropDown)
-	return f
-}
-
 // AddCheckbox adds a checkbox to the form. It has a label, an initial state,
 // and an (optional) callback function which is invoked when the state of the
 // checkbox was changed by the user.
