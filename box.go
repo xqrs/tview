@@ -54,9 +54,6 @@ type Box struct {
 	// nothing should be forwarded).
 	inputCapture func(event *tcell.EventKey) *tcell.EventKey
 
-	// An optional function which is called before the box is drawn.
-	draw func(screen tcell.Screen, x, y, width, height int) (int, int, int, int)
-
 	// An optional capture function which receives a mouse event and returns the
 	// event to be forwarded to the primitive's default mouse event handler (at
 	// least one nil if nothing should be forwarded).
@@ -145,25 +142,6 @@ func (b *Box) SetRect(x, y, width, height int) {
 	b.width = width
 	b.height = height
 	b.innerX = -1 // Mark inner rect as uninitialized.
-}
-
-// SetDrawFunc sets a callback function which is invoked after the box primitive
-// has been drawn. This allows you to add a more individual style to the box
-// (and all primitives which extend it).
-//
-// The function is provided with the box's dimensions (set via SetRect()). It
-// must return the box's inner dimensions (x, y, width, height) which will be
-// returned by GetInnerRect(), used by descendent primitives to draw their own
-// content.
-func (b *Box) SetDrawFunc(handler func(screen tcell.Screen, x, y, width, height int) (int, int, int, int)) *Box {
-	b.draw = handler
-	return b
-}
-
-// GetDrawFunc returns the callback function which was installed with
-// SetDrawFunc() or nil if no such function has been installed.
-func (b *Box) GetDrawFunc() func(screen tcell.Screen, x, y, width, height int) (int, int, int, int) {
-	return b.draw
 }
 
 // WrapInputHandler wraps an input handler (see [Box.InputHandler]) with the
@@ -446,14 +424,9 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 		}
 	}
 
-	// Call custom draw function.
-	if b.draw != nil {
-		b.innerX, b.innerY, b.innerWidth, b.innerHeight = b.draw(screen, b.x, b.y, b.width, b.height)
-	} else {
-		// Remember the inner rect.
-		b.innerX = -1
-		b.innerX, b.innerY, b.innerWidth, b.innerHeight = b.GetInnerRect()
-	}
+	// Remember the inner rect.
+	b.innerX = -1
+	b.innerX, b.innerY, b.innerWidth, b.innerHeight = b.GetInnerRect()
 }
 
 // SetFocusFunc sets a callback function which is invoked when this primitive
