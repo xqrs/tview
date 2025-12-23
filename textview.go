@@ -1366,9 +1366,8 @@ func (t *TextView) Draw(screen tcell.Screen) {
 
 				// Paint on screen.
 				for offset := w - 1; offset >= 0; offset-- {
-					runes := []rune(ch)
 					if offset == 0 {
-						screen.SetContent(x+xPos+offset, y+line-t.lineOffset, runes[0], runes[1:], style)
+						screen.PutStrStyled(x+xPos+offset, y+line-t.lineOffset, ch, style)
 					} else {
 						screen.Put(x+xPos+offset, y+line-t.lineOffset, " ", style)
 					}

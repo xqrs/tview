@@ -121,9 +121,8 @@ func printWithStyle(screen tcell.Screen, text string, x, y, skipWidth, maxWidth 
 			}
 			for offset := width - 1; offset >= 0; offset-- {
 				// To avoid undesired effects, we populate all cells.
-				runes := []rune(c)
 				if offset == 0 {
-					screen.Put(x+offset, y, string(runes), finalStyle)
+					screen.Put(x+offset, y, c, finalStyle)
 				} else {
 					screen.Put(x+offset, y, " ", finalStyle)
 				}
