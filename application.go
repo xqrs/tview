@@ -83,9 +83,6 @@ type Application struct {
 	// The root primitive to be seen on the screen.
 	root Primitive
 
-	// Whether or not the application resizes the root primitive.
-	rootFullscreen bool
-
 	// An optional capture function which receives a key event and returns the
 	// event to be forwarded to the default input handler (nil if nothing should
 	// be forwarded).
@@ -530,7 +527,6 @@ func (a *Application) draw() *Application {
 	a.Lock()
 	screen := a.screen
 	root := a.root
-	fullscreen := a.rootFullscreen
 	before := a.beforeDraw
 	after := a.afterDraw
 	a.Unlock()
@@ -540,11 +536,8 @@ func (a *Application) draw() *Application {
 		return a
 	}
 
-	// Resize if requested.
-	if fullscreen { // root is not nil here.
-		width, height := screen.Size()
-		root.SetRect(0, 0, width, height)
-	}
+	width, height := screen.Size()
+	root.SetRect(0, 0, width, height)
 
 	// Clear screen to remove unwanted artifacts from the previous cycle.
 	screen.Clear()
@@ -623,34 +616,19 @@ func (a *Application) GetAfterDrawFunc() func(screen tcell.Screen) {
 	return a.afterDraw
 }
 
-// SetRoot sets the root primitive for this application. If "fullscreen" is set
-// to true, the root primitive's position will be changed to fill the screen.
-//
-// This function must be called at least once or nothing will be displayed when
+// SetRoot sets the root primitive for this application. This function must be called at least once or nothing will be displayed when
 // the application starts.
 //
 // It also calls SetFocus() on the primitive.
-func (a *Application) SetRoot(root Primitive, fullscreen bool) *Application {
+func (a *Application) SetRoot(root Primitive) *Application {
 	a.Lock()
 	a.root = root
-	a.rootFullscreen = fullscreen
 	if a.screen != nil {
 		a.screen.Clear()
 	}
 	a.Unlock()
 
 	a.SetFocus(root)
-
-	return a
-}
-
-// ResizeToFullScreen resizes the given primitive such that it fills the entire
-// screen.
-func (a *Application) ResizeToFullScreen(p Primitive) *Application {
-	a.RLock()
-	width, height := a.screen.Size()
-	a.RUnlock()
-	p.SetRect(0, 0, width, height)
 	return a
 }
 
