@@ -77,10 +77,6 @@ type Application struct {
 	// Fini(), to set a new screen (or nil to stop the application).
 	screen tcell.Screen
 
-	// The application's title. If not empty, it will be set on every new screen
-	// that is added.
-	title string
-
 	// The primitive which currently has the keyboard focus.
 	focus Primitive
 
@@ -89,12 +85,6 @@ type Application struct {
 
 	// Whether or not the application resizes the root primitive.
 	rootFullscreen bool
-
-	// Set to true if mouse events are enabled.
-	enableMouse bool
-
-	// Set to true if paste events are enabled.
-	enablePaste bool
 
 	// An optional capture function which receives a key event and returns the
 	// event to be forwarded to the default input handler (nil if nothing should
@@ -150,9 +140,6 @@ func NewApplication() *Application {
 //     forward the Ctrl-C event to primitives down the hierarchy, return a new
 //     key event with the same key and modifiers, e.g.
 //     tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModNone).
-//
-// Pasted key events are not forwarded to the input capture function if pasting
-// is enabled (see [Application.EnablePaste]).
 func (a *Application) SetInputCapture(capture func(event *tcell.EventKey) *tcell.EventKey) *Application {
 	a.inputCapture = capture
 	return a
@@ -181,51 +168,13 @@ func (a *Application) GetMouseCapture() func(event *tcell.EventMouse, action Mou
 	return a.mouseCapture
 }
 
-// SetTitle sets the title of the terminal window, to the extent that the
-// terminal supports it. A non-empty title will be set on every new tcell.Screen
-// that is created by or added to this application.
-func (a *Application) SetTitle(title string) *Application {
+// SetScreen sets the application's screen.
+func (a *Application) SetScreen(screen tcell.Screen) *Application {
 	a.Lock()
 	defer a.Unlock()
-	a.title = title
-	if a.screen != nil {
-		a.screen.SetTitle(title)
+	if a.screen == nil {
+		a.screen = screen
 	}
-	return a
-}
-
-// EnableMouse enables mouse events or disables them (if "false" is provided).
-func (a *Application) EnableMouse(enable bool) *Application {
-	a.Lock()
-	defer a.Unlock()
-	if enable != a.enableMouse && a.screen != nil {
-		if enable {
-			a.screen.EnableMouse()
-		} else {
-			a.screen.DisableMouse()
-		}
-	}
-	a.enableMouse = enable
-	return a
-}
-
-// EnablePaste enables the capturing of paste events or disables them (if
-// "false" is provided). This must be supported by the terminal.
-//
-// Widgets won't interpret paste events for navigation or selection purposes.
-// Paste events are typically only used to insert a block of text into an
-// [InputField] or a [TextArea].
-func (a *Application) EnablePaste(enable bool) *Application {
-	a.Lock()
-	defer a.Unlock()
-	if enable != a.enablePaste && a.screen != nil {
-		if enable {
-			a.screen.EnablePaste()
-		} else {
-			a.screen.DisablePaste()
-		}
-	}
-	a.enablePaste = enable
 	return a
 }
 
@@ -255,20 +204,6 @@ func (a *Application) Run() error {
 		if err = a.screen.Init(); err != nil {
 			a.Unlock()
 			return err
-		}
-		if a.enableMouse {
-			a.screen.EnableMouse()
-		} else {
-			a.screen.DisableMouse()
-		}
-		if a.enablePaste {
-			a.screen.EnablePaste()
-		} else {
-			a.screen.DisablePaste()
-		}
-
-		if a.title != "" {
-			a.screen.SetTitle(a.title)
 		}
 	}
 
@@ -356,9 +291,6 @@ EventLoop:
 					a.draw()
 				}
 			case *tcell.EventPaste:
-				if !a.enablePaste {
-					break
-				}
 				if event.Start() {
 					pasting = true
 					pasteBuffer.Reset()
