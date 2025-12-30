@@ -88,14 +88,6 @@ type Application struct {
 	// be forwarded).
 	inputCapture func(event *tcell.EventKey) *tcell.EventKey
 
-	// An optional callback function which is invoked just before the root
-	// primitive is drawn.
-	beforeDraw func(screen tcell.Screen) bool
-
-	// An optional callback function which is invoked after the root primitive
-	// was drawn.
-	afterDraw func(screen tcell.Screen)
-
 	events chan tcell.Event
 
 	// Functions queued from goroutines, used to serialize updates to primitives.
@@ -527,8 +519,6 @@ func (a *Application) draw() *Application {
 	a.Lock()
 	screen := a.screen
 	root := a.root
-	before := a.beforeDraw
-	after := a.afterDraw
 	a.Unlock()
 
 	// Maybe we're not ready yet or not anymore.
@@ -541,23 +531,8 @@ func (a *Application) draw() *Application {
 
 	// Clear screen to remove unwanted artifacts from the previous cycle.
 	screen.Clear()
-
-	// Call before handler if there is one.
-	if before != nil {
-		if before(screen) {
-			screen.Show()
-			return a
-		}
-	}
-
 	// Draw all primitives.
 	root.Draw(screen)
-
-	// Call after handler if there is one.
-	if after != nil {
-		after(screen)
-	}
-
 	// Sync screen.
 	screen.Show()
 
@@ -579,41 +554,6 @@ func (a *Application) Sync() *Application {
 		screen.Sync()
 	}}
 	return a
-}
-
-// SetBeforeDrawFunc installs a callback function which is invoked just before
-// the root primitive is drawn during screen updates. If the function returns
-// true, drawing will not continue, i.e. the root primitive will not be drawn
-// (and an after-draw-handler will not be called).
-//
-// Note that the screen is not cleared by the application. To clear the screen,
-// you may call screen.Clear().
-//
-// Provide nil to uninstall the callback function.
-func (a *Application) SetBeforeDrawFunc(handler func(screen tcell.Screen) bool) *Application {
-	a.beforeDraw = handler
-	return a
-}
-
-// GetBeforeDrawFunc returns the callback function installed with
-// SetBeforeDrawFunc() or nil if none has been installed.
-func (a *Application) GetBeforeDrawFunc() func(screen tcell.Screen) bool {
-	return a.beforeDraw
-}
-
-// SetAfterDrawFunc installs a callback function which is invoked after the root
-// primitive was drawn during screen updates.
-//
-// Provide nil to uninstall the callback function.
-func (a *Application) SetAfterDrawFunc(handler func(screen tcell.Screen)) *Application {
-	a.afterDraw = handler
-	return a
-}
-
-// GetAfterDrawFunc returns the callback function installed with
-// SetAfterDrawFunc() or nil if none has been installed.
-func (a *Application) GetAfterDrawFunc() func(screen tcell.Screen) {
-	return a.afterDraw
 }
 
 // SetRoot sets the root primitive for this application. This function must be called at least once or nothing will be displayed when
