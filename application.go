@@ -190,12 +190,10 @@ func (a *Application) Run() error {
 			a.Unlock()
 			return err
 		}
-
 		if err = screen.Init(); err != nil {
 			a.Unlock()
 			return err
 		}
-
 		a.screen = screen
 	}
 
