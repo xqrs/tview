@@ -111,7 +111,7 @@ func (b *Box) GetInnerRect() (int, int, int, int) {
 		height--
 	}
 
-	if b.borders.Has(BordersBottom) {
+	if b.footer != "" || b.borders.Has(BordersBottom) {
 		height--
 	}
 
@@ -346,6 +346,29 @@ func (b *Box) SetTitleAlignment(alignment Alignment) *Box {
 	return b
 }
 
+// GetFooter returns the box's current footer.
+func (b *Box) GetFooter() string {
+	return b.footer
+}
+
+// SetFooter sets the box's footer.
+func (b *Box) SetFooter(footer string) *Box {
+	b.footer = footer
+	return b
+}
+
+// SetFooterStyle sets the style of the footer.
+func (b *Box) SetFooterStyle(style tcell.Style) *Box {
+	b.footerStyle = style
+	return b
+}
+
+// SetFooterAlignment sets the alignment of the footer.
+func (b *Box) SetFooterAlignment(alignment Alignment) *Box {
+	b.footerAlignment = alignment
+	return b
+}
+
 // Draw draws this primitive onto the screen.
 func (b *Box) Draw(screen tcell.Screen) {
 	b.DrawForSubclass(screen, b)
@@ -428,6 +451,21 @@ func (b *Box) DrawForSubclass(screen tcell.Screen, p Primitive) {
 			_, style, _ := screen.Get(xEllipsis, b.y)
 			fg := style.GetForeground()
 			Print(screen, string(SemigraphicsHorizontalEllipsis), xEllipsis, b.y, 1, AlignmentLeft, fg)
+		}
+	}
+
+	// Draw footer.
+	if b.footer != "" && b.width >= 4 {
+		start, end, _ := printWithStyle(screen, b.footer, b.x+1, b.y+b.height-1, 0, b.width-2, b.footerAlignment, b.footerStyle, true)
+		printed := end - start
+		if len(b.footer)-printed > 0 && printed > 0 {
+			xEllipsis := b.x + b.width - 2
+			if b.footerAlignment == AlignmentRight {
+				xEllipsis = b.x + 1
+			}
+			_, style, _ := screen.Get(xEllipsis, b.y+b.height-1)
+			fg := style.GetForeground()
+			Print(screen, string(SemigraphicsHorizontalEllipsis), xEllipsis, b.y+b.height-1, 1, AlignmentLeft, fg)
 		}
 	}
 
