@@ -40,6 +40,11 @@ type Box struct {
 	titleStyle     tcell.Style
 	titleAlignment Alignment
 
+	// Footer
+	footer          string
+	footerStyle     tcell.Style
+	footerAlignment Alignment
+
 	// Whether or not this box has focus. This is typically ignored for
 	// container primitives (e.g. Flex, Grid, Pages), as they will delegate
 	// focus to their children.
@@ -71,8 +76,10 @@ func NewBox() *Box {
 		borderStyle: tcell.StyleDefault.Foreground(Styles.BorderColor).Background(Styles.PrimitiveBackgroundColor),
 		borderSet:   BorderSetPlain(),
 
-		titleStyle:     tcell.StyleDefault.Foreground(Styles.TitleColor),
-		titleAlignment: AlignmentCenter,
+		titleStyle:      tcell.StyleDefault.Foreground(Styles.TitleColor),
+		titleAlignment:  AlignmentCenter,
+		footerStyle:     tcell.StyleDefault.Foreground(Styles.TitleColor),
+		footerAlignment: AlignmentCenter,
 	}
 	return b
 }
