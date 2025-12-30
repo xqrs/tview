@@ -1,6 +1,9 @@
 package tview
 
-import "github.com/gdamore/tcell/v3"
+import (
+	"github.com/gdamore/tcell/v3"
+	"github.com/gdamore/tcell/v3/color"
+)
 
 // Theme defines the colors used when primitives are initialized.
 type Theme struct {
@@ -21,15 +24,15 @@ type Theme struct {
 // background and some basic colors: black, white, yellow, green, cyan, and
 // blue.
 var Styles = Theme{
-	PrimitiveBackgroundColor:    tcell.ColorBlack,
-	ContrastBackgroundColor:     tcell.ColorBlue,
-	MoreContrastBackgroundColor: tcell.ColorGreen,
-	BorderColor:                 tcell.ColorWhite,
-	TitleColor:                  tcell.ColorWhite,
-	GraphicsColor:               tcell.ColorWhite,
-	PrimaryTextColor:            tcell.ColorWhite,
-	SecondaryTextColor:          tcell.ColorYellow,
-	TertiaryTextColor:           tcell.ColorGreen,
-	InverseTextColor:            tcell.ColorBlue,
-	ContrastSecondaryTextColor:  tcell.ColorNavy,
+	PrimitiveBackgroundColor:    color.Black,
+	ContrastBackgroundColor:     color.Blue,
+	MoreContrastBackgroundColor: color.Green,
+	BorderColor:                 color.White,
+	TitleColor:                  color.White,
+	GraphicsColor:               color.White,
+	PrimaryTextColor:            color.White,
+	SecondaryTextColor:          color.Yellow,
+	TertiaryTextColor:           color.Green,
+	InverseTextColor:            color.Blue,
+	ContrastSecondaryTextColor:  color.Navy,
 }
