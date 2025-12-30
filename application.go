@@ -177,7 +177,7 @@ func (a *Application) SetScreen(screen tcell.Screen) *Application {
 // example when needing to print a call stack during a panic.
 func (a *Application) Run() error {
 	var (
-		err, appErr error
+		appErr      error
 		lastRedraw  time.Time   // The time the screen was last redrawn.
 		redrawTimer *time.Timer // A timer to schedule the next redraw.
 	)
@@ -185,15 +185,18 @@ func (a *Application) Run() error {
 
 	// Make a screen if there is none yet.
 	if a.screen == nil {
-		a.screen, err = tcell.NewScreen()
+		screen, err := tcell.NewScreen()
 		if err != nil {
 			a.Unlock()
 			return err
 		}
-		if err = a.screen.Init(); err != nil {
+
+		if err = screen.Init(); err != nil {
 			a.Unlock()
 			return err
 		}
+
+		a.screen = screen
 	}
 
 	// We catch panics to clean up because they mess up the terminal.
