@@ -2,7 +2,6 @@ package tview
 
 import (
 	"math/rand"
-	"regexp"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -11,9 +10,25 @@ import (
 	"github.com/rivo/uniseg"
 )
 
-// escapedTagPattern matches an escaped tag, e.g. "[red[]", at the beginning of
-// a string.
-var escapedTagPattern = regexp.MustCompile(`^\[[^\[\]]+\[+\]`)
+func hasEscapedTagPrefix(str string) bool {
+	if len(str) < 4 || str[0] != '[' {
+		return false
+	}
+	i := 1
+	if str[i] == '[' || str[i] == ']' {
+		return false
+	}
+	for i < len(str) && str[i] != '[' && str[i] != ']' {
+		i++
+	}
+	if i >= len(str) || str[i] != '[' {
+		return false
+	}
+	for i < len(str) && str[i] == '[' {
+		i++
+	}
+	return i < len(str) && str[i] == ']'
+}
 
 // stepOptions is a bit field of options for [step]. A value of 0 results in
 // [step] having the same behavior as uniseg.Step, i.e. no tview-related parsing
@@ -194,7 +209,7 @@ func step(str string, state *stepState, opts stepOptions) (cluster, rest string,
 					}
 				}
 				// Is this an escaped tag?
-				if escapedTagPattern.MatchString(str[length:]) {
+				if hasEscapedTagPrefix(str[length:]) {
 					state.escapedTagState = etStart
 				}
 			}
