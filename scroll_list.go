@@ -25,6 +25,8 @@ type ScrollList struct {
 	Builder     ScrollListBuilder
 	gap         int
 	snapToItems bool
+	trackEnd    bool
+	atEnd       bool
 
 	cursor int
 	scroll scrollListState
@@ -36,9 +38,13 @@ type ScrollList struct {
 }
 
 type scrollListState struct {
-	top         int
-	offset      int
-	pending     int
+	// Index of the top item in the viewport.
+	top int
+	// Line offset into the top item; negative values mean the item is scrolled up.
+	offset int
+	// Pending scroll delta in lines to apply on the next draw.
+	pending int
+	// Ensure the cursor is visible on the next draw.
 	wantsCursor bool
 }
 
@@ -78,6 +84,7 @@ func (l *ScrollList) Clear() *ScrollList {
 	l.scroll = scrollListState{}
 	l.lastDraw = nil
 	l.lastRect = scrollListRect{}
+	l.atEnd = false
 	return l
 }
 
@@ -96,6 +103,24 @@ func (l *ScrollList) SetSnapToItems(snap bool) *ScrollList {
 	return l
 }
 
+// SetTrackEnd toggles auto-scrolling when the view is already at the end.
+func (l *ScrollList) SetTrackEnd(track bool) *ScrollList {
+	l.trackEnd = track
+	return l
+}
+
+// ScrollToEnd scrolls the view so the last items are visible.
+func (l *ScrollList) ScrollToEnd() *ScrollList {
+	_, _, width, height := l.GetInnerRect()
+	if width <= 0 || height <= 0 {
+		return l
+	}
+	l.scroll.top, l.scroll.offset = l.endScrollState(width, height)
+	l.scroll.wantsCursor = false
+	l.atEnd = true
+	return l
+}
+
 // SetCursor sets the currently selected item index.
 func (l *ScrollList) SetCursor(index int) *ScrollList {
 	if index < -1 {
@@ -103,6 +128,7 @@ func (l *ScrollList) SetCursor(index int) *ScrollList {
 	}
 	if l.cursor != index {
 		l.cursor = index
+		l.atEnd = false
 		l.ensureScroll()
 		if l.changed != nil {
 			l.changed(l.cursor)
@@ -120,6 +146,18 @@ func (l *ScrollList) Cursor() int {
 // scroll down.
 func (l *ScrollList) SetPendingScroll(lines int) *ScrollList {
 	l.scroll.pending = lines
+	return l
+}
+
+// ScrollUp scrolls the list up by one line.
+func (l *ScrollList) ScrollUp() *ScrollList {
+	l.scroll.pending -= 1
+	return l
+}
+
+// ScrollDown scrolls the list down by one line.
+func (l *ScrollList) ScrollDown() *ScrollList {
+	l.scroll.pending += 1
 	return l
 }
 
@@ -189,6 +227,13 @@ func (l *ScrollList) Draw(screen tcell.Screen) {
 		return
 	}
 
+	// If we were already at the end, keep following new items without
+	// forcing full scans during normal scrolling.
+	if l.trackEnd && l.atEnd {
+		l.scroll.top, l.scroll.offset = l.endScrollState(usableWidth, height)
+		l.scroll.wantsCursor = false
+	}
+
 	// In snap mode, ensure the cursor item is within the fully visible window.
 	if l.snapToItems && l.scroll.wantsCursor && l.cursor >= 0 {
 		visible := l.visibleItemCount(usableWidth, height)
@@ -252,6 +297,7 @@ rebuild:
 		l.scroll.offset = 0
 		l.lastDraw = nil
 		l.lastRect = scrollListRect{x: x, y: y, width: width, height: height}
+		l.atEnd = false
 		return
 	}
 
@@ -280,6 +326,7 @@ rebuild:
 			l.scroll.offset = 0
 			l.lastDraw = nil
 			l.lastRect = scrollListRect{x: x, y: y, width: width, height: height}
+			l.atEnd = false
 			return
 		}
 
@@ -356,6 +403,12 @@ rebuild:
 			}
 		}
 	}
+
+	last := children[len(children)-1]
+	if !endReached && l.Builder(last.index+1, l.cursor) == nil {
+		endReached = true
+	}
+	l.atEnd = endReached && last.row+last.height <= height
 
 	l.lastDraw = children
 	l.lastRect = scrollListRect{x: x, y: y, width: width, height: height}
@@ -490,6 +543,50 @@ func (l *ScrollList) visibleItemCount(width int, height int) int {
 		return 1
 	}
 	return count
+}
+
+func (l *ScrollList) endScrollState(width int, height int) (int, int) {
+	if l.Builder == nil || width <= 0 || height <= 0 {
+		return 0, 0
+	}
+	start := max(l.scroll.top, 0)
+	// If the current top is past the end, restart from the beginning.
+	if l.Builder(start, l.cursor) == nil && start != 0 {
+		start = 0
+	}
+	last := start
+	for {
+		if l.Builder(last, l.cursor) == nil {
+			last--
+			break
+		}
+		last++
+	}
+	if last < 0 {
+		return 0, 0
+	}
+
+	// Walk upward from the last item until we fill a viewport.
+	total := 0
+	for i := last; i >= 0; i-- {
+		item := l.Builder(i, l.cursor)
+		if item == nil {
+			continue
+		}
+		if total > 0 {
+			total += l.gap
+		}
+		itemHeight := l.itemHeight(item, width)
+		if total+itemHeight > height {
+			offset := max(total+itemHeight-height, 0)
+			return i, offset
+		}
+		total += itemHeight
+		if i == 0 {
+			break
+		}
+	}
+	return 0, 0
 }
 
 // InputHandler returns the handler for this primitive.
