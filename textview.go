@@ -439,11 +439,14 @@ func (t *TextView) Height(width int) int {
 	}
 	// Keep the width used to build lineIndex in sync with the caller's width.
 	t.lastWidth = width
-	lineCount := t.GetWrappedLineCount()
-	if lineCount == 0 {
+	// Build lineIndex for this width so we can return the wrapped line count.
+	t.parseAhead(width, func(int, *textViewLine) bool {
+		return false
+	})
+	if len(t.lineIndex) == 0 {
 		return 1
 	}
-	return lineCount
+	return len(t.lineIndex)
 }
 
 // SetDynamicColors sets the flag that allows the text color to be changed
