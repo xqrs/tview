@@ -16,10 +16,10 @@ const (
 )
 
 var (
-	// Regular expression used to escape style/region tags.
+	// Regular expression used to escape style tags.
 	escapePattern = regexp.MustCompile(`(\[[a-zA-Z0-9_,;: \-\."#]+\[*)\]`)
 
-	// Regular expression used to unescape escaped style/region tags.
+	// Regular expression used to unescape escaped style tags.
 	unescapePattern = regexp.MustCompile(`(\[[a-zA-Z0-9_,;: \-\."#]+\[*)\[\]`)
 )
 

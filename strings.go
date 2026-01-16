@@ -59,10 +59,6 @@ func isAttrTag(b byte) bool {
 	}
 }
 
-func isRegionChar(b byte) bool {
-	return isAlphaNum(b) || b == '_' || b == ',' || b == ';' || b == ':' || b == ' ' || b == '-' || b == '.'
-}
-
 func attrMaskForUpper(b byte) tcell.AttrMask {
 	switch b {
 	case 'B':
@@ -89,9 +85,8 @@ type stepOptions int
 
 // Bit fields for [stepOptions].
 const (
-	stepOptionsNone   stepOptions = 0
-	stepOptionsStyle  stepOptions = 1 << iota // Parse style tags.
-	stepOptionsRegion                         // Parse region tags.
+	stepOptionsNone  stepOptions = 0
+	stepOptionsStyle stepOptions = 1 << iota // Parse style tags.
 )
 
 // stepState represents the current state of the parser implemented in [step].
@@ -99,7 +94,6 @@ type stepState struct {
 	unisegState     int         // The state of the uniseg parser.
 	boundaries      int         // Information about boundaries, as returned by uniseg.Step.
 	style           tcell.Style // The style of the returned grapheme cluster.
-	region          string      // The region of the returned grapheme cluster.
 	escapedTagState int         // States for parsing escaped tags (defined in [step]).
 	grossLength     int         // The length of the cluster, including any tags not returned.
 
@@ -152,7 +146,7 @@ func (s *stepState) Style() tcell.Style {
 }
 
 // step uses uniseg.Step to iterate over the grapheme clusters of a string but
-// (optionally) also parses the string for style or region tags.
+// (optionally) also parses the string for style tags.
 //
 // This function can be called consecutively to extract all grapheme clusters
 // from str, without returning any contained (parsed) tags. The return values
@@ -167,8 +161,8 @@ func (s *stepState) Style() tcell.Style {
 //
 // Pass nil for state on the first call. This will assume an initial style with
 // [Styles.PrimitiveBackgroundColor] as the background color and
-// [Styles.PrimaryTextColor] as the text color, no current region. If you want
-// to start with a different style or region, you can set the state accordingly
+// [Styles.PrimaryTextColor] as the text color. If you want to start with a
+// different style, you can set the state accordingly
 // but you must then set [state.unisegState] to -1.
 //
 // There is no need to call uniseg.HasTrailingLineBreakInString on the last
@@ -248,10 +242,9 @@ func step(str string, state *stepState, opts stepOptions) (cluster, rest string,
 		if state.escapedTagState == etNone {
 			if cluster[0] == '[' {
 				// We've already opened a tag. Parse it.
-				length, style, region := parseTag(str, state, opts)
+				length, style := parseTag(str, state, opts)
 				if length > 0 {
 					state.style = style
-					state.region = region
 					cluster, rest, state.boundaries, state.unisegState = uniseg.StepString(str[length:], preState)
 					state.grossLength = len(cluster) + length
 					if rest == "" {
@@ -268,7 +261,7 @@ func step(str string, state *stepState, opts stepOptions) (cluster, rest string,
 			if len(rest) > 0 && rest[0] == '[' {
 				// A tag might follow the cluster. If so, we need to fix the state
 				// for the boundaries to be correct.
-				if length, _, _ := parseTag(rest, state, opts); length > 0 {
+				if length, _ := parseTag(rest, state, opts); length > 0 {
 					if len(rest) > length {
 						_, l := utf8.DecodeRuneInString(rest[length:])
 						cluster += rest[length : length+l]
@@ -289,11 +282,11 @@ func step(str string, state *stepState, opts stepOptions) (cluster, rest string,
 	return
 }
 
-// parseTag parses str for consecutive style and/or region tags, assuming that
-// str starts with the opening bracket for the first tag. It returns the string
-// length of all valid tags (0 if the first tag is not valid) and the updated
-// style and region for valid tags (based on the provided state).
-func parseTag(str string, state *stepState, opts stepOptions) (length int, style tcell.Style, region string) {
+// parseTag parses str for consecutive style tags, assuming that str starts with
+// the opening bracket for the first tag. It returns the string length of all
+// valid tags (0 if the first tag is not valid) and the updated style for valid
+// tags (based on the provided state).
+func parseTag(str string, state *stepState, opts stepOptions) (length int, style tcell.Style) {
 	if opts == stepOptionsNone {
 		return // No tags to parse.
 	}
@@ -303,7 +296,6 @@ func parseTag(str string, state *stepState, opts stepOptions) (length int, style
 		tagStateNone = iota
 		tagStateDoneTag
 		tagStateStart
-		tagStateRegionStart
 		tagStateEndForeground
 		tagStateStartBackground
 		tagStateNumericForeground
@@ -313,8 +305,6 @@ func parseTag(str string, state *stepState, opts stepOptions) (length int, style
 		tagStateNumericBackground
 		tagStateNameBackground
 		tagStateAttributes
-		tagStateRegionEnd
-		tagStateRegionName
 		tagStateEndAttributes
 		tagStateStartURL
 		tagStateEndURL
@@ -326,7 +316,6 @@ func parseTag(str string, state *stepState, opts stepOptions) (length int, style
 		tempStr             strings.Builder
 	)
 	tStyle := state.style
-	tRegion := state.region
 
 	// Process state transitions.
 	for len(str) > 0 {
@@ -343,15 +332,10 @@ func parseTag(str string, state *stepState, opts stepOptions) (length int, style
 				return
 			}
 		case tagStateStart:
-			if ch == '"' && opts&stepOptionsRegion == 0 {
-				return // Region tags are not allowed.
-			} else if ch != '"' && opts&stepOptionsStyle == 0 {
+			if ch != '"' && opts&stepOptionsStyle == 0 {
 				return // Style tags are not allowed.
 			}
 			switch {
-			case ch == '"': // Start of a region tag.
-				tempStr.Reset()
-				tagState = tagStateRegionStart
 			case !isTagStartChar(ch): // Invalid style tag.
 				return
 			case ch == '-': // Reset foreground color.
@@ -557,37 +541,11 @@ func parseTag(str string, state *stepState, opts stepOptions) (length int, style
 			} else { // URL character.
 				tempStr.WriteByte(ch)
 			}
-		case tagStateRegionStart:
-			switch {
-			case ch == '"': // End of region tag.
-				tagState = tagStateRegionEnd
-			case isRegionChar(ch): // Region name.
-				tempStr.WriteByte(ch)
-				tagState = tagStateRegionName
-			default: // Invalid tag.
-				return
-			}
-		case tagStateRegionEnd:
-			if ch == ']' { // End of tag.
-				tRegion = tempStr.String()
-				tagState = tagStateDoneTag
-			} else { // Invalid tag.
-				return
-			}
-		case tagStateRegionName:
-			switch {
-			case ch == '"': // End of region tag.
-				tagState = tagStateRegionEnd
-			case isRegionChar(ch): // Region name.
-				tempStr.WriteByte(ch)
-			default: // Invalid tag.
-				return
-			}
 		}
 
 		// The last transition led to a tag end. Make the tag permanent.
 		if tagState == tagStateDoneTag {
-			length, style, region = tagLength, tStyle, tRegion
+			length, style = tagLength, tStyle
 			tagState = tagStateNone // Reset state.
 		}
 	}
@@ -668,7 +626,7 @@ func WordWrap(text string, width int) (lines []string) {
 	return
 }
 
-// Escape escapes the given text such that color and/or region tags are not
+// Escape escapes the given text such that color tags are not
 // recognized and substituted by the print functions of this package. For
 // example, to include a tag-like string in a box title or in a TextView:
 //
@@ -683,8 +641,7 @@ func Unescape(text string) string {
 	return unescapePattern.ReplaceAllString(text, "$1]")
 }
 
-// stripTags strips style tags from the given string. (Region tags are not
-// stripped.)
+// stripTags strips style tags from the given string.
 func stripTags(text string) string {
 	var (
 		str   strings.Builder

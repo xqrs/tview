@@ -13,28 +13,10 @@ var TabSize = 4
 
 // textViewLine contains information about a line displayed in the text view.
 type textViewLine struct {
-	offset  int        // The string position in the buffer where this line starts.
-	width   int        // The screen width of this line.
-	length  int        // The string length (in bytes) of this line.
-	state   *stepState // The parser state at the beginning of the line, before parsing the first character.
-	regions []*Region  // The regions on this line, in the order of their appearance.
-}
-
-// Region represents a region in a [TextView]. Note that depending on how the
-// region is retrieved, the end positions and locations may not correspond to
-// the true end of the region but to the end of the last line that was parsed.
-type Region struct {
-	// The region ID.
-	ID string
-
-	// The start and end offsets into the text string of the region. The end
-	// points to the first byte after the region.
-	Start, End int
-
-	// The start and end positions of the region in screen coordinates, relative
-	// to the position of where the first character of the text view would be
-	// drawn.
-	StartRow, StartColumn, EndRow, EndColumn int
+	offset int        // The string position in the buffer where this line starts.
+	width  int        // The screen width of this line.
+	length int        // The string length (in bytes) of this line.
+	state  *stepState // The parser state at the beginning of the line, before parsing the first character.
 }
 
 // TextViewWriter is a writer that can be used to write to and clear a TextView
@@ -111,28 +93,6 @@ func (w TextViewWriter) HasFocus() bool {
 // works the same way as anywhere else. See the package documentation for more
 // information.
 //
-// # Regions and Highlights
-//
-// If regions are enabled via [TextView.SetRegions], you can define text regions
-// within the text and assign region IDs to them. Text regions start with region
-// tags. Region tags are square brackets that contain a region ID in double
-// quotes, for example:
-//
-//	We define a ["rg"]region[""] here.
-//
-// A text region ends with the next region tag. Tags with no region ID ([""])
-// don't start new regions. They can therefore be used to mark the end of a
-// region. Region IDs must satisfy the following regular expression:
-//
-//	[a-zA-Z0-9_,;: \-\.]+
-//
-// Regions can be highlighted by calling the [TextView.Highlight] function with
-// one or more region IDs. This can be used to display search results, for
-// example.
-//
-// The [TextView.ScrollToHighlight] function can be used to jump to the
-// currently highlighted region once when the text view is drawn the next time.
-//
 // # Large Texts
 //
 // The text view can handle reasonably large texts. It will parse the text as
@@ -153,8 +113,8 @@ type TextView struct {
 	sync.Mutex
 	*Box
 
-	// The size of the text area. If set to 0, the text view will use the entire
-	// available space.
+	// The requested size of the text area. If set to 0, the text view will use
+	// the entire available space. This only affects rendering in Draw.
 	width, height int
 
 	// The text buffer.
@@ -167,10 +127,6 @@ type TextView struct {
 	// The screen width of the longest line in the index.
 	longestLine int
 
-	// Regions mapped by their ID to the line where they start. Regions which
-	// cannot be found in [TextView.lineIndex] are not contained.
-	regions map[string]int
-
 	// The label text shown, usually when part of a form.
 	label string
 
@@ -182,9 +138,6 @@ type TextView struct {
 
 	// The text alignment, one of AlignLeft, AlignCenter, or AlignRight.
 	alignment Alignment
-
-	// Currently highlighted regions.
-	highlights map[string]struct{}
 
 	// The last width for which the current text view was drawn.
 	lastWidth int
@@ -227,18 +180,6 @@ type TextView struct {
 	// Whether or not style tags are used.
 	styleTags bool
 
-	// Whether or not region tags are used.
-	regionTags bool
-
-	// A temporary flag which, when true, will automatically bring the current
-	// highlight(s) into the visible screen the next time the text view is
-	// drawn.
-	scrollToHighlights bool
-
-	// If true, setting new highlights will be a XOR instead of an overwrite
-	// operation.
-	toggleHighlights bool
-
 	// An optional function which is called when the content of the text view
 	// has changed.
 	changed func()
@@ -246,10 +187,6 @@ type TextView struct {
 	// An optional function which is called when the user presses one of the
 	// following keys: Escape, Enter, Tab, Backtab.
 	done func(tcell.Key)
-
-	// An optional function which is called when one or more regions were
-	// highlighted.
-	highlighted func(added, removed, remaining []string)
 
 	// A callback function set by the Form class and called when the user leaves
 	// this form item.
@@ -261,14 +198,12 @@ func NewTextView() *TextView {
 	return &TextView{
 		Box:        NewBox(),
 		labelStyle: tcell.StyleDefault.Foreground(Styles.SecondaryTextColor),
-		highlights: make(map[string]struct{}),
 		lineOffset: -1,
 		scrollable: true,
 		alignment:  AlignmentLeft,
 		wrap:       true,
 		wordWrap:   true,
 		textStyle:  tcell.StyleDefault.Background(Styles.PrimitiveBackgroundColor).Foreground(Styles.PrimaryTextColor),
-		regionTags: false,
 		styleTags:  false,
 	}
 }
@@ -418,11 +353,11 @@ func (t *TextView) SetText(text string) *TextView {
 }
 
 // GetText returns the current text of this text view. If "stripAllTags" is set
-// to true, any region/style tags are stripped from the text. Note that any text
+// to true, any style tags are stripped from the text. Note that any text
 // that has been discarded due to [TextView.SetMaxLines] or
 // [TextView.SetScrollable] will not be part of the returned text.
 func (t *TextView) GetText(stripAllTags bool) string {
-	if !stripAllTags || (!t.styleTags && !t.regionTags) {
+	if !stripAllTags || !t.styleTags {
 		return t.text.String()
 	}
 
@@ -433,12 +368,7 @@ func (t *TextView) GetText(stripAllTags bool) string {
 		opts  stepOptions
 		ch    string
 	)
-	if t.styleTags {
-		opts = stepOptionsStyle
-	}
-	if t.regionTags {
-		opts |= stepOptionsRegion
-	}
+	opts = stepOptionsStyle
 	for len(text) > 0 {
 		ch, text, state = step(text, state, opts)
 		str.WriteString(ch)
@@ -480,10 +410,40 @@ func (t *TextView) GetOriginalLineCount() int {
 // count. Calling this method before the text view was drawn for the first time
 // will assume no wrapping.
 func (t *TextView) GetWrappedLineCount() int {
+	if t.text.Len() == 0 {
+		return 0
+	}
 	t.parseAhead(t.width, func(int, *textViewLine) bool {
 		return false
 	})
 	return len(t.lineIndex)
+}
+
+// Height returns the required height for rendering the text view at the given
+// width when used as a scroll list item.
+// TODO: remove this—this is for discordo
+func (t *TextView) Height(width int) int {
+	// Note: this uses the provided width directly and does not clamp to t.width
+	// or t.height. Draw() applies those constraints separately.
+	if width < 1 {
+		// Avoid zero/negative widths; a text view always occupies at least one row.
+		return 1
+	}
+	if t.text.Len() == 0 {
+		// Empty text still needs a visible row.
+		return 1
+	}
+	if width != t.lastWidth && t.wrap {
+		// Wrapping depends on width, so cached line breaks must be reset.
+		t.resetIndex()
+	}
+	// Keep the width used to build lineIndex in sync with the caller's width.
+	t.lastWidth = width
+	lineCount := t.GetWrappedLineCount()
+	if lineCount == 0 {
+		return 1
+	}
+	return lineCount
 }
 
 // SetDynamicColors sets the flag that allows the text color to be changed
@@ -493,16 +453,6 @@ func (t *TextView) SetDynamicColors(dynamic bool) *TextView {
 		t.resetIndex() // This invalidates the entire index.
 	}
 	t.styleTags = dynamic
-	return t
-}
-
-// SetRegions sets the flag that allows to define regions in the text. See class
-// description for details.
-func (t *TextView) SetRegions(regions bool) *TextView {
-	if t.regionTags != regions {
-		t.resetIndex() // This invalidates the entire index.
-	}
-	t.regionTags = regions
 	return t
 }
 
@@ -532,19 +482,6 @@ func (t *TextView) SetChangedFunc(handler func()) *TextView {
 // handler.
 func (t *TextView) SetDoneFunc(handler func(key tcell.Key)) *TextView {
 	t.done = handler
-	return t
-}
-
-// SetHighlightedFunc sets a handler which is called when the list of currently
-// highlighted regions change. It receives a list of region IDs which were newly
-// highlighted, those that are not highlighted anymore, and those that remain
-// highlighted.
-//
-// Note that because regions are only determined when drawing the text view,
-// this function can only fire for regions that have existed when the text view
-// was last drawn.
-func (t *TextView) SetHighlightedFunc(handler func(added, removed, remaining []string)) *TextView {
-	t.highlighted = handler
 	return t
 }
 
@@ -623,238 +560,6 @@ func (t *TextView) clear() {
 	t.resetIndex()
 }
 
-// Highlight specifies which regions should be highlighted. If highlight
-// toggling is set to true (see [TextView.SetToggleHighlights]), the highlight
-// of the provided regions is toggled (i.e. highlighted regions are
-// un-highlighted and vice versa). If toggling is set to false, the provided
-// regions are highlighted and all other regions will not be highlighted (you
-// may also provide nil to turn off all highlights).
-//
-// For more information on regions, see class description. Empty region strings
-// or regions not contained in the text are ignored.
-//
-// Text in highlighted regions will be drawn inverted, i.e. with their
-// background and foreground colors swapped.
-//
-// If toggling is set to false, clicking outside of any region will remove all
-// highlights.
-//
-// This function is expensive if a specified region is in a part of the text
-// that has not yet been parsed, as is typically the case for lines below the
-// visible area.
-func (t *TextView) Highlight(regionIDs ...string) *TextView {
-	// Make sure we know these regions.
-	t.parseAhead(t.lastWidth, func(lineNumber int, line *textViewLine) bool {
-		for _, regionID := range regionIDs {
-			if _, ok := t.regions[regionID]; !ok {
-				return false
-			}
-		}
-		return true
-	})
-
-	// Remove unknown regions.
-	newRegions := make([]string, 0, len(regionIDs))
-	for _, regionID := range regionIDs {
-		if _, ok := t.regions[regionID]; ok {
-			newRegions = append(newRegions, regionID)
-		}
-	}
-	regionIDs = newRegions
-
-	// Toggle highlights.
-	if t.toggleHighlights {
-		var newIDs []string
-	HighlightLoop:
-		for regionID := range t.highlights {
-			for _, id := range regionIDs {
-				if regionID == id {
-					continue HighlightLoop
-				}
-			}
-			newIDs = append(newIDs, regionID)
-		}
-		for _, regionID := range regionIDs {
-			if _, ok := t.highlights[regionID]; !ok {
-				newIDs = append(newIDs, regionID)
-			}
-		}
-		regionIDs = newIDs
-	} // Now we have a list of region IDs that end up being highlighted.
-
-	// Determine added and removed regions.
-	var added, removed, remaining []string
-	if t.highlighted != nil {
-		for _, regionID := range regionIDs {
-			if _, ok := t.highlights[regionID]; ok {
-				remaining = append(remaining, regionID)
-				delete(t.highlights, regionID)
-			} else {
-				added = append(added, regionID)
-			}
-		}
-		for regionID := range t.highlights {
-			removed = append(removed, regionID)
-		}
-	}
-
-	// Make new selection.
-	t.highlights = make(map[string]struct{})
-	for _, id := range regionIDs {
-		if id == "" {
-			continue
-		}
-		t.highlights[id] = struct{}{}
-	}
-
-	// Notify.
-	if t.highlighted != nil && (len(added) > 0 || len(removed) > 0) {
-		t.highlighted(added, removed, remaining)
-	}
-
-	return t
-}
-
-// GetHighlights returns the IDs of all currently highlighted regions.
-func (t *TextView) GetHighlights() (regionIDs []string) {
-	for id := range t.highlights {
-		regionIDs = append(regionIDs, id)
-	}
-	return
-}
-
-// SetToggleHighlights sets a flag to determine how regions are highlighted.
-// When set to true, the [TextView.Highlight] function (or a mouse click) will
-// toggle the provided/selected regions. When set to false, [TextView.Highlight]
-// (or a mouse click) will simply highlight the provided regions.
-func (t *TextView) SetToggleHighlights(toggle bool) *TextView {
-	t.toggleHighlights = toggle
-	return t
-}
-
-// ScrollToHighlight will cause the visible area to be scrolled so that the
-// highlighted regions appear in the visible area of the text view. This
-// repositioning happens the next time the text view is drawn. It happens only
-// once so you will need to call this function repeatedly to always keep
-// highlighted regions in view.
-//
-// Nothing happens if there are no highlighted regions or if the text view is
-// not scrollable.
-func (t *TextView) ScrollToHighlight() *TextView {
-	if len(t.highlights) == 0 || !t.scrollable || !t.regionTags {
-		return t
-	}
-	t.scrollToHighlights = true
-	t.trackEnd = false
-	return t
-}
-
-// GetRegionText returns the text of the first region with the given ID. If
-// dynamic colors are enabled, style tags are stripped from the text.
-//
-// If the region does not exist or if regions are turned off, an empty string
-// is returned.
-//
-// This function can be expensive if the specified region is way beyond the
-// visible area of the text view as the text needs to be parsed until the region
-// can be found, or if the region does not contain any text.
-func (t *TextView) GetRegionText(regionID string) string {
-	if !t.regionTags || regionID == "" {
-		return ""
-	}
-
-	// Parse until we find the region.
-	lineNumber, ok := t.regions[regionID]
-	if !ok {
-		lineNumber = -1
-		t.parseAhead(t.lastWidth, func(number int, line *textViewLine) bool {
-			lineNumber, ok = t.regions[regionID]
-			return ok
-		})
-		if lineNumber < 0 {
-			return "" // We couldn't find this region.
-		}
-	}
-
-	// Extract text from region.
-	var (
-		line       = t.lineIndex[lineNumber]
-		text       = t.text.String()[line.offset:]
-		st         = *line.state
-		state      = &st
-		options    = stepOptionsRegion
-		regionText strings.Builder
-	)
-	if t.styleTags {
-		options |= stepOptionsStyle
-	}
-	for len(text) > 0 {
-		var ch string
-		ch, text, state = step(text, state, options)
-		if state.region == regionID {
-			regionText.WriteString(ch)
-		} else if regionText.Len() > 0 {
-			break
-		}
-	}
-
-	return regionText.String()
-}
-
-// GetRegions returns the regions in this [TextView]. If tail is set to false,
-// only regions from the startRow row to the end of the currently visible area
-// are returned. If tail is set to true, the regions below the visible area of
-// the view are also included. Note that the latter will require parsing the
-// entire text and can therefore be expensive. Setting startRow to a value
-// larger than the last visible row results in nil being returned. To obtain
-// only visible regions, set startRow to the current row offset (see
-// [TextView.GetScrollOffset]) and tail to false.
-//
-// Regions are returned in the order of their appearance in the text. Do not
-// modify the returned [Region] objects. Region positions change when the text
-// view is resized or when the text changes. Such changes will render the
-// returned slice invalid.
-//
-// If this function is called before the text view was drawn for the first
-// time, the return value is undefined.
-func (t *TextView) GetRegions(startRow int, tail bool) []*Region {
-	_, _, _, height := t.GetInnerRect()
-	if !t.regionTags || !tail && startRow >= t.lineOffset+height {
-		return nil
-	}
-
-	// Parse until we have all (complete) regions we need.
-	var lastRegion *Region
-	t.parseAhead(t.lastWidth, func(lineNumber int, line *textViewLine) bool {
-		if tail || lineNumber < t.lineOffset+height {
-			if len(line.regions) > 0 {
-				lastRegion = line.regions[len(line.regions)-1]
-			}
-			return false // These must be parsed in any case.
-		}
-		return len(line.regions) == 0 || line.regions[0] != lastRegion // Keep parsing to complete the last region.
-	})
-	if startRow >= len(t.lineIndex) {
-		return nil // We don't have that many lines.
-	}
-
-	// Merge regions into a slice.
-	var regions []*Region
-	for row, line := range t.lineIndex {
-		if tail && row >= t.lineOffset+height {
-			break
-		}
-		for _, region := range line.regions {
-			if len(regions) > 0 && regions[len(regions)-1] == region {
-				continue // Already added.
-			}
-			regions = append(regions, region)
-		}
-	}
-
-	return regions
-}
-
 // Focus is called when this primitive receives focus.
 func (t *TextView) Focus(delegate func(p Primitive)) {
 	// Implemented here with locking because this is used by layout primitives.
@@ -931,7 +636,6 @@ func (t *TextView) BatchWriter() TextViewWriter {
 // resetIndex resets all indexed data, including the line index.
 func (t *TextView) resetIndex() {
 	t.lineIndex = nil
-	t.regions = make(map[string]int)
 	t.longestLine = 0
 }
 
@@ -944,8 +648,8 @@ func (t *TextView) resetIndex() {
 //
 // There is no guarantee that stop will ever be called.
 //
-// The function adds entries to the [TextView.lineIndex] slice and the
-// [TextView.regions] map and adjusts [TextView.longestLine].
+// The function adds entries to the [TextView.lineIndex] slice and adjusts
+// [TextView.longestLine].
 func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textViewLine) bool) {
 	if t.text.Len() == 0 {
 		return // No text. Nothing to parse.
@@ -961,15 +665,9 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 	if t.styleTags {
 		options |= stepOptionsStyle
 	}
-	if t.regionTags {
-		options |= stepOptionsRegion
-	}
 
 	// Start parsing at the last line in the index.
-	var (
-		lastLine *textViewLine
-		region   *Region
-	)
+	var lastLine *textViewLine
 	str := t.text.String() // The remaining text to parse.
 	if len(t.lineIndex) == 0 {
 		// Insert the first line.
@@ -987,21 +685,15 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 		lastLine.length = 0
 		str = str[lastLine.offset:]
 	}
-	if len(lastLine.regions) > 0 {
-		region = lastLine.regions[0]
-		lastLine.regions = lastLine.regions[:1]
-	}
-
 	// Parse.
 	var (
-		lastOption       int               // Text index of the last optional split point, relative to the beginning of the line.
-		lastOptionWidth  int               // Line width at last optional split point.
-		lastOptionState  *stepState        // State at last optional split point.
-		lastOptionRegion *Region           // Region at last optional split point or nil if none.
-		leftPos          int               // The current position in the line (assuming left-alignment).
-		offset           = lastLine.offset // Text index of the current position.
-		st               = *lastLine.state // Current state.
-		state            = &st             // Pointer to current state.
+		lastOption      int               // Text index of the last optional split point, relative to the beginning of the line.
+		lastOptionWidth int               // Line width at last optional split point.
+		lastOptionState *stepState        // State at last optional split point.
+		leftPos         int               // The current position in the line (assuming left-alignment).
+		offset          = lastLine.offset // Text index of the current position.
+		st              = *lastLine.state // Current state.
+		state           = &st             // Pointer to current state.
 	)
 	for len(str) > 0 {
 		var c string
@@ -1028,20 +720,6 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 					offset: offset,
 					state:  &st,
 				}
-				if state.region != "" {
-					if state.region == region.ID {
-						lastLine.regions = []*Region{region}
-					} else {
-						region = &Region{
-							ID:          state.region,
-							Start:       offset,
-							StartRow:    len(t.lineIndex),
-							StartColumn: 0,
-						}
-					}
-				} else {
-					region = nil
-				}
 				lastOption, lastOptionWidth, leftPos = 0, 0, 0
 			} else {
 				// Split at the last split point.
@@ -1057,32 +735,10 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 					return
 				}
 				lastLine = newLine
-				if lastOptionRegion != nil {
-					lastLine.regions = []*Region{lastOptionRegion}
-				}
-				region = lastOptionRegion
 				leftPos -= lastOptionWidth
 				lastOption, lastOptionWidth = 0, 0
 			}
 			t.lineIndex = append(t.lineIndex, lastLine)
-		}
-
-		// Is there a region switch?
-		if state.region != "" && (region == nil || state.region != region.ID) {
-			// Start a new region.
-			region = &Region{
-				ID:          state.region,
-				Start:       offset,
-				StartRow:    len(t.lineIndex) - 1,
-				StartColumn: leftPos,
-			}
-			lastLine.regions = append(lastLine.regions, region)
-			if _, ok := t.regions[state.region]; !ok {
-				t.regions[state.region] = len(t.lineIndex) - 1
-			}
-		} else if state.region == "" && region != nil {
-			// End the previous region.
-			region = nil
 		}
 
 		// Move ahead.
@@ -1090,11 +746,6 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 		lastLine.length += length
 		offset += length
 		leftPos += w
-		if region != nil {
-			region.End = offset
-			region.EndRow = len(t.lineIndex) - 1
-			region.EndColumn = leftPos
-		}
 
 		// Do we have a new longest line?
 		if lastLine.width > t.longestLine {
@@ -1110,7 +761,6 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 					lastOptionWidth = lastLine.width
 					st := *state
 					lastOptionState = &st
-					lastOptionRegion = region
 				}
 			} else {
 				// We must split here.
@@ -1121,9 +771,6 @@ func (t *TextView) parseAhead(width int, stop func(lineNumber int, line *textVie
 				lastLine = &textViewLine{
 					offset: offset,
 					state:  &st,
-				}
-				if region != nil {
-					lastLine.regions = []*Region{region}
 				}
 				t.lineIndex = append(t.lineIndex, lastLine)
 				lastOption, lastOptionWidth, leftPos = 0, 0, 0
@@ -1187,74 +834,6 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	if t.styleTags {
 		options |= stepOptionsStyle
 	}
-	if t.regionTags {
-		options |= stepOptionsRegion
-	}
-
-	// Scroll to highlighted regions.
-	if t.regionTags && t.scrollToHighlights {
-		// Make sure we know all highlighted regions.
-		t.parseAhead(width, func(lineNumber int, line *textViewLine) bool {
-			for regionID := range t.highlights {
-				if _, ok := t.regions[regionID]; !ok {
-					return false
-				}
-				t.highlights[regionID] = struct{}{}
-			}
-			return true
-		})
-
-		// What is the line range for all highlighted regions?
-		var (
-			firstRegion                string
-			fromHighlight, toHighlight int
-		)
-		for regionID := range t.highlights {
-			// We can safely assume that the region is known.
-			line := t.regions[regionID]
-			if firstRegion == "" || line > toHighlight {
-				toHighlight = line
-			}
-			if firstRegion == "" || line < fromHighlight {
-				fromHighlight = line
-				firstRegion = regionID
-			}
-		}
-		if firstRegion != "" {
-			// Do we fit the entire height?
-			if toHighlight-fromHighlight+1 < height {
-				// Yes, let's center the highlights.
-				t.lineOffset = (fromHighlight + toHighlight - height) / 2
-			} else {
-				// No, let's move to the start of the highlights.
-				t.lineOffset = fromHighlight
-			}
-
-			// If the highlight is too far to the right, move it to the middle.
-			if t.wrap {
-				// Find the first highlight's column in screen space.
-				line := t.lineIndex[fromHighlight]
-				st := *line.state
-				state := &st
-				str := t.text.String()[line.offset:]
-				var posHighlight int
-				for len(str) > 0 && posHighlight < line.width && state.region != firstRegion {
-					_, str, state = step(str, state, options)
-					posHighlight += state.Width()
-				}
-
-				if posHighlight-t.columnOffset > 3*width/4 {
-					t.columnOffset = posHighlight - width/2
-				}
-
-				// If the highlight is off-screen on the left, move it on-screen.
-				if posHighlight-t.columnOffset < 0 {
-					t.columnOffset = posHighlight - width/4
-				}
-			}
-		}
-	}
-	t.scrollToHighlights = false
 
 	// Make sure our index has enough lines.
 	t.parseAhead(width, func(lineNumber int, line *textViewLine) bool {
@@ -1352,17 +931,6 @@ func (t *TextView) Draw(screen tcell.Screen) {
 			// Draw this character.
 			if w > 0 {
 				style := state.Style()
-
-				// Do we highlight this character?
-				var highlighted bool
-				if state.region != "" {
-					if _, ok := t.highlights[state.region]; ok {
-						highlighted = true
-					}
-				}
-				if highlighted {
-					style = style.Reverse(true)
-				}
 
 				// Paint on screen.
 				for offset := w - 1; offset >= 0; offset-- {
@@ -1473,35 +1041,12 @@ func (t *TextView) MouseHandler() func(action MouseAction, event *tcell.EventMou
 			return false, nil
 		}
 
-		rectX, rectY, width, height := t.GetInnerRect()
+		_, _, width, height := t.GetInnerRect()
 		switch action {
 		case MouseLeftDown:
 			setFocus(t)
 			consumed = true
 		case MouseLeftClick:
-			if t.regionTags && t.InInnerRect(x, y) {
-				// Find a region to highlight.
-				column := x - rectX
-				row := y - rectY + t.lineOffset
-				var highlightedID string
-				if row < len(t.lineIndex) {
-					line := t.lineIndex[row]
-					for _, region := range line.regions {
-						if !(row < region.StartRow ||
-							row > region.EndRow ||
-							(row == region.StartRow && column < region.StartColumn) ||
-							(row == region.EndRow && column >= region.EndColumn)) {
-							highlightedID = region.ID
-							break
-						}
-					}
-				}
-				if highlightedID != "" {
-					t.Highlight(highlightedID)
-				} else if !t.toggleHighlights {
-					t.Highlight()
-				}
-			}
 			consumed = true
 		case MouseScrollUp:
 			if !t.scrollable {
