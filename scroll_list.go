@@ -109,6 +109,16 @@ func (l *ScrollList) SetTrackEnd(track bool) *ScrollList {
 	return l
 }
 
+// ScrollToStart resets the scroll position to the top (index 0), without
+// changing the cursor.
+func (l *ScrollList) ScrollToStart() *ScrollList {
+	l.scroll.top = 0
+	l.scroll.offset = 0
+	l.scroll.wantsCursor = false
+	l.atEnd = false
+	return l
+}
+
 // ScrollToEnd scrolls the view so the last items are visible.
 func (l *ScrollList) ScrollToEnd() *ScrollList {
 	_, _, width, height := l.GetInnerRect()
