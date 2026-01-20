@@ -254,6 +254,15 @@ func (l *ScrollList) Draw(screen tcell.Screen) {
 		l.scroll.wantsCursor = false
 	}
 
+	// In non-snap mode, try to center the cursor when there is room.
+	if !l.snapToItems && l.scroll.wantsCursor && l.cursor >= 0 {
+		if top, offset, centered := l.centerScrollState(usableWidth, height); centered {
+			l.scroll.top = top
+			l.scroll.offset = offset
+			l.scroll.wantsCursor = false
+		}
+	}
+
 	pendingDelta := l.scroll.pending
 	ah := -(l.scroll.offset + pendingDelta)
 	l.scroll.pending = 0
@@ -489,12 +498,78 @@ func (l *ScrollList) ensureScroll() {
 		l.scroll.wantsCursor = false
 		return
 	}
-	if l.cursor > l.scroll.top {
-		l.scroll.wantsCursor = true
-		return
+	if l.cursor < l.scroll.top {
+		l.scroll.top = l.cursor
+		l.scroll.offset = 0
 	}
-	l.scroll.top = l.cursor
-	l.scroll.offset = 0
+	l.scroll.wantsCursor = true
+}
+
+func (l *ScrollList) centerScrollState(width int, height int) (int, int, bool) {
+	if l.Builder == nil || l.cursor < 0 || width <= 0 || height <= 0 {
+		return 0, 0, false
+	}
+	cursorItem := l.Builder(l.cursor, l.cursor)
+	if cursorItem == nil {
+		return 0, 0, false
+	}
+	cursorHeight := l.itemHeight(cursorItem, width)
+	// Compute the space above the cursor so its center aligns to the viewport center.
+	targetCenter := height / 2
+	desiredBefore := max(targetCenter-cursorHeight/2, 0)
+
+	// Build a top/offset that leaves desiredBefore rows ahead of the cursor.
+	top := l.cursor
+	offset := 0
+	remaining := desiredBefore
+	for remaining > 0 && top > 0 {
+		prevIndex := top - 1
+		prevItem := l.Builder(prevIndex, l.cursor)
+		if prevItem == nil {
+			break
+		}
+		prevHeight := l.itemHeight(prevItem, width)
+		span := prevHeight
+		if l.gap > 0 {
+			span += l.gap
+		}
+		if remaining >= span {
+			remaining -= span
+			top = prevIndex
+			offset = 0
+			continue
+		}
+		top = prevIndex
+		if remaining > l.gap {
+			// Scroll partway into the previous item if needed.
+			withinItem := remaining - l.gap
+			offset = max(prevHeight-withinItem, 0)
+		} else {
+			offset = prevHeight
+		}
+		remaining = 0
+	}
+
+	// If we ran out of items above, skip centering.
+	if remaining > 0 {
+		return 0, 0, false
+	}
+
+	// Verify there is enough content below to keep the viewport filled.
+	ah := -offset
+	for i := top; ; i++ {
+		item := l.Builder(i, l.cursor)
+		if item == nil {
+			return 0, 0, false
+		}
+		itemHeight := l.itemHeight(item, width)
+		if ah+itemHeight >= height {
+			break
+		}
+		ah += itemHeight + l.gap
+	}
+
+	return top, offset, true
 }
 
 func (l *ScrollList) scrollByItems(delta int, count int, width int, height int) {
