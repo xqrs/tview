@@ -25,6 +25,7 @@ type ScrollList struct {
 	Builder     ScrollListBuilder
 	gap         int
 	snapToItems bool
+	centerCursor bool
 	trackEnd    bool
 	atEnd       bool
 
@@ -65,8 +66,9 @@ type scrollListRect struct {
 // NewScrollList returns a new scroll list.
 func NewScrollList() *ScrollList {
 	return &ScrollList{
-		Box:    NewBox(),
-		cursor: -1,
+		Box:          NewBox(),
+		centerCursor: true,
+		cursor:       -1,
 	}
 }
 
@@ -100,6 +102,13 @@ func (l *ScrollList) SetGap(gap int) *ScrollList {
 // SetSnapToItems toggles snapping so only fully visible items are shown.
 func (l *ScrollList) SetSnapToItems(snap bool) *ScrollList {
 	l.snapToItems = snap
+	return l
+}
+
+// SetCenterCursor controls whether the cursor is kept centered whenever
+// possible.
+func (l *ScrollList) SetCenterCursor(center bool) *ScrollList {
+	l.centerCursor = center
 	return l
 }
 
@@ -255,7 +264,7 @@ func (l *ScrollList) Draw(screen tcell.Screen) {
 	}
 
 	// In non-snap mode, try to center the cursor when there is room.
-	if !l.snapToItems && l.scroll.wantsCursor && l.cursor >= 0 {
+	if !l.snapToItems && l.centerCursor && l.scroll.wantsCursor && l.cursor >= 0 {
 		if top, offset, centered := l.centerScrollState(usableWidth, height); centered {
 			l.scroll.top = top
 			l.scroll.offset = offset
