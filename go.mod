@@ -3,7 +3,7 @@ module github.com/ayn2op/tview
 go 1.25.3
 
 require (
-	github.com/gdamore/tcell/v3 v3.1.0
+	github.com/gdamore/tcell/v3 v3.1.2
 	github.com/rivo/uniseg v0.4.7
 )
 
@@ -12,5 +12,5 @@ require (
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/term v0.39.0 // indirect
-	golang.org/x/text v0.32.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 )
