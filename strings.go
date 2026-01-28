@@ -467,6 +467,8 @@ func parseTag(str string, state *stepState, opts stepOptions) (length int, style
 				tagState = tagStateDoneTag
 			case ch == '-': // Reset attributes.
 				tStyle = tStyle.Attributes(state.initialAttributes)
+				// Underline is not part of AttrMask in tcell, so reset it explicitly.
+				tStyle = tStyle.Underline(false)
 				tagState = tagStateEndAttributes
 			case ch == ':': // Start of URL.
 				tagState = tagStateStartURL
