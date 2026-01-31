@@ -358,7 +358,7 @@ type TreeView struct {
 	// therefore does not need to be reprocessed.
 	stableNodes bool
 
-	// Internal mouse information.
+	// Internal mouse track data.
 	lastMouseY int
 }
 
