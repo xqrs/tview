@@ -357,15 +357,19 @@ type TreeView struct {
 	// Temporarily set to true while we know that the tree has not changed and
 	// therefore does not need to be reprocessed.
 	stableNodes bool
+
+	// Internal mouse track data.
+	lastMouseY int
 }
 
 // NewTreeView returns a new tree view.
 func NewTreeView() *TreeView {
 	return &TreeView{
 		Box:             NewBox(),
-		centerCursor:   true,
+		centerCursor:    true,
 		graphics:        true,
 		graphicsColor:   Styles.GraphicsColor,
+		lastMouseY:      -1,
 	}
 }
 
@@ -735,17 +739,21 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 	// cursor, except for treeScroll, treeHome, and treeEnd.
 	x, y, width, height := t.GetInnerRect()
 	switch t.movement {
-	case treeMove, treeScroll:
+	case treeMove:
+		t.movement = treeNone
+		fallthrough
+	case treeScroll:
 		t.offsetY += t.step
+		t.step = 0
 	case treeHome:
 		t.offsetY = 0
+		t.movement = treeNone
 	case treeEnd:
 		t.offsetY = len(t.nodes)
+		t.movement = treeNone
 	}
-	t.movement = treeNone
 
-	// Fix invalid offsets.
-	if t.offsetY >= len(t.nodes)-height {
+	if t.offsetY > len(t.nodes)-height {
 		t.offsetY = len(t.nodes) - height
 	}
 	if t.offsetY < 0 {
@@ -905,11 +913,27 @@ func (t *TreeView) MouseHandler() func(action MouseAction, event *tcell.EventMou
 
 		switch action {
 		case MouseLeftDown:
-			setFocus(t)
+			t.lastMouseY = y
+			consumed = true
+		case MouseMove:
+			if event.Buttons()&tcell.Button1 != 0 && t.lastMouseY != -1 {
+				t.movement = treeScroll
+				t.step = t.lastMouseY - y
+				t.lastMouseY = y
+			}
+			consumed = true
+		case MouseLeftUp:
+			t.lastMouseY = -1
 			consumed = true
 		case MouseLeftClick:
+			setFocus(t)
 			_, rectY, _, _ := t.GetInnerRect()
 			y += t.offsetY - rectY
+			if t.lastMouseY != -1 {
+				y += t.lastMouseY - y
+				t.lastMouseY = -1
+				t.movement = treeNone
+			}
 			if y >= 0 && y < len(t.nodes) {
 				node := t.nodes[y]
 				if node.selectable {
