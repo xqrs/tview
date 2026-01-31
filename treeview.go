@@ -916,7 +916,7 @@ func (t *TreeView) MouseHandler() func(action MouseAction, event *tcell.EventMou
 			t.lastMouseY = y
 			consumed = true
 		case MouseMove:
-			if t.lastMouseY != -1 {
+			if event.Buttons()&tcell.Button1 != 0 && t.lastMouseY != -1 {
 				t.movement = treeScroll
 				t.step = t.lastMouseY - y
 				t.lastMouseY = y
