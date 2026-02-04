@@ -46,7 +46,7 @@ type Box struct {
 	footerAlignment Alignment
 
 	// Whether or not this box has focus. This is typically ignored for
-	// container primitives (e.g. Flex, Grid, Pages), as they will delegate
+	// container primitives (e.g. Flex, Grid, Layers), as they will delegate
 	// focus to their children.
 	hasFocus bool
 
