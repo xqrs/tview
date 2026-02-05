@@ -12,18 +12,20 @@ type layer struct {
 	resize  bool            // Whether or not to resize the layer when it is drawn.
 	visible bool            // Whether or not this layer is visible.
 	enabled bool            // Whether or not this layer can receive focus/input.
-	overlay bool            // Whether this layer applies an overlay style to layers behind it.
-	ovStyle tcell.Style
+	overlay bool            // Whether this layer applies a background style to layers behind it.
 }
 
 // Layers is a container for other primitives laid out on top of each other.
-// The layers are drawn from back to front and can optionally apply an overlay
-// style to the layers behind them (typically used for modal dialogs).
+// The layers are drawn from back to front and can optionally apply a
+// background style to the layers behind them (typically used for modal dialogs).
 type Layers struct {
 	*tview.Box
 
 	// The contained layers. (Visible) layers are drawn from back to front.
 	layers []*layer
+
+	// The style applied to layers behind the active overlay layer.
+	backgroundStyle tcell.Style
 
 	// We keep a reference to the function which allows us to set the focus to
 	// a newly visible layer.
@@ -64,19 +66,16 @@ func WithEnabled(enabled bool) Option {
 	}
 }
 
-// WithOverlayStyle sets an overlay style for this layer.
-func WithOverlayStyle(style tcell.Style) Option {
+// WithOverlay marks this layer as an overlay layer.
+func WithOverlay() Option {
 	return func(l *layer) {
 		l.overlay = true
-		l.ovStyle = style
 	}
 }
 
 // New returns a new Layers object.
 func New() *Layers {
-	l := &Layers{
-		Box: tview.NewBox(),
-	}
+	l := &Layers{Box: tview.NewBox()}
 	return l
 }
 
@@ -312,19 +311,11 @@ func (l *Layers) GetLayerEnabled(name string) bool {
 	return false
 }
 
-// SetLayerOverlayStyle controls whether a layer applies a style overlay to
-// all layers behind it. The overlay is implemented by post-processing the
-// screen buffer, so it is terminal-dependent and only supports additive style
-// changes (it will not remove existing attributes).
-//
-// Only one overlay is active at a time: the top-most visible+enabled layer
-// with an overlay style. This keeps the model simple and avoids stacking
-// multiple overlays that may be visually confusing.
-func (l *Layers) SetLayerOverlayStyle(name string, style tcell.Style) *Layers {
+// ClearLayerOverlay disables overlay styling for the given layer.
+func (l *Layers) ClearLayerOverlay(name string) *Layers {
 	for _, layer := range l.layers {
 		if layer.name == name {
-			layer.overlay = true
-			layer.ovStyle = style
+			layer.overlay = false
 			if layer.visible && l.changed != nil {
 				l.changed()
 			}
@@ -334,17 +325,12 @@ func (l *Layers) SetLayerOverlayStyle(name string, style tcell.Style) *Layers {
 	return l
 }
 
-// ClearLayerOverlay disables overlay styling for the given layer.
-func (l *Layers) ClearLayerOverlay(name string) *Layers {
-	for _, layer := range l.layers {
-		if layer.name == name {
-			layer.overlay = false
-			layer.ovStyle = tcell.StyleDefault
-			if layer.visible && l.changed != nil {
-				l.changed()
-			}
-			break
-		}
+// SetBackgroundStyle sets the style applied to layers behind the active
+// overlay layer.
+func (l *Layers) SetBackgroundStyle(style tcell.Style) *Layers {
+	l.backgroundStyle = style
+	if l.changed != nil {
+		l.changed()
 	}
 	return l
 }
@@ -379,7 +365,7 @@ func (l *Layers) Draw(screen tcell.Screen) {
 	overlayIndex := l.topVisibleEnabledOverlayIndex()
 	var ovScreen *overlayScreen
 	if overlayIndex >= 0 {
-		ovScreen = newOverlayScreen(screen, l.layers[overlayIndex].ovStyle)
+		ovScreen = newOverlayScreen(screen, l.backgroundStyle)
 	}
 	for index, layer := range l.layers {
 		if !layer.visible {
@@ -498,23 +484,23 @@ func newOverlayScreen(screen tcell.Screen, overlay tcell.Style) *overlayScreen {
 }
 
 func (s *overlayScreen) SetContent(x int, y int, primary rune, combining []rune, style tcell.Style) {
-	s.Screen.SetContent(x, y, primary, combining, applyOverlayStyle(style, s.overlay))
+	s.Screen.SetContent(x, y, primary, combining, applyBackgroundStyle(style, s.overlay))
 }
 
 func (s *overlayScreen) Put(x int, y int, str string, style tcell.Style) (string, int) {
-	return s.Screen.Put(x, y, str, applyOverlayStyle(style, s.overlay))
+	return s.Screen.Put(x, y, str, applyBackgroundStyle(style, s.overlay))
 }
 
 func (s *overlayScreen) PutStr(x int, y int, str string) {
 	// Use StyleDefault so the screen's default style still applies, then overlay.
-	s.Screen.PutStrStyled(x, y, str, applyOverlayStyle(tcell.StyleDefault, s.overlay))
+	s.Screen.PutStrStyled(x, y, str, applyBackgroundStyle(tcell.StyleDefault, s.overlay))
 }
 
 func (s *overlayScreen) PutStrStyled(x int, y int, str string, style tcell.Style) {
-	s.Screen.PutStrStyled(x, y, str, applyOverlayStyle(style, s.overlay))
+	s.Screen.PutStrStyled(x, y, str, applyBackgroundStyle(style, s.overlay))
 }
 
-func applyOverlayStyle(base tcell.Style, overlay tcell.Style) tcell.Style {
+func applyBackgroundStyle(base tcell.Style, overlay tcell.Style) tcell.Style {
 	overlayFg := overlay.GetForeground()
 	overlayBg := overlay.GetBackground()
 
