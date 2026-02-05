@@ -325,9 +325,9 @@ func (l *Layers) ClearLayerOverlay(name string) *Layers {
 	return l
 }
 
-// SetBackgroundStyle sets the style applied to layers behind the active
+// SetBackgroundLayerStyle sets the style applied to layers behind the active
 // overlay layer.
-func (l *Layers) SetBackgroundStyle(style tcell.Style) *Layers {
+func (l *Layers) SetBackgroundLayerStyle(style tcell.Style) *Layers {
 	l.backgroundStyle = style
 	if l.changed != nil {
 		l.changed()
