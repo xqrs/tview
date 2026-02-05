@@ -23,9 +23,8 @@ type Layers struct {
 
 	// The contained layers. (Visible) layers are drawn from back to front.
 	layers []*layer
-
 	// The style applied to layers behind the active overlay layer.
-	backgroundStyle tcell.Style
+	backgroundLayerStyle tcell.Style
 
 	// We keep a reference to the function which allows us to set the focus to
 	// a newly visible layer.
@@ -328,7 +327,7 @@ func (l *Layers) ClearLayerOverlay(name string) *Layers {
 // SetBackgroundLayerStyle sets the style applied to layers behind the active
 // overlay layer.
 func (l *Layers) SetBackgroundLayerStyle(style tcell.Style) *Layers {
-	l.backgroundStyle = style
+	l.backgroundLayerStyle = style
 	if l.changed != nil {
 		l.changed()
 	}
@@ -365,7 +364,7 @@ func (l *Layers) Draw(screen tcell.Screen) {
 	overlayIndex := l.topVisibleEnabledOverlayIndex()
 	var ovScreen *overlayScreen
 	if overlayIndex >= 0 {
-		ovScreen = newOverlayScreen(screen, l.backgroundStyle)
+		ovScreen = newOverlayScreen(screen, l.backgroundLayerStyle)
 	}
 	for index, layer := range l.layers {
 		if !layer.visible {
