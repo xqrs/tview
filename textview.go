@@ -210,7 +210,10 @@ func NewTextView() *TextView {
 
 // SetLabel sets the text to be displayed before the text view.
 func (t *TextView) SetLabel(label string) *TextView {
-	t.label = label
+	if t.label != label {
+		t.label = label
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -222,7 +225,10 @@ func (t *TextView) GetLabel() string {
 // SetLabelWidth sets the screen width of the label. A value of 0 will cause the
 // primitive to use the width of the label string.
 func (t *TextView) SetLabelWidth(width int) *TextView {
-	t.labelWidth = width
+	if t.labelWidth != width {
+		t.labelWidth = width
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -231,8 +237,11 @@ func (t *TextView) SetLabelWidth(width int) *TextView {
 // top left corner. If any of the values are 0 or larger than the available
 // space, the available space will be used.
 func (t *TextView) SetSize(rows, columns int) *TextView {
-	t.width = columns
-	t.height = rows
+	if t.width != columns || t.height != rows {
+		t.width = columns
+		t.height = rows
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -260,9 +269,12 @@ func (t *TextView) GetDisabled() bool {
 // scrollable. If false, text that moves above the text view's top row will be
 // permanently deleted.
 func (t *TextView) SetScrollable(scrollable bool) *TextView {
-	t.scrollable = scrollable
-	if !scrollable {
-		t.trackEnd = true
+	if t.scrollable != scrollable {
+		t.scrollable = scrollable
+		if !scrollable {
+			t.trackEnd = true
+		}
+		t.MarkDirty()
 	}
 	return t
 }
@@ -273,6 +285,7 @@ func (t *TextView) SetScrollable(scrollable bool) *TextView {
 func (t *TextView) SetWrap(wrap bool) *TextView {
 	if t.wrap != wrap {
 		t.resetIndex() // This invalidates the entire index.
+		t.MarkDirty()
 	}
 	t.wrap = wrap
 	return t
@@ -285,6 +298,7 @@ func (t *TextView) SetWrap(wrap bool) *TextView {
 func (t *TextView) SetWordWrap(wrapOnWords bool) *TextView {
 	if t.wrap && t.wordWrap != wrapOnWords {
 		t.resetIndex() // This invalidates the entire index.
+		t.MarkDirty()
 	}
 	t.wordWrap = wrapOnWords
 	return t
@@ -300,21 +314,31 @@ func (t *TextView) SetWordWrap(wrapOnWords bool) *TextView {
 //
 // A value of 0 (the default) will keep all lines in place.
 func (t *TextView) SetMaxLines(maxLines int) *TextView {
-	t.maxLines = maxLines
+	if t.maxLines != maxLines {
+		t.maxLines = maxLines
+		t.MarkDirty()
+	}
 	return t
 }
 
 // SetTextAlign sets the text alignment within the text view. This must be
 // either AlignLeft, AlignCenter, or AlignRight.
 func (t *TextView) SetTextAlign(alignment Alignment) *TextView {
-	t.alignment = alignment
+	if t.alignment != alignment {
+		t.alignment = alignment
+		t.MarkDirty()
+	}
 	return t
 }
 
 // SetTextColor sets the initial color of the text.
 func (t *TextView) SetTextColor(color tcell.Color) *TextView {
-	t.textStyle = t.textStyle.Foreground(color)
-	t.resetIndex()
+	style := t.textStyle.Foreground(color)
+	if t.textStyle != style {
+		t.textStyle = style
+		t.resetIndex()
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -323,16 +347,23 @@ func (t *TextView) SetTextColor(color tcell.Color) *TextView {
 // the background color of the main text element.
 func (t *TextView) SetBackgroundColor(color tcell.Color) *Box {
 	t.Box.SetBackgroundColor(color)
-	t.textStyle = t.textStyle.Background(color)
-	t.resetIndex()
+	style := t.textStyle.Background(color)
+	if t.textStyle != style {
+		t.textStyle = style
+		t.resetIndex()
+		t.MarkDirty()
+	}
 	return t.Box
 }
 
 // SetTextStyle sets the initial style of the text. This style's background
 // color also determines the background color of the main text element.
 func (t *TextView) SetTextStyle(style tcell.Style) *TextView {
-	t.textStyle = style
-	t.resetIndex()
+	if t.textStyle != style {
+		t.textStyle = style
+		t.resetIndex()
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -343,9 +374,13 @@ func (t *TextView) SetTextStyle(style tcell.Style) *TextView {
 func (t *TextView) SetText(text string) *TextView {
 	t.Lock()
 	defer t.Unlock()
+	if t.text.String() == text {
+		return t
+	}
 	t.text.Reset()
 	t.text.WriteString(text)
 	t.resetIndex()
+	t.MarkDirty()
 	if t.changed != nil {
 		go t.changed()
 	}
@@ -454,6 +489,7 @@ func (t *TextView) Height(width int) int {
 func (t *TextView) SetDynamicColors(dynamic bool) *TextView {
 	if t.styleTags != dynamic {
 		t.resetIndex() // This invalidates the entire index.
+		t.MarkDirty()
 	}
 	t.styleTags = dynamic
 	return t
@@ -496,11 +532,29 @@ func (t *TextView) SetFinishedFunc(handler func(key tcell.Key)) FormItem {
 
 // SetFormAttributes sets attributes shared by all form items.
 func (t *TextView) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldTextColor, fieldBgColor tcell.Color) FormItem {
-	t.labelWidth = labelWidth
-	t.backgroundColor = bgColor
-	t.labelStyle = t.labelStyle.Foreground(labelColor)
+	changed := false
+	if t.labelWidth != labelWidth {
+		t.labelWidth = labelWidth
+		changed = true
+	}
+	if t.backgroundColor != bgColor {
+		t.backgroundColor = bgColor
+		changed = true
+	}
+	labelStyle := t.labelStyle.Foreground(labelColor)
+	if t.labelStyle != labelStyle {
+		t.labelStyle = labelStyle
+		changed = true
+	}
 	// We ignore the field background color because this is a read-only element.
-	t.textStyle = tcell.StyleDefault.Foreground(fieldTextColor).Background(bgColor)
+	textStyle := tcell.StyleDefault.Foreground(fieldTextColor).Background(bgColor)
+	if t.textStyle != textStyle {
+		t.textStyle = textStyle
+		changed = true
+	}
+	if changed {
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -509,9 +563,12 @@ func (t *TextView) ScrollTo(row, column int) *TextView {
 	if !t.scrollable {
 		return t
 	}
-	t.lineOffset = row
-	t.columnOffset = column
-	t.trackEnd = false
+	if t.lineOffset != row || t.columnOffset != column || t.trackEnd {
+		t.lineOffset = row
+		t.columnOffset = column
+		t.trackEnd = false
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -521,9 +578,12 @@ func (t *TextView) ScrollToBeginning() *TextView {
 	if !t.scrollable {
 		return t
 	}
-	t.trackEnd = false
-	t.lineOffset = 0
-	t.columnOffset = 0
+	if t.trackEnd || t.lineOffset != 0 || t.columnOffset != 0 {
+		t.trackEnd = false
+		t.lineOffset = 0
+		t.columnOffset = 0
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -534,8 +594,11 @@ func (t *TextView) ScrollToEnd() *TextView {
 	if !t.scrollable {
 		return t
 	}
-	t.trackEnd = true
-	t.columnOffset = 0
+	if !t.trackEnd || t.columnOffset != 0 {
+		t.trackEnd = true
+		t.columnOffset = 0
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -549,6 +612,9 @@ func (t *TextView) GetScrollOffset() (row, column int) {
 func (t *TextView) Clear() *TextView {
 	t.Lock()
 	defer t.Unlock()
+	if t.text.Len() == 0 {
+		return t
+	}
 	t.clear()
 	if t.changed != nil {
 		go t.changed()
@@ -561,6 +627,7 @@ func (t *TextView) Clear() *TextView {
 func (t *TextView) clear() {
 	t.text.Reset()
 	t.resetIndex()
+	t.MarkDirty()
 }
 
 // Focus is called when this primitive receives focus.
@@ -610,7 +677,11 @@ func (t *TextView) write(p []byte) (n int, err error) {
 		}()
 	}
 
-	return t.text.Write(p)
+	n, err = t.text.Write(p)
+	if n > 0 {
+		t.MarkDirty()
+	}
+	return n, err
 }
 
 // BatchWriter returns a new writer that can be used to write into the buffer
@@ -975,6 +1046,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 // InputHandler returns the handler for this primitive.
 func (t *TextView) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
 	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
+		previousLineOffset, previousColumnOffset, previousTrackEnd := t.lineOffset, t.columnOffset, t.trackEnd
 		key := event.Key()
 
 		if key == tcell.KeyEscape || key == tcell.KeyEnter || key == tcell.KeyTab || key == tcell.KeyBacktab {
@@ -1033,12 +1105,16 @@ func (t *TextView) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 			t.trackEnd = false
 			t.lineOffset -= t.pageSize
 		}
+		if t.lineOffset != previousLineOffset || t.columnOffset != previousColumnOffset || t.trackEnd != previousTrackEnd {
+			t.MarkDirty()
+		}
 	})
 }
 
 // MouseHandler returns the mouse handler for this primitive.
 func (t *TextView) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
 	return t.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+		previousLineOffset, previousTrackEnd := t.lineOffset, t.trackEnd
 		x, y := event.Position()
 		if !t.InRect(x, y) {
 			return false, nil
@@ -1073,6 +1149,9 @@ func (t *TextView) MouseHandler() func(action MouseAction, event *tcell.EventMou
 				}
 			}
 			consumed = true
+		}
+		if t.lineOffset != previousLineOffset || t.trackEnd != previousTrackEnd {
+			t.MarkDirty()
 		}
 
 		return

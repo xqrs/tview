@@ -48,6 +48,7 @@ func NewFrame(primitive Primitive) *Frame {
 		left:      1,
 		right:     1,
 	}
+	bindDirtyParent(primitive, f.Box)
 
 	return f
 }
@@ -55,11 +56,17 @@ func NewFrame(primitive Primitive) *Frame {
 // SetPrimitive replaces the contained primitive with the given one. To remove
 // a primitive, set it to nil.
 func (f *Frame) SetPrimitive(p Primitive) *Frame {
+	if f.primitive == p {
+		return f
+	}
 	var hasFocus bool
 	if f.primitive != nil {
 		hasFocus = f.primitive.HasFocus()
+		unbindDirtyParent(f.primitive, f.Box)
 	}
 	f.primitive = p
+	bindDirtyParent(f.primitive, f.Box)
+	f.MarkDirty()
 	if hasFocus && f.setFocus != nil {
 		f.setFocus(p) // Restore focus.
 	}
@@ -83,12 +90,16 @@ func (f *Frame) AddText(text string, header bool, alignment Alignment, color tce
 		Alignment: alignment,
 		Color:     color,
 	})
+	f.MarkDirty()
 	return f
 }
 
 // Clear removes all text from the frame.
 func (f *Frame) Clear() *Frame {
-	f.text = nil
+	if len(f.text) > 0 {
+		f.text = nil
+		f.MarkDirty()
+	}
 	return f
 }
 
@@ -96,8 +107,27 @@ func (f *Frame) Clear() *Frame {
 // "footer", the vertical space between the header and footer text and the
 // contained primitive (does not apply if there is no text).
 func (f *Frame) SetBorders(top, bottom, header, footer, left, right int) *Frame {
-	f.top, f.bottom, f.header, f.footer, f.left, f.right = top, bottom, header, footer, left, right
+	if f.top != top || f.bottom != bottom || f.header != header || f.footer != footer || f.left != left || f.right != right {
+		f.top, f.bottom, f.header, f.footer, f.left, f.right = top, bottom, header, footer, left, right
+		f.MarkDirty()
+	}
 	return f
+}
+
+// IsDirty returns whether this primitive or its child needs redraw.
+func (f *Frame) IsDirty() bool {
+	if f.Box.IsDirty() {
+		return true
+	}
+	return f.primitive != nil && f.primitive.IsDirty()
+}
+
+// MarkClean marks this primitive and its child as clean.
+func (f *Frame) MarkClean() {
+	f.Box.MarkClean()
+	if f.primitive != nil {
+		f.primitive.MarkClean()
+	}
 }
 
 // Draw draws this primitive onto the screen.

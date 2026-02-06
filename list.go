@@ -136,7 +136,10 @@ func (l *List) SetCurrentItem(index int) *List {
 		l.changed(index, item.MainText, item.SecondaryText, item.Shortcut)
 	}
 
-	l.currentItem = index
+	if l.currentItem != index {
+		l.currentItem = index
+		l.MarkDirty()
+	}
 
 	return l
 }
@@ -156,8 +159,11 @@ func (l *List) GetCurrentItem() int {
 // selected item is visible and item texts move out of view. Users can also
 // modify these values by interacting with the list.
 func (l *List) SetOffset(items, horizontal int) *List {
-	l.itemOffset = items
-	l.horizontalOffset = horizontal
+	if l.itemOffset != items || l.horizontalOffset != horizontal {
+		l.itemOffset = items
+		l.horizontalOffset = horizontal
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -194,6 +200,7 @@ func (l *List) RemoveItem(index int) *List {
 
 	// Remove item.
 	l.items = slices.Delete(l.items, index, index+1)
+	l.MarkDirty()
 
 	// If there is nothing left, we're done.
 	if len(l.items) == 0 {
@@ -217,7 +224,11 @@ func (l *List) RemoveItem(index int) *List {
 
 // SetMainTextColor sets the color of the items' main text.
 func (l *List) SetMainTextColor(color tcell.Color) *List {
-	l.mainTextStyle = l.mainTextStyle.Foreground(color)
+	style := l.mainTextStyle.Foreground(color)
+	if l.mainTextStyle != style {
+		l.mainTextStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -225,13 +236,20 @@ func (l *List) SetMainTextColor(color tcell.Color) *List {
 // background color is ignored in order not to override the background color of
 // the list itself.
 func (l *List) SetMainTextStyle(style tcell.Style) *List {
-	l.mainTextStyle = style
+	if l.mainTextStyle != style {
+		l.mainTextStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
 // SetSecondaryTextColor sets the color of the items' secondary text.
 func (l *List) SetSecondaryTextColor(color tcell.Color) *List {
-	l.secondaryTextStyle = l.secondaryTextStyle.Foreground(color)
+	style := l.secondaryTextStyle.Foreground(color)
+	if l.secondaryTextStyle != style {
+		l.secondaryTextStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -239,13 +257,20 @@ func (l *List) SetSecondaryTextColor(color tcell.Color) *List {
 // the background color is ignored in order not to override the background color
 // of the list itself.
 func (l *List) SetSecondaryTextStyle(style tcell.Style) *List {
-	l.secondaryTextStyle = style
+	if l.secondaryTextStyle != style {
+		l.secondaryTextStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
 // SetShortcutColor sets the color of the items' shortcut.
 func (l *List) SetShortcutColor(color tcell.Color) *List {
-	l.shortcutStyle = l.shortcutStyle.Foreground(color)
+	style := l.shortcutStyle.Foreground(color)
+	if l.shortcutStyle != style {
+		l.shortcutStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -253,7 +278,10 @@ func (l *List) SetShortcutColor(color tcell.Color) *List {
 // background color is ignored in order not to override the background color of
 // the list itself.
 func (l *List) SetShortcutStyle(style tcell.Style) *List {
-	l.shortcutStyle = style
+	if l.shortcutStyle != style {
+		l.shortcutStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -261,13 +289,21 @@ func (l *List) SetShortcutStyle(style tcell.Style) *List {
 // color of main text characters that are different from the main text color
 // (e.g. style tags) is maintained.
 func (l *List) SetSelectedTextColor(color tcell.Color) *List {
-	l.selectedStyle = l.selectedStyle.Foreground(color)
+	style := l.selectedStyle.Foreground(color)
+	if l.selectedStyle != style {
+		l.selectedStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
 // SetSelectedBackgroundColor sets the background color of selected items.
 func (l *List) SetSelectedBackgroundColor(color tcell.Color) *List {
-	l.selectedStyle = l.selectedStyle.Background(color)
+	style := l.selectedStyle.Background(color)
+	if l.selectedStyle != style {
+		l.selectedStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -275,15 +311,21 @@ func (l *List) SetSelectedBackgroundColor(color tcell.Color) *List {
 // main text characters that are different from the main text color (e.g. color
 // tags) is maintained.
 func (l *List) SetSelectedStyle(style tcell.Style) *List {
-	l.selectedStyle = style
+	if l.selectedStyle != style {
+		l.selectedStyle = style
+		l.MarkDirty()
+	}
 	return l
 }
 
 // SetUseStyleTags sets a flag which determines whether style tags are used in
 // the main and secondary texts. The default is true.
 func (l *List) SetUseStyleTags(mainStyleTags, secondaryStyleTags bool) *List {
-	l.mainStyleTags = mainStyleTags
-	l.secondaryStyleTags = secondaryStyleTags
+	if l.mainStyleTags != mainStyleTags || l.secondaryStyleTags != secondaryStyleTags {
+		l.mainStyleTags = mainStyleTags
+		l.secondaryStyleTags = secondaryStyleTags
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -297,7 +339,10 @@ func (l *List) GetUseStyleTags() (mainStyleTags, secondaryStyleTags bool) {
 // list item is highlighted. If set to true, selected items are only highlighted
 // when the list has focus. If set to false, they are always highlighted.
 func (l *List) SetSelectedFocusOnly(focusOnly bool) *List {
-	l.selectedFocusOnly = focusOnly
+	if l.selectedFocusOnly != focusOnly {
+		l.selectedFocusOnly = focusOnly
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -306,13 +351,19 @@ func (l *List) SetSelectedFocusOnly(focusOnly bool) *List {
 // true, the highlight spans the entire view. If set to false, only the text of
 // the selected item from beginning to end is highlighted.
 func (l *List) SetHighlightFullLine(highlight bool) *List {
-	l.highlightFullLine = highlight
+	if l.highlightFullLine != highlight {
+		l.highlightFullLine = highlight
+		l.MarkDirty()
+	}
 	return l
 }
 
 // ShowSecondaryText determines whether or not to show secondary item texts.
 func (l *List) ShowSecondaryText(show bool) *List {
-	l.showSecondaryText = show
+	if l.showSecondaryText != show {
+		l.showSecondaryText = show
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -322,7 +373,10 @@ func (l *List) ShowSecondaryText(show bool) *List {
 // false, the selection won't change when navigating downwards on the last item
 // or navigating upwards on the first item.
 func (l *List) SetWrapAround(wrapAround bool) *List {
-	l.wrapAround = wrapAround
+	if l.wrapAround != wrapAround {
+		l.wrapAround = wrapAround
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -422,6 +476,7 @@ func (l *List) InsertItem(index int, mainText, secondaryText string, shortcut ru
 		item := l.items[0]
 		l.changed(0, item.MainText, item.SecondaryText, item.Shortcut)
 	}
+	l.MarkDirty()
 
 	return l
 }
@@ -448,8 +503,11 @@ func (l *List) GetItemText(index int) (main, secondary string) {
 // out of range.
 func (l *List) SetItemText(index int, main, secondary string) *List {
 	item := l.items[index]
-	item.MainText = main
-	item.SecondaryText = secondary
+	if item.MainText != main || item.SecondaryText != secondary {
+		item.MainText = main
+		item.SecondaryText = secondary
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -495,8 +553,11 @@ func (l *List) FindItems(mainSearch, secondarySearch string, mustContainBoth, ig
 
 // Clear removes all items from the list.
 func (l *List) Clear() *List {
-	l.items = nil
-	l.currentItem = 0
+	if len(l.items) > 0 || l.currentItem != 0 {
+		l.items = nil
+		l.currentItem = 0
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -621,6 +682,7 @@ func (l *List) InputHandler() func(event *tcell.EventKey, setFocus func(p Primit
 		}
 
 		previousItem := l.currentItem
+		previousHorizontalOffset := l.horizontalOffset
 
 		switch key := event.Key(); key {
 		case tcell.KeyTab, tcell.KeyDown:
@@ -708,6 +770,9 @@ func (l *List) InputHandler() func(event *tcell.EventKey, setFocus func(p Primit
 				l.changed(l.currentItem, item.MainText, item.SecondaryText, item.Shortcut)
 			}
 		}
+		if l.currentItem != previousItem || l.horizontalOffset != previousHorizontalOffset {
+			l.MarkDirty()
+		}
 	})
 }
 
@@ -737,6 +802,10 @@ func (l *List) MouseHandler() func(action MouseAction, event *tcell.EventMouse, 
 		if !l.InRect(event.Position()) {
 			return false, nil
 		}
+
+		previousCurrentItem := l.currentItem
+		previousItemOffset := l.itemOffset
+		previousHorizontalOffset := l.horizontalOffset
 
 		// Process mouse event.
 		switch action {
@@ -779,6 +848,9 @@ func (l *List) MouseHandler() func(action MouseAction, event *tcell.EventMouse, 
 		case MouseScrollRight:
 			l.horizontalOffset++
 			consumed = true
+		}
+		if l.currentItem != previousCurrentItem || l.itemOffset != previousItemOffset || l.horizontalOffset != previousHorizontalOffset {
+			l.MarkDirty()
 		}
 
 		return

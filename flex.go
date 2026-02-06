@@ -69,14 +69,20 @@ func NewFlex() *Flex {
 // these are the opposite of what you would expect coming from CSS. You may also
 // use FlexColumnCSS or FlexRowCSS, to remain in line with the CSS definition.
 func (f *Flex) SetDirection(direction int) *Flex {
-	f.direction = direction
+	if f.direction != direction {
+		f.direction = direction
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetFullScreen sets the flag which, when true, causes the flex layout to use
 // the entire screen space instead of whatever size it is currently assigned to.
 func (f *Flex) SetFullScreen(fullScreen bool) *Flex {
-	f.fullScreen = fullScreen
+	if f.fullScreen != fullScreen {
+		f.fullScreen = fullScreen
+		f.MarkDirty()
+	}
 	return f
 }
 
@@ -95,17 +101,34 @@ func (f *Flex) SetFullScreen(fullScreen bool) *Flex {
 // You can provide a nil value for the primitive. This will still consume screen
 // space but nothing will be drawn.
 func (f *Flex) AddItem(item Primitive, fixedSize, proportion int, focus bool) *Flex {
+	bindDirtyParent(item, f.Box)
 	f.items = append(f.items, &flexItem{Item: item, FixedSize: fixedSize, Proportion: proportion, Focus: focus})
+	f.MarkDirty()
 	return f
 }
 
 // RemoveItem removes all items for the given primitive from the container,
 // keeping the order of the remaining items intact.
 func (f *Flex) RemoveItem(p Primitive) *Flex {
+	removed := false
 	for index := len(f.items) - 1; index >= 0; index-- {
 		if f.items[index].Item == p {
 			f.items = slices.Delete(f.items, index, index+1)
+			removed = true
 		}
+	}
+	if removed {
+		stillPresent := false
+		for _, item := range f.items {
+			if item.Item == p {
+				stillPresent = true
+				break
+			}
+		}
+		if !stillPresent {
+			unbindDirtyParent(p, f.Box)
+		}
+		f.MarkDirty()
 	}
 	return f
 }
@@ -125,7 +148,13 @@ func (f *Flex) GetItem(index int) Primitive {
 
 // Clear removes all items from the container.
 func (f *Flex) Clear() *Flex {
-	f.items = nil
+	if len(f.items) > 0 {
+		for _, item := range f.items {
+			unbindDirtyParent(item.Item, f.Box)
+		}
+		f.items = nil
+		f.MarkDirty()
+	}
 	return f
 }
 
@@ -133,13 +162,41 @@ func (f *Flex) Clear() *Flex {
 // are multiple Flex items with the same primitive, they will all receive the
 // same size. For details regarding the size parameters, see AddItem().
 func (f *Flex) ResizeItem(p Primitive, fixedSize, proportion int) *Flex {
+	changed := false
 	for _, item := range f.items {
-		if item.Item == p {
+		if item.Item == p && (item.FixedSize != fixedSize || item.Proportion != proportion) {
 			item.FixedSize = fixedSize
 			item.Proportion = proportion
+			changed = true
 		}
 	}
+	if changed {
+		f.MarkDirty()
+	}
 	return f
+}
+
+// IsDirty returns whether this primitive or one of its children needs redraw.
+func (f *Flex) IsDirty() bool {
+	if f.Box.IsDirty() {
+		return true
+	}
+	for _, item := range f.items {
+		if item.Item != nil && item.Item.IsDirty() {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkClean marks this primitive and all children as clean.
+func (f *Flex) MarkClean() {
+	f.Box.MarkClean()
+	for _, item := range f.items {
+		if item.Item != nil {
+			item.Item.MarkClean()
+		}
+	}
 }
 
 // Draw draws this primitive onto the screen.

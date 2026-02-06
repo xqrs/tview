@@ -49,7 +49,10 @@ func NewButton(label string) *Button {
 
 // SetLabel sets the button text.
 func (b *Button) SetLabel(label string) *Button {
-	b.text = label
+	if b.text != label {
+		b.text = label
+		b.MarkDirty()
+	}
 	return b
 }
 
@@ -60,39 +63,60 @@ func (b *Button) GetLabel() string {
 
 // SetLabelColor sets the color of the button text.
 func (b *Button) SetLabelColor(color tcell.Color) *Button {
-	b.style = b.style.Foreground(color)
+	style := b.style.Foreground(color)
+	if b.style != style {
+		b.style = style
+		b.MarkDirty()
+	}
 	return b
 }
 
 // SetStyle sets the style of the button used when it is not focused.
 func (b *Button) SetStyle(style tcell.Style) *Button {
-	b.style = style
+	if b.style != style {
+		b.style = style
+		b.MarkDirty()
+	}
 	return b
 }
 
 // SetLabelColorActivated sets the color of the button text when the button is
 // in focus.
 func (b *Button) SetLabelColorActivated(color tcell.Color) *Button {
-	b.activatedStyle = b.activatedStyle.Foreground(color)
+	style := b.activatedStyle.Foreground(color)
+	if b.activatedStyle != style {
+		b.activatedStyle = style
+		b.MarkDirty()
+	}
 	return b
 }
 
 // SetBackgroundColorActivated sets the background color of the button text when
 // the button is in focus.
 func (b *Button) SetBackgroundColorActivated(color tcell.Color) *Button {
-	b.activatedStyle = b.activatedStyle.Background(color)
+	style := b.activatedStyle.Background(color)
+	if b.activatedStyle != style {
+		b.activatedStyle = style
+		b.MarkDirty()
+	}
 	return b
 }
 
 // SetActivatedStyle sets the style of the button used when it is focused.
 func (b *Button) SetActivatedStyle(style tcell.Style) *Button {
-	b.activatedStyle = style
+	if b.activatedStyle != style {
+		b.activatedStyle = style
+		b.MarkDirty()
+	}
 	return b
 }
 
 // SetDisabledStyle sets the style of the button used when it is disabled.
 func (b *Button) SetDisabledStyle(style tcell.Style) *Button {
-	b.disabledStyle = style
+	if b.disabledStyle != style {
+		b.disabledStyle = style
+		b.MarkDirty()
+	}
 	return b
 }
 
@@ -102,7 +126,10 @@ func (b *Button) SetDisabledStyle(style tcell.Style) *Button {
 // If the button is part of a form, you should set focus to the form itself
 // after calling this function to set focus to the next non-disabled form item.
 func (b *Button) SetDisabled(disabled bool) *Button {
-	b.disabled = disabled
+	if b.disabled != disabled {
+		b.disabled = disabled
+		b.MarkDirty()
+	}
 	return b
 }
 

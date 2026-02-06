@@ -66,4 +66,13 @@ type Primitive interface {
 	// future. If you subclass from Box, it is recommended that you wrap your
 	// handler using Box.WrapPasteHandler() so you inherit that functionality.
 	PasteHandler() func(text string, setFocus func(p Primitive))
+
+	// IsDirty returns true if this primitive needs to be redrawn.
+	IsDirty() bool
+
+	// MarkDirty marks this primitive as needing a redraw.
+	MarkDirty()
+
+	// MarkClean marks this primitive as not needing redraw.
+	MarkClean()
 }

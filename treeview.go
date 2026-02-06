@@ -46,6 +46,9 @@ type TreeNode struct {
 	// An optional function which is called when the user selects this node.
 	selected func()
 
+	// Whether this node (or one of its children) needs redraw.
+	dirty bool
+
 	// The hierarchy level (0 for the root, 1 for its children, and so on). This
 	// is only up to date immediately after a call to process() (e.g. via
 	// Draw()).
@@ -66,6 +69,7 @@ func NewTreeNode(text string) *TreeNode {
 		indent:            2,
 		expanded:          true,
 		selectable:        true,
+		dirty:             true,
 	}
 }
 
@@ -101,6 +105,7 @@ func (n *TreeNode) Walk(callback func(node, parent *TreeNode) bool) *TreeNode {
 // internal tree structure.
 func (n *TreeNode) SetReference(reference any) *TreeNode {
 	n.reference = reference
+	n.markDirty()
 	return n
 }
 
@@ -111,7 +116,19 @@ func (n *TreeNode) GetReference() any {
 
 // SetChildren sets this node's child nodes.
 func (n *TreeNode) SetChildren(childNodes []*TreeNode) *TreeNode {
-	n.children = childNodes
+	changed := len(n.children) != len(childNodes)
+	if !changed {
+		for index := range childNodes {
+			if n.children[index] != childNodes[index] {
+				changed = true
+				break
+			}
+		}
+	}
+	if changed {
+		n.children = childNodes
+		n.markDirty()
+	}
 	return n
 }
 
@@ -127,13 +144,17 @@ func (n *TreeNode) GetChildren() []*TreeNode {
 
 // ClearChildren removes all child nodes from this node.
 func (n *TreeNode) ClearChildren() *TreeNode {
-	n.children = nil
+	if len(n.children) > 0 {
+		n.children = nil
+		n.markDirty()
+	}
 	return n
 }
 
 // AddChild adds a new child node to this node.
 func (n *TreeNode) AddChild(node *TreeNode) *TreeNode {
 	n.children = append(n.children, node)
+	n.markDirty()
 	return n
 }
 
@@ -143,6 +164,7 @@ func (n *TreeNode) RemoveChild(node *TreeNode) *TreeNode {
 	for index, child := range n.children {
 		if child == node {
 			n.children = slices.Delete(n.children, index, index+1)
+			n.markDirty()
 			break
 		}
 	}
@@ -152,7 +174,10 @@ func (n *TreeNode) RemoveChild(node *TreeNode) *TreeNode {
 // SetSelectable sets a flag indicating whether this node can be selected by
 // the user.
 func (n *TreeNode) SetSelectable(selectable bool) *TreeNode {
-	n.selectable = selectable
+	if n.selectable != selectable {
+		n.selectable = selectable
+		n.markDirty()
+	}
 	return n
 }
 
@@ -165,37 +190,62 @@ func (n *TreeNode) SetSelectedFunc(handler func()) *TreeNode {
 
 // SetExpanded sets whether or not this node's child nodes should be displayed.
 func (n *TreeNode) SetExpanded(expanded bool) *TreeNode {
-	n.expanded = expanded
+	if n.expanded != expanded {
+		n.expanded = expanded
+		n.markDirty()
+	}
 	return n
 }
 
 // Expand makes the child nodes of this node appear.
 func (n *TreeNode) Expand() *TreeNode {
-	n.expanded = true
+	if !n.expanded {
+		n.expanded = true
+		n.markDirty()
+	}
 	return n
 }
 
 // Collapse makes the child nodes of this node disappear.
 func (n *TreeNode) Collapse() *TreeNode {
-	n.expanded = false
+	if n.expanded {
+		n.expanded = false
+		n.markDirty()
+	}
 	return n
 }
 
 // ExpandAll expands this node and all descendent nodes.
 func (n *TreeNode) ExpandAll() *TreeNode {
+	changed := false
 	n.Walk(func(node, parent *TreeNode) bool {
-		node.expanded = true
+		if !node.expanded {
+			node.expanded = true
+			node.dirty = true
+			changed = true
+		}
 		return true
 	})
+	if changed {
+		n.markDirty()
+	}
 	return n
 }
 
 // CollapseAll collapses this node and all descendent nodes.
 func (n *TreeNode) CollapseAll() *TreeNode {
+	changed := false
 	n.Walk(func(node, parent *TreeNode) bool {
-		node.expanded = false
+		if node.expanded {
+			node.expanded = false
+			node.dirty = true
+			changed = true
+		}
 		return true
 	})
+	if changed {
+		n.markDirty()
+	}
 	return n
 }
 
@@ -206,7 +256,10 @@ func (n *TreeNode) IsExpanded() bool {
 
 // SetText sets the node's text which is displayed.
 func (n *TreeNode) SetText(text string) *TreeNode {
-	n.text = text
+	if n.text != text {
+		n.text = text
+		n.markDirty()
+	}
 	return n
 }
 
@@ -220,14 +273,22 @@ func (n *TreeNode) GetColor() tcell.Color {
 // sets the background color of the selected text style. For more control over
 // styles, use [TreeNode.SetTextStyle] and [TreeNode.SetSelectedTextStyle].
 func (n *TreeNode) SetColor(color tcell.Color) *TreeNode {
-	n.textStyle = n.textStyle.Foreground(color)
-	n.selectedTextStyle = n.selectedTextStyle.Background(color)
+	textStyle := n.textStyle.Foreground(color)
+	selectedTextStyle := n.selectedTextStyle.Background(color)
+	if n.textStyle != textStyle || n.selectedTextStyle != selectedTextStyle {
+		n.textStyle = textStyle
+		n.selectedTextStyle = selectedTextStyle
+		n.markDirty()
+	}
 	return n
 }
 
 // SetTextStyle sets the text style for this node.
 func (n *TreeNode) SetTextStyle(style tcell.Style) *TreeNode {
-	n.textStyle = style
+	if n.textStyle != style {
+		n.textStyle = style
+		n.markDirty()
+	}
 	return n
 }
 
@@ -238,7 +299,10 @@ func (n *TreeNode) GetTextStyle() tcell.Style {
 
 // SetSelectedTextStyle sets the text style for this node when it is selected.
 func (n *TreeNode) SetSelectedTextStyle(style tcell.Style) *TreeNode {
-	n.selectedTextStyle = style
+	if n.selectedTextStyle != style {
+		n.selectedTextStyle = style
+		n.markDirty()
+	}
 	return n
 }
 
@@ -252,7 +316,10 @@ func (n *TreeNode) GetSelectedTextStyle() tcell.Style {
 // keeps the text as far left as possible with a minimum of line graphics. Any
 // value greater than that moves the text to the right.
 func (n *TreeNode) SetIndent(indent int) *TreeNode {
-	n.indent = indent
+	if n.indent != indent {
+		n.indent = indent
+		n.markDirty()
+	}
 	return n
 }
 
@@ -365,17 +432,48 @@ type TreeView struct {
 // NewTreeView returns a new tree view.
 func NewTreeView() *TreeView {
 	return &TreeView{
-		Box:             NewBox(),
-		centerCursor:    true,
-		graphics:        true,
-		graphicsColor:   Styles.GraphicsColor,
-		lastMouseY:      -1,
+		Box:           NewBox(),
+		centerCursor:  true,
+		graphics:      true,
+		graphicsColor: Styles.GraphicsColor,
+		lastMouseY:    -1,
 	}
+}
+
+func (n *TreeNode) markDirty() {
+	n.dirty = true
+}
+
+func (n *TreeNode) markClean() {
+	n.dirty = false
+	for _, child := range n.children {
+		if child != nil {
+			child.markClean()
+		}
+	}
+}
+
+func (n *TreeNode) isDirty() bool {
+	if n == nil {
+		return false
+	}
+	if n.dirty {
+		return true
+	}
+	for _, child := range n.children {
+		if child != nil && child.isDirty() {
+			return true
+		}
+	}
+	return false
 }
 
 // SetRoot sets the root node of the tree.
 func (t *TreeView) SetRoot(root *TreeNode) *TreeView {
-	t.root = root
+	if t.root != root {
+		t.root = root
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -393,7 +491,10 @@ func (t *TreeView) GetRoot() *TreeNode {
 // that will be selected is not known until the tree is drawn. Triggering the
 // "changed" callback is thus deferred until the next call to [TreeView.Draw].
 func (t *TreeView) SetCurrentNode(node *TreeNode) *TreeView {
-	t.currentNode = node
+	if t.currentNode != node {
+		t.currentNode = node
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -436,14 +537,20 @@ func (t *TreeView) GetPath(node *TreeNode) []*TreeNode {
 // root, 1 to the root's child nodes, and so on. Nodes above the top level are
 // not displayed.
 func (t *TreeView) SetTopLevel(topLevel int) *TreeView {
-	t.topLevel = topLevel
+	if t.topLevel != topLevel {
+		t.topLevel = topLevel
+		t.MarkDirty()
+	}
 	return t
 }
 
 // SetCenterCursor controls whether the cursor is kept centered whenever
 // possible.
 func (t *TreeView) SetCenterCursor(center bool) *TreeView {
-	t.centerCursor = center
+	if t.centerCursor != center {
+		t.centerCursor = center
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -459,7 +566,19 @@ func (t *TreeView) SetCenterCursor(center bool) *TreeView {
 //
 // Deeper levels will cycle through the prefixes.
 func (t *TreeView) SetPrefixes(prefixes []string) *TreeView {
-	t.prefixes = prefixes
+	changed := len(t.prefixes) != len(prefixes)
+	if !changed {
+		for index := range prefixes {
+			if t.prefixes[index] != prefixes[index] {
+				changed = true
+				break
+			}
+		}
+	}
+	if changed {
+		t.prefixes = prefixes
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -467,20 +586,29 @@ func (t *TreeView) SetPrefixes(prefixes []string) *TreeView {
 // all texts except that of top-level nodes will be placed in the same column.
 // If set to false, they will indent with the hierarchy.
 func (t *TreeView) SetAlign(align bool) *TreeView {
-	t.align = align
+	if t.align != align {
+		t.align = align
+		t.MarkDirty()
+	}
 	return t
 }
 
 // SetGraphics sets a flag which determines whether or not line graphics are
 // drawn to illustrate the tree's hierarchy.
 func (t *TreeView) SetGraphics(showGraphics bool) *TreeView {
-	t.graphics = showGraphics
+	if t.graphics != showGraphics {
+		t.graphics = showGraphics
+		t.MarkDirty()
+	}
 	return t
 }
 
 // SetGraphicsColor sets the colors of the lines used to draw the tree structure.
 func (t *TreeView) SetGraphicsColor(color tcell.Color) *TreeView {
-	t.graphicsColor = color
+	if t.graphicsColor != color {
+		t.graphicsColor = color
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -539,8 +667,25 @@ func (t *TreeView) Move(offset int) *TreeView {
 	}
 	t.movement = treeMove
 	t.step = offset
+	t.MarkDirty()
 	t.process(false)
 	return t
+}
+
+// IsDirty returns whether this primitive or its nodes need redraw.
+func (t *TreeView) IsDirty() bool {
+	if t.Box.IsDirty() {
+		return true
+	}
+	return t.root != nil && t.root.isDirty()
+}
+
+// MarkClean marks this primitive and all nodes as clean.
+func (t *TreeView) MarkClean() {
+	t.Box.MarkClean()
+	if t.root != nil {
+		t.root.markClean()
+	}
 }
 
 // process builds the visible tree, populates the "nodes" slice, and processes
@@ -899,6 +1044,7 @@ func (t *TreeView) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 			selectNode()
 		}
 
+		t.MarkDirty()
 		t.process(true)
 	})
 }
@@ -959,6 +1105,9 @@ func (t *TreeView) MouseHandler() func(action MouseAction, event *tcell.EventMou
 			t.movement = treeScroll
 			t.step = 1
 			consumed = true
+		}
+		if consumed {
+			t.MarkDirty()
 		}
 
 		return

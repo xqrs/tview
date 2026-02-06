@@ -104,16 +104,8 @@ type Application struct {
 	lastMouseClick          time.Time        // The time when a mouse button was last clicked.
 	lastMouseButtons        tcell.ButtonMask // The last mouse button state.
 
-	// frontFrame is the last frame flushed to the terminal, while backFrame
-	// captures the frame currently being rendered.
-	frontFrame *frame
-	backFrame  *frame
-
-	// forceRedraw bypasses row-span diffing for the next frame.
+	// forceRedraw bypasses root dirty checks for the next frame.
 	forceRedraw bool
-
-	// spaces caches a full-width run of blanks for clear-run batching.
-	spaces string
 }
 
 // NewApplication creates and returns a new application.
@@ -174,8 +166,6 @@ func (a *Application) SetScreen(screen tcell.Screen) *Application {
 	defer a.Unlock()
 	if a.screen == nil {
 		a.screen = screen
-		a.frontFrame = nil
-		a.backFrame = nil
 		a.forceRedraw = true
 	}
 	return a
@@ -316,6 +306,11 @@ EventLoop:
 					}
 				}
 			case *tcell.EventResize:
+				a.Lock()
+				// Resize events can imply terminal state changes even when size
+				// reports unchanged, so force one redraw pass.
+				a.forceRedraw = true
+				a.Unlock()
 				if time.Since(lastRedraw) < redrawPause {
 					if redrawTimer != nil {
 						redrawTimer.Stop()
@@ -534,15 +529,7 @@ func (a *Application) draw() *Application {
 	a.Lock()
 	screen := a.screen
 	root := a.root
-	drawWidth, drawHeight := 0, 0
-	if screen != nil {
-		drawWidth, drawHeight = screen.Size()
-		a.ensureDiffFrames(drawWidth, drawHeight)
-	}
-	front := a.frontFrame
-	back := a.backFrame
 	forceRedraw := a.forceRedraw
-	spaces := a.spaces
 	a.Unlock()
 
 	// Maybe we're not ready yet or not anymore.
@@ -550,16 +537,26 @@ func (a *Application) draw() *Application {
 		return a
 	}
 
+	drawWidth, drawHeight := screen.Size()
 	root.SetRect(0, 0, drawWidth, drawHeight)
 
-	back.beginFrame()
-	root.Draw(&captureScreen{Screen: screen, frame: back})
-	if a.blitDiff(screen, front, back, forceRedraw, spaces) {
-		screen.Show()
+	// Skip the render pass if nothing changed.
+	if !forceRedraw && !root.IsDirty() {
+		return a
 	}
 
+	// Clear dirty flags before drawing so updates that happen during this draw
+	// cycle can re-dirty the tree and trigger a subsequent frame.
+	root.MarkClean()
+
+	// tcell already keeps a logical back buffer and emits only visual deltas in
+	// Show(), so we only need to redraw primitives and let tcell perform output
+	// diffing.
+	screen.Clear()
+	root.Draw(screen)
+	screen.Show()
+
 	a.Lock()
-	a.frontFrame, a.backFrame = a.backFrame, a.frontFrame
 	a.forceRedraw = false
 	a.Unlock()
 
@@ -592,8 +589,6 @@ func (a *Application) SetRoot(root Primitive) *Application {
 	a.Lock()
 	a.root = root
 	if a.screen != nil {
-		a.frontFrame = nil
-		a.backFrame = nil
 		a.forceRedraw = true
 	}
 	a.Unlock()
@@ -669,301 +664,4 @@ func (a *Application) QueueUpdateDraw(f func()) *Application {
 func (a *Application) QueueEvent(event tcell.Event) *Application {
 	a.events <- event
 	return a
-}
-
-func (a *Application) ensureDiffFrames(width, height int) {
-	if a.frontFrame == nil || a.backFrame == nil {
-		a.frontFrame = newFrame(width, height)
-		a.backFrame = newFrame(width, height)
-		a.ensureSpaces(width)
-		// Seed both generations so first diff sees "empty previous frame"
-		// consistently without special-case checks in the blitter.
-		a.frontFrame.beginFrame()
-		a.backFrame.beginFrame()
-		a.forceRedraw = true
-		return
-	}
-	if a.frontFrame.width == width && a.frontFrame.height == height &&
-		a.backFrame.width == width && a.backFrame.height == height {
-		return
-	}
-	a.frontFrame.resize(width, height)
-	a.backFrame.resize(width, height)
-	a.ensureSpaces(width)
-	a.frontFrame.beginFrame()
-	a.backFrame.beginFrame()
-	a.forceRedraw = true
-}
-
-func (a *Application) ensureSpaces(width int) {
-	if width <= 0 {
-		a.spaces = ""
-		return
-	}
-	if len(a.spaces) >= width {
-		return
-	}
-	a.spaces = strings.Repeat(" ", width)
-}
-
-// blitDiff writes only changed cells from back -> screen, using front as the
-// previous flushed baseline.
-//
-// Rows are selected by dirty-line metadata tracked while primitives draw.
-// For non-forced redraws, we only visit rows touched in either frame and use
-// the union of their dirty spans.
-func (a *Application) blitDiff(screen tcell.Screen, front, back *frame, forceRedraw bool, spaces string) bool {
-	if front == nil || back == nil {
-		return false
-	}
-
-	width, height := back.width, back.height
-	changed := false
-
-	// If the draw pass called Clear(), clear the terminal once and then repaint
-	// only rows touched afterward in this frame.
-	if back.clearAll {
-		screen.Clear()
-		changed = true
-		for y := range height {
-			start, end, ok := back.rowSpan(y)
-			if !ok || start >= end {
-				continue
-			}
-			base := y * width
-			bRow := back.cells[base : base+width]
-			if a.paintBackRowRangeNoCompare(screen, y, start, end, bRow, back.gen, spaces) {
-				changed = true
-			}
-		}
-		return changed
-	}
-
-	// Forced redraws (e.g. Sync/resize/root swaps) repaint the entire viewport
-	// directly from back without consulting front. This avoids spending CPU on
-	// equality checks when we already know a full repaint is required.
-	if forceRedraw {
-		// Clear first for conservative correctness across resize/root swaps and
-		// complex glyph transitions before repainting every viewport cell.
-		screen.Clear()
-		changed = true
-		for y := range height {
-			base := y * width
-			bRow := back.cells[base : base+width]
-			if a.paintBackRowRangeNoCompare(screen, y, 0, width, bRow, back.gen, spaces) {
-				changed = true
-			}
-		}
-		return changed
-	}
-
-	for y := range height {
-		var start, end int
-		backStart, backEnd, backOK := back.rowSpan(y)
-		frontStart, frontEnd, frontOK := front.rowSpan(y)
-		switch {
-		case backOK && frontOK:
-			// Use the union of old/new dirty windows so deletions and insertions
-			// on either side are both considered.
-			start = min(backStart, frontStart)
-			end = max(backEnd, frontEnd)
-		case backOK:
-			start, end = backStart, backEnd
-		case frontOK:
-			start, end = frontStart, frontEnd
-		default:
-			continue
-		}
-		if start >= end {
-			continue
-		}
-
-		base := y * width
-		fRow := front.cells[base : base+width]
-		bRow := back.cells[base : base+width]
-		// Ncurses-style row hashing short-circuits dirty windows that were
-		// touched but ended up visually unchanged.
-		if rowRangeSignature(fRow, front.gen, start, end) == rowRangeSignature(bRow, back.gen, start, end) {
-			continue
-		}
-		// Walk the candidate dirty window and emit only changed runs.
-		for x := start; x < end; {
-			frontCell := fRow[x]
-			frontOK := frontCell.gen == front.gen
-			backCell := bRow[x]
-			backOK := backCell.gen == back.gen
-
-			// Cheap-state fast path: both missing means unchanged blank.
-			if !frontOK && !backOK {
-				x++
-				continue
-			}
-			if backOK && backCell.cont {
-				// Continuation columns are metadata-only and should be covered by
-				// a lead wide grapheme. If metadata is orphaned, clear this cell
-				// defensively so stale right-half artifacts cannot survive.
-				if !isContinuationCoveredByLead(bRow, back.gen, x) {
-					screen.PutStrStyled(x, y, spaces[:1], tcell.StyleDefault)
-					changed = true
-				}
-				x++
-				continue
-			}
-			// Keep cellsEqual authoritative for semantic equality.
-			if cellsEqual(frontCell, frontOK, backCell, backOK) {
-				// Dirty spans can still contain unchanged cells; skip them so we
-				// only emit terminal writes for actual visual deltas.
-				x++
-				continue
-			}
-
-			cell := bRow[x]
-			if cell.gen != back.gen {
-				runStart := x
-				for x < end {
-					fc := fRow[x]
-					fok := fc.gen == front.gen
-					bc := bRow[x]
-					bok := bc.gen == back.gen
-					// Stop clear-run immediately when new content starts.
-					if bok {
-						break
-					}
-					if !fok {
-						// Both sides are logically blank; keep extending clear-run.
-						x++
-						continue
-					}
-					if cellsEqual(fc, fok, bc, bok) {
-						break
-					}
-					x++
-				}
-				// This range changed from previous content to logical blanks.
-				screen.PutStrStyled(runStart, y, spaces[:x-runStart], tcell.StyleDefault)
-				changed = true
-				continue
-			}
-			// Batch contiguous single-cell graphemes with the same style.
-			if cell.dw == 1 {
-				style := cell.style
-				runStart := x
-				var b strings.Builder
-				for x < end {
-					next := bRow[x]
-					fc := fRow[x]
-					fok := fc.gen == front.gen
-					bc := bRow[x]
-					bok := bc.gen == back.gen
-					if !bok || next.style != style || next.dw != 1 {
-						break
-					}
-					// For single-width text runs, equality is a simple field check.
-					if fok && fc.style == bc.style && fc.dw == bc.dw && fc.text == bc.text {
-						break
-					}
-					b.WriteString(next.text)
-					x++
-				}
-				screen.PutStrStyled(runStart, y, b.String(), style)
-				changed = true
-				continue
-			}
-
-			screen.Put(x, y, cell.text, cell.style)
-			changed = true
-			x++
-		}
-	}
-
-	return changed
-}
-
-// paintBackRowRangeNoCompare writes [start,end) from back to screen without
-// consulting front. It is used by explicit full-repaint modes (clearAll and
-// forceRedraw).
-func (a *Application) paintBackRowRangeNoCompare(screen tcell.Screen, y, start, end int, bRow []cell, backGen uint32, spaces string) bool {
-	wrote := false
-	for x := start; x < end; {
-		cell := bRow[x]
-		if cell.gen != backGen {
-			// Missing cells are logical blanks in this generation; batch them
-			// into one clear run to avoid per-cell terminal calls.
-			runStart := x
-			for x < end && bRow[x].gen != backGen {
-				x++
-			}
-			screen.PutStrStyled(runStart, y, spaces[:x-runStart], tcell.StyleDefault)
-			wrote = true
-			continue
-		}
-		if cell.cont {
-			// Continuation cells do not emit output directly; when metadata is
-			// orphaned, clear the cell defensively.
-			if !isContinuationCoveredByLead(bRow, backGen, x) {
-				screen.PutStrStyled(x, y, spaces[:1], tcell.StyleDefault)
-				wrote = true
-			}
-			x++
-			continue
-		}
-		if cell.dw == 1 {
-			// Fast path: batch contiguous single-cell graphemes sharing style.
-			style := cell.style
-			runStart := x
-			var b strings.Builder
-			for x < end {
-				next := bRow[x]
-				if next.gen != backGen || next.style != style || next.dw != 1 {
-					break
-				}
-				b.WriteString(next.text)
-				x++
-			}
-			screen.PutStrStyled(runStart, y, b.String(), style)
-			wrote = true
-			continue
-		}
-
-		// Wide/complex graphemes are emitted one cell at a time.
-		screen.Put(x, y, cell.text, cell.style)
-		wrote = true
-		x++
-	}
-	return wrote
-}
-
-func rowRangeSignature(row []cell, gen uint32, start, end int) uint64 {
-	h := uint64(fnv64Offset)
-	for x := start; x < end; x++ {
-		c := row[x]
-		if c.gen != gen {
-			h = hashMixUint64(h, 0)
-			continue
-		}
-		h = hashMixUint64(h, c.sig)
-	}
-	return hashMixUint64(h, uint64(end-start))
-}
-
-// isContinuationCoveredByLead validates continuation metadata in O(1) using
-// the stored lead column. This keeps the hot path cheap while guarding against
-// stale continuation flags.
-func isContinuationCoveredByLead(bRow []cell, backGen uint32, x int) bool {
-	if x < 0 || x >= len(bRow) {
-		return false
-	}
-	c := bRow[x]
-	if c.gen != backGen || !c.cont {
-		return false
-	}
-	leadX := c.leadX
-	if leadX < 0 || leadX >= x || leadX >= len(bRow) {
-		return false
-	}
-	lead := bRow[leadX]
-	if lead.gen != backGen || lead.cont || lead.dw <= 1 {
-		return false
-	}
-	return leadX+int(lead.dw) > x
 }

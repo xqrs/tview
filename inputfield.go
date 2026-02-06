@@ -92,12 +92,22 @@ type InputField struct {
 	finished func(tcell.Key)
 }
 
+func (i *InputField) clearAutocompleteListLocked() {
+	if i.autocompleteList == nil {
+		return
+	}
+	unbindDirtyParent(i.autocompleteList, i.Box)
+	i.autocompleteList = nil
+	i.MarkDirty()
+}
+
 // NewInputField returns a new input field.
 func NewInputField() *InputField {
 	i := &InputField{
 		Box:      NewBox(),
 		textArea: NewTextArea().SetWrap(false),
 	}
+	bindDirtyParent(i.textArea, i.Box)
 	i.textArea.SetChangedFunc(func() {
 		if i.changed != nil {
 			i.changed(i.textArea.GetText())
@@ -115,7 +125,9 @@ func NewInputField() *InputField {
 // SetText sets the current text of the input field. This can be undone by the
 // user. Calling this function will also trigger a "changed" event.
 func (i *InputField) SetText(text string) *InputField {
-	i.textArea.Replace(0, i.textArea.GetTextLength(), text)
+	if i.textArea.GetText() != text {
+		i.textArea.Replace(0, i.textArea.GetTextLength(), text)
+	}
 	return i
 }
 
@@ -126,7 +138,9 @@ func (i *InputField) GetText() string {
 
 // SetLabel sets the text to be displayed before the input area.
 func (i *InputField) SetLabel(label string) *InputField {
-	i.textArea.SetLabel(label)
+	if i.textArea.GetLabel() != label {
+		i.textArea.SetLabel(label)
+	}
 	return i
 }
 
@@ -138,25 +152,34 @@ func (i *InputField) GetLabel() string {
 // SetLabelWidth sets the screen width of the label. A value of 0 will cause the
 // primitive to use the width of the label string.
 func (i *InputField) SetLabelWidth(width int) *InputField {
-	i.textArea.SetLabelWidth(width)
+	if i.textArea.GetLabelWidth() != width {
+		i.textArea.SetLabelWidth(width)
+	}
 	return i
 }
 
 // SetPlaceholder sets the text to be displayed when the input text is empty.
 func (i *InputField) SetPlaceholder(text string) *InputField {
-	i.textArea.SetPlaceholder(text)
+	if i.textArea.placeholder != text {
+		i.textArea.SetPlaceholder(text)
+	}
 	return i
 }
 
 // SetLabelColor sets the text color of the label.
 func (i *InputField) SetLabelColor(color tcell.Color) *InputField {
-	i.textArea.SetLabelStyle(i.textArea.GetLabelStyle().Foreground(color))
+	style := i.textArea.GetLabelStyle().Foreground(color)
+	if i.textArea.GetLabelStyle() != style {
+		i.textArea.SetLabelStyle(style)
+	}
 	return i
 }
 
 // SetLabelStyle sets the style of the label.
 func (i *InputField) SetLabelStyle(style tcell.Style) *InputField {
-	i.textArea.SetLabelStyle(style)
+	if i.textArea.GetLabelStyle() != style {
+		i.textArea.SetLabelStyle(style)
+	}
 	return i
 }
 
@@ -167,20 +190,28 @@ func (i *InputField) GetLabelStyle() tcell.Style {
 
 // SetFieldBackgroundColor sets the background color of the input area.
 func (i *InputField) SetFieldBackgroundColor(color tcell.Color) *InputField {
-	i.textArea.SetTextStyle(i.textArea.GetTextStyle().Background(color))
+	style := i.textArea.GetTextStyle().Background(color)
+	if i.textArea.GetTextStyle() != style {
+		i.textArea.SetTextStyle(style)
+	}
 	return i
 }
 
 // SetFieldTextColor sets the text color of the input area.
 func (i *InputField) SetFieldTextColor(color tcell.Color) *InputField {
-	i.textArea.SetTextStyle(i.textArea.GetTextStyle().Foreground(color))
+	style := i.textArea.GetTextStyle().Foreground(color)
+	if i.textArea.GetTextStyle() != style {
+		i.textArea.SetTextStyle(style)
+	}
 	return i
 }
 
 // SetFieldStyle sets the style of the input area (when no placeholder is
 // shown).
 func (i *InputField) SetFieldStyle(style tcell.Style) *InputField {
-	i.textArea.SetTextStyle(style)
+	if i.textArea.GetTextStyle() != style {
+		i.textArea.SetTextStyle(style)
+	}
 	return i
 }
 
@@ -192,14 +223,19 @@ func (i *InputField) GetFieldStyle() tcell.Style {
 
 // SetPlaceholderTextColor sets the text color of placeholder text.
 func (i *InputField) SetPlaceholderTextColor(color tcell.Color) *InputField {
-	i.textArea.SetPlaceholderStyle(i.textArea.GetPlaceholderStyle().Foreground(color))
+	style := i.textArea.GetPlaceholderStyle().Foreground(color)
+	if i.textArea.GetPlaceholderStyle() != style {
+		i.textArea.SetPlaceholderStyle(style)
+	}
 	return i
 }
 
 // SetPlaceholderStyle sets the style of the input area (when a placeholder is
 // shown).
 func (i *InputField) SetPlaceholderStyle(style tcell.Style) *InputField {
-	i.textArea.SetPlaceholderStyle(style)
+	if i.textArea.GetPlaceholderStyle() != style {
+		i.textArea.SetPlaceholderStyle(style)
+	}
 	return i
 }
 
@@ -213,16 +249,22 @@ func (i *InputField) GetPlaceholderStyle() tcell.Style {
 // For details, see [List.SetMainTextStyle], [List.SetSelectedStyle], and
 // [Box.SetBackgroundColor].
 func (i *InputField) SetAutocompleteStyles(background tcell.Color, main, selected tcell.Style) *InputField {
-	i.autocompleteStyles.background = background
-	i.autocompleteStyles.main = main
-	i.autocompleteStyles.selected = selected
+	if i.autocompleteStyles.background != background || i.autocompleteStyles.main != main || i.autocompleteStyles.selected != selected {
+		i.autocompleteStyles.background = background
+		i.autocompleteStyles.main = main
+		i.autocompleteStyles.selected = selected
+		i.MarkDirty()
+	}
 	return i
 }
 
 // SetAutocompleteUseTags sets whether or not the autocomplete entries may
 // contain style tags affecting their appearance. The default is true.
 func (i *InputField) SetAutocompleteUseTags(useTags bool) *InputField {
-	i.autocompleteStyles.useTags = useTags
+	if i.autocompleteStyles.useTags != useTags {
+		i.autocompleteStyles.useTags = useTags
+		i.MarkDirty()
+	}
 	return i
 }
 
@@ -235,7 +277,10 @@ func (i *InputField) SetFormAttributes(labelWidth int, labelColor, bgColor, fiel
 // SetFieldWidth sets the screen width of the input area. A value of 0 means
 // extend as much as possible.
 func (i *InputField) SetFieldWidth(width int) *InputField {
-	i.fieldWidth = width
+	if i.fieldWidth != width {
+		i.fieldWidth = width
+		i.MarkDirty()
+	}
 	return i
 }
 
@@ -251,7 +296,9 @@ func (i *InputField) GetFieldHeight() int {
 
 // SetDisabled sets whether or not the item is disabled / read-only.
 func (i *InputField) SetDisabled(disabled bool) FormItem {
-	i.textArea.SetDisabled(disabled)
+	if i.textArea.GetDisabled() != disabled {
+		i.textArea.SetDisabled(disabled)
+	}
 	if i.finished != nil {
 		i.finished(-1)
 	}
@@ -268,6 +315,7 @@ func (i *InputField) GetDisabled() bool {
 func (i *InputField) SetMaskCharacter(mask rune) *InputField {
 	if mask == 0 {
 		i.textArea.setTransform(nil)
+		i.MarkDirty()
 		return i
 	}
 	maskStr := string(mask)
@@ -275,6 +323,7 @@ func (i *InputField) SetMaskCharacter(mask rune) *InputField {
 	i.textArea.setTransform(func(cluster, rest string, boundaries int) (newCluster string, newBoundaries int) {
 		return maskStr, maskWidth << uniseg.ShiftWidth
 	})
+	i.MarkDirty()
 	return i
 }
 
@@ -328,13 +377,14 @@ func (i *InputField) Autocomplete() *InputField {
 	entries := i.autocomplete(text)
 	if len(entries) == 0 {
 		// No entries, no list.
-		i.autocompleteList = nil
+		i.clearAutocompleteListLocked()
 		return i
 	}
 
 	// Make a list if we have none.
 	if i.autocompleteList == nil {
 		i.autocompleteList = NewList()
+		bindDirtyParent(i.autocompleteList, i.Box)
 		i.autocompleteList.ShowSecondaryText(false).
 			SetMainTextStyle(i.autocompleteStyles.main).
 			SetSelectedStyle(i.autocompleteStyles.selected).
@@ -418,7 +468,30 @@ func (i *InputField) HasFocus() bool {
 func (i *InputField) Blur() {
 	i.textArea.Blur()
 	i.Box.Blur()
-	i.autocompleteList = nil // Hide the autocomplete drop-down.
+	i.autocompleteListMutex.Lock()
+	defer i.autocompleteListMutex.Unlock()
+	i.clearAutocompleteListLocked() // Hide the autocomplete drop-down.
+}
+
+// IsDirty returns whether this primitive or one of its children needs redraw.
+func (i *InputField) IsDirty() bool {
+	if i.Box.IsDirty() || i.textArea.IsDirty() {
+		return true
+	}
+	i.autocompleteListMutex.Lock()
+	defer i.autocompleteListMutex.Unlock()
+	return i.autocompleteList != nil && i.autocompleteList.IsDirty()
+}
+
+// MarkClean marks this primitive and children as clean.
+func (i *InputField) MarkClean() {
+	i.Box.MarkClean()
+	i.textArea.MarkClean()
+	i.autocompleteListMutex.Lock()
+	defer i.autocompleteListMutex.Unlock()
+	if i.autocompleteList != nil {
+		i.autocompleteList.MarkClean()
+	}
 }
 
 // Draw draws this primitive onto the screen.
@@ -505,7 +578,7 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 			i.autocompleteList.SetSelectedFunc(nil)
 			switch key := event.Key(); key {
 			case tcell.KeyEscape: // Close the list.
-				i.autocompleteList = nil
+				i.clearAutocompleteListLocked()
 				return
 			case tcell.KeyEnter, tcell.KeyTab: // Intentional selection.
 				index := i.autocompleteList.GetCurrentItem()
@@ -516,13 +589,13 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 						source = AutocompletedTab
 					}
 					if i.autocompleted(stripTags(text), index, source) {
-						i.autocompleteList = nil
+						i.clearAutocompleteListLocked()
 						currentText = i.GetText()
 					}
 				} else {
 					i.SetText(text)
 					skipAutocomplete = true
-					i.autocompleteList = nil
+					i.clearAutocompleteListLocked()
 				}
 				return
 			case tcell.KeyDown, tcell.KeyUp, tcell.KeyPgDn, tcell.KeyPgUp:
@@ -530,7 +603,7 @@ func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p 
 					text = stripTags(text)
 					if i.autocompleted != nil {
 						if i.autocompleted(text, index, AutocompletedNavigate) {
-							i.autocompleteList = nil
+							i.clearAutocompleteListLocked()
 							currentText = i.GetText()
 						}
 					} else {
@@ -597,14 +670,14 @@ func (i *InputField) MouseHandler() func(action MouseAction, event *tcell.EventM
 				text = stripTags(text)
 				if i.autocompleted != nil {
 					if i.autocompleted(text, index, AutocompletedClick) {
-						i.autocompleteList = nil
+						i.clearAutocompleteListLocked()
 						currentText = i.GetText()
 					}
 					return
 				}
 				i.SetText(text)
 				skipAutocomplete = true
-				i.autocompleteList = nil
+				i.clearAutocompleteListLocked()
 			})
 			if consumed, _ = i.autocompleteList.MouseHandler()(action, event, setFocus); consumed {
 				setFocus(i)

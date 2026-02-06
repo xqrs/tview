@@ -116,7 +116,10 @@ func (l *Layers) GetVisibile(name string) bool {
 
 // Clear removes all layers.
 func (l *Layers) Clear() *Layers {
-	l.layers = nil
+	if len(l.layers) > 0 {
+		l.layers = nil
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -138,11 +141,13 @@ func (l *Layers) AddLayer(item tview.Primitive, opts ...Option) *Layers {
 		for index, layer := range l.layers {
 			if layer.name == newLayer.name {
 				l.layers = append(l.layers[:index], l.layers[index+1:]...)
+				l.MarkDirty()
 				break
 			}
 		}
 	}
 	l.layers = append(l.layers, newLayer)
+	l.MarkDirty()
 	if l.changed != nil {
 		l.changed()
 	}
@@ -158,6 +163,7 @@ func (l *Layers) RemoveLayer(name string) *Layers {
 	for index, layer := range l.layers {
 		if layer.name == name {
 			l.layers = append(l.layers[:index], l.layers[index+1:]...)
+			l.MarkDirty()
 			if layer.visible && l.changed != nil {
 				l.changed()
 			}
@@ -184,8 +190,9 @@ func (l *Layers) HasLayer(name string) bool {
 // which are already visible).
 func (l *Layers) ShowLayer(name string) *Layers {
 	for _, layer := range l.layers {
-		if layer.name == name {
+		if layer.name == name && !layer.visible {
 			layer.visible = true
+			l.MarkDirty()
 			if l.changed != nil {
 				l.changed()
 			}
@@ -201,8 +208,9 @@ func (l *Layers) ShowLayer(name string) *Layers {
 // HideLayer sets a layer's visibility to "false".
 func (l *Layers) HideLayer(name string) *Layers {
 	for _, layer := range l.layers {
-		if layer.name == name {
+		if layer.name == name && layer.visible {
 			layer.visible = false
+			l.MarkDirty()
 			if l.changed != nil {
 				l.changed()
 			}
@@ -222,6 +230,7 @@ func (l *Layers) SendToFront(name string) *Layers {
 		if layer.name == name {
 			if index < len(l.layers)-1 {
 				l.layers = append(append(l.layers[:index], l.layers[index+1:]...), layer)
+				l.MarkDirty()
 			}
 			if layer.visible && l.changed != nil {
 				l.changed()
@@ -243,6 +252,7 @@ func (l *Layers) SendToBack(name string) *Layers {
 		if ly.name == name {
 			if index > 0 {
 				l.layers = append(append([]*layer{ly}, l.layers[:index]...), l.layers[index+1:]...)
+				l.MarkDirty()
 			}
 			if ly.visible && l.changed != nil {
 				l.changed()
@@ -283,11 +293,12 @@ func (l *Layers) GetLayer(name string) tview.Primitive {
 func (l *Layers) SetLayerEnabled(name string, enabled bool) *Layers {
 	hasFocus := l.HasFocus()
 	for _, layer := range l.layers {
-		if layer.name == name {
+		if layer.name == name && layer.enabled != enabled {
 			if !enabled && layer.item.HasFocus() {
 				layer.item.Blur()
 			}
 			layer.enabled = enabled
+			l.MarkDirty()
 			if layer.visible && l.changed != nil {
 				l.changed()
 			}
@@ -313,8 +324,9 @@ func (l *Layers) GetLayerEnabled(name string) bool {
 // ClearLayerOverlay disables overlay styling for the given layer.
 func (l *Layers) ClearLayerOverlay(name string) *Layers {
 	for _, layer := range l.layers {
-		if layer.name == name {
+		if layer.name == name && layer.overlay {
 			layer.overlay = false
+			l.MarkDirty()
 			if layer.visible && l.changed != nil {
 				l.changed()
 			}
@@ -327,11 +339,37 @@ func (l *Layers) ClearLayerOverlay(name string) *Layers {
 // SetBackgroundLayerStyle sets the style applied to layers behind the active
 // overlay layer.
 func (l *Layers) SetBackgroundLayerStyle(style tcell.Style) *Layers {
-	l.backgroundLayerStyle = style
-	if l.changed != nil {
-		l.changed()
+	if l.backgroundLayerStyle != style {
+		l.backgroundLayerStyle = style
+		l.MarkDirty()
+		if l.changed != nil {
+			l.changed()
+		}
 	}
 	return l
+}
+
+// IsDirty returns whether this primitive or one of its visible children needs redraw.
+func (l *Layers) IsDirty() bool {
+	if l.Box.IsDirty() {
+		return true
+	}
+	for _, layer := range l.layers {
+		if layer.visible && layer.item != nil && layer.item.IsDirty() {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkClean marks this primitive and all children as clean.
+func (l *Layers) MarkClean() {
+	l.Box.MarkClean()
+	for _, layer := range l.layers {
+		if layer.item != nil {
+			layer.item.MarkClean()
+		}
+	}
 }
 
 // HasFocus returns whether or not this primitive has focus.

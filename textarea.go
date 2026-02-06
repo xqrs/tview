@@ -431,6 +431,7 @@ func (t *TextArea) SetText(text string, cursorAtTheEnd bool) *TextArea {
 	if t.lastWidth > 0 && t.moved != nil {
 		t.moved()
 	}
+	t.MarkDirty()
 
 	return t
 }
@@ -629,6 +630,7 @@ func (t *TextArea) GetTextLength() int {
 //
 // The effects of this function can be undone (and redone) by the user.
 func (t *TextArea) Replace(start, end int, text string) *TextArea {
+	previousSelectionStart, previousCursor := t.selectionStart, t.cursor
 	t.Select(start, end)
 	row := t.selectionStart.row
 	t.cursor.pos = t.replace(t.selectionStart.pos, t.cursor.pos, text, false)
@@ -638,6 +640,9 @@ func (t *TextArea) Replace(start, end int, text string) *TextArea {
 	t.selectionStart = t.cursor
 	if t.moved != nil {
 		t.moved()
+	}
+	if previousSelectionStart != t.selectionStart || previousCursor != t.cursor {
+		t.MarkDirty()
 	}
 	// The "changed" event will have been triggered by the "replace" function.
 	return t
@@ -654,6 +659,9 @@ func (t *TextArea) Select(start, end int) *TextArea {
 	defer func() {
 		if (oldFrom != t.selectionStart || oldTo != t.cursor) && t.moved != nil {
 			t.moved()
+		}
+		if oldFrom != t.selectionStart || oldTo != t.cursor {
+			t.MarkDirty()
 		}
 	}()
 
@@ -762,6 +770,7 @@ func (t *TextArea) SetWrap(wrap bool) *TextArea {
 	if t.wrap != wrap {
 		t.wrap = wrap
 		t.reset()
+		t.MarkDirty()
 	}
 	return t
 }
@@ -777,19 +786,26 @@ func (t *TextArea) SetWordWrap(wrapOnWords bool) *TextArea {
 	if t.wordWrap != wrapOnWords {
 		t.wordWrap = wrapOnWords
 		t.reset()
+		t.MarkDirty()
 	}
 	return t
 }
 
 // SetPlaceholder sets the text to be displayed when the text area is empty.
 func (t *TextArea) SetPlaceholder(placeholder string) *TextArea {
-	t.placeholder = placeholder
+	if t.placeholder != placeholder {
+		t.placeholder = placeholder
+		t.MarkDirty()
+	}
 	return t
 }
 
 // SetLabel sets the text to be displayed before the text area.
 func (t *TextArea) SetLabel(label string) *TextArea {
-	t.label = label
+	if t.label != label {
+		t.label = label
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -801,7 +817,10 @@ func (t *TextArea) GetLabel() string {
 // SetLabelWidth sets the screen width of the label. A value of 0 will cause the
 // primitive to use the width of the label string.
 func (t *TextArea) SetLabelWidth(width int) *TextArea {
-	t.labelWidth = width
+	if t.labelWidth != width {
+		t.labelWidth = width
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -815,8 +834,11 @@ func (t *TextArea) GetLabelWidth() int {
 // top left corner. If any of the values are 0 or larger than the available
 // space, the available space will be used.
 func (t *TextArea) SetSize(rows, columns int) *TextArea {
-	t.width = columns
-	t.height = rows
+	if t.width != columns || t.height != rows {
+		t.width = columns
+		t.height = rows
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -832,7 +854,10 @@ func (t *TextArea) GetFieldHeight() int {
 
 // SetDisabled sets whether or not the item is disabled / read-only.
 func (t *TextArea) SetDisabled(disabled bool) FormItem {
-	t.disabled = disabled
+	if t.disabled != disabled {
+		t.disabled = disabled
+		t.MarkDirty()
+	}
 	if t.finished != nil {
 		t.finished(-1)
 	}
@@ -848,21 +873,30 @@ func (t *TextArea) GetDisabled() bool {
 // value of 0 means there is no limit. If the text area currently contains more
 // bytes than this, it may violate this constraint.
 func (t *TextArea) SetMaxLength(maxLength int) *TextArea {
-	t.maxLength = maxLength
+	if t.maxLength != maxLength {
+		t.maxLength = maxLength
+		t.MarkDirty()
+	}
 	return t
 }
 
 // setMinCursorPadding sets a minimum width to be reserved left and right of the
 // cursor. This is ignored if wrapping is enabled.
 func (t *TextArea) setMinCursorPadding(prefix, suffix int) *TextArea {
-	t.minCursorPrefix = prefix
-	t.minCursorSuffix = suffix
+	if t.minCursorPrefix != prefix || t.minCursorSuffix != suffix {
+		t.minCursorPrefix = prefix
+		t.minCursorSuffix = suffix
+		t.MarkDirty()
+	}
 	return t
 }
 
 // SetLabelStyle sets the style of the label.
 func (t *TextArea) SetLabelStyle(style tcell.Style) *TextArea {
-	t.labelStyle = style
+	if t.labelStyle != style {
+		t.labelStyle = style
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -873,7 +907,10 @@ func (t *TextArea) GetLabelStyle() tcell.Style {
 
 // SetTextStyle sets the style of the text.
 func (t *TextArea) SetTextStyle(style tcell.Style) *TextArea {
-	t.textStyle = style
+	if t.textStyle != style {
+		t.textStyle = style
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -884,13 +921,19 @@ func (t *TextArea) GetTextStyle() tcell.Style {
 
 // SetSelectedStyle sets the style of the selected text.
 func (t *TextArea) SetSelectedStyle(style tcell.Style) *TextArea {
-	t.selectedStyle = style
+	if t.selectedStyle != style {
+		t.selectedStyle = style
+		t.MarkDirty()
+	}
 	return t
 }
 
 // SetPlaceholderStyle sets the style of the placeholder text.
 func (t *TextArea) SetPlaceholderStyle(style tcell.Style) *TextArea {
-	t.placeholderStyle = style
+	if t.placeholderStyle != style {
+		t.placeholderStyle = style
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -911,7 +954,10 @@ func (t *TextArea) GetOffset() (row, column int) {
 // is enabled, the column offset is ignored. These values may get adjusted
 // automatically to ensure that some text is always visible.
 func (t *TextArea) SetOffset(row, column int) *TextArea {
-	t.rowOffset, t.columnOffset = row, column
+	if t.rowOffset != row || t.columnOffset != column {
+		t.rowOffset, t.columnOffset = row, column
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -981,10 +1027,28 @@ func (t *TextArea) Focus(delegate func(p Primitive)) {
 
 // SetFormAttributes sets attributes shared by all form items.
 func (t *TextArea) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldTextColor, fieldBgColor tcell.Color) FormItem {
-	t.labelWidth = labelWidth
-	t.backgroundColor = bgColor
-	t.labelStyle = t.labelStyle.Foreground(labelColor)
-	t.textStyle = tcell.StyleDefault.Foreground(fieldTextColor).Background(fieldBgColor)
+	changed := false
+	if t.labelWidth != labelWidth {
+		t.labelWidth = labelWidth
+		changed = true
+	}
+	if t.backgroundColor != bgColor {
+		t.backgroundColor = bgColor
+		changed = true
+	}
+	labelStyle := t.labelStyle.Foreground(labelColor)
+	if t.labelStyle != labelStyle {
+		t.labelStyle = labelStyle
+		changed = true
+	}
+	textStyle := tcell.StyleDefault.Foreground(fieldTextColor).Background(fieldBgColor)
+	if t.textStyle != textStyle {
+		t.textStyle = textStyle
+		changed = true
+	}
+	if changed {
+		t.MarkDirty()
+	}
 	return t
 }
 
@@ -1008,6 +1072,7 @@ func (t *TextArea) replace(deleteStart, deleteEnd [3]int, insert string, continu
 	if deleteStart == deleteEnd && insert == "" || t.maxLength > 0 && len(insert) > 0 && t.length+len(insert) >= t.maxLength {
 		return deleteEnd
 	}
+	t.MarkDirty()
 
 	// Notify at the end.
 	if t.changed != nil {
@@ -1934,6 +1999,14 @@ func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 		if t.disabled {
 			return
 		}
+		previousSelectionStart, previousCursor := t.selectionStart, t.cursor
+		previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
+		defer func() {
+			if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
+				previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset {
+				t.MarkDirty()
+			}
+		}()
 
 		// All actions except a few specific ones are "other" actions.
 		newLastAction := taActionOther
@@ -2319,6 +2392,15 @@ func (t *TextArea) MouseHandler() func(action MouseAction, event *tcell.EventMou
 		if t.disabled {
 			return false, nil
 		}
+		previousSelectionStart, previousCursor := t.selectionStart, t.cursor
+		previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
+		previousDragging := t.dragging
+		defer func() {
+			if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
+				previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset || previousDragging != t.dragging {
+				t.MarkDirty()
+			}
+		}()
 
 		x, y := event.Position()
 		rectX, rectY, _, _ := t.GetInnerRect()

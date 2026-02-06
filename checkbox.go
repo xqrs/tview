@@ -73,10 +73,11 @@ func NewCheckbox() *Checkbox {
 // callback if the state changes with this call.
 func (c *Checkbox) SetChecked(checked bool) *Checkbox {
 	if c.checked != checked {
+		c.checked = checked
+		c.MarkDirty()
 		if c.changed != nil {
 			c.changed(checked)
 		}
-		c.checked = checked
 	}
 	return c
 }
@@ -88,7 +89,10 @@ func (c *Checkbox) IsChecked() bool {
 
 // SetLabel sets the text to be displayed before the input area.
 func (c *Checkbox) SetLabel(label string) *Checkbox {
-	c.label = label
+	if c.label != label {
+		c.label = label
+		c.MarkDirty()
+	}
 	return c
 }
 
@@ -100,54 +104,85 @@ func (c *Checkbox) GetLabel() string {
 // SetLabelWidth sets the screen width of the label. A value of 0 will cause the
 // primitive to use the width of the label string.
 func (c *Checkbox) SetLabelWidth(width int) *Checkbox {
-	c.labelWidth = width
+	if c.labelWidth != width {
+		c.labelWidth = width
+		c.MarkDirty()
+	}
 	return c
 }
 
 // SetLabelColor sets the color of the label.
 func (c *Checkbox) SetLabelColor(color tcell.Color) *Checkbox {
-	c.labelStyle = c.labelStyle.Foreground(color)
+	style := c.labelStyle.Foreground(color)
+	if c.labelStyle != style {
+		c.labelStyle = style
+		c.MarkDirty()
+	}
 	return c
 }
 
 // SetLabelStyle sets the style of the label.
 func (c *Checkbox) SetLabelStyle(style tcell.Style) *Checkbox {
-	c.labelStyle = style
+	if c.labelStyle != style {
+		c.labelStyle = style
+		c.MarkDirty()
+	}
 	return c
 }
 
 // SetFieldBackgroundColor sets the background color of the input area.
 func (c *Checkbox) SetFieldBackgroundColor(color tcell.Color) *Checkbox {
-	c.uncheckedStyle = c.uncheckedStyle.Background(color)
-	c.checkedStyle = c.checkedStyle.Background(color)
-	c.focusStyle = c.focusStyle.Foreground(color)
+	uncheckedStyle := c.uncheckedStyle.Background(color)
+	checkedStyle := c.checkedStyle.Background(color)
+	focusStyle := c.focusStyle.Foreground(color)
+	if c.uncheckedStyle != uncheckedStyle || c.checkedStyle != checkedStyle || c.focusStyle != focusStyle {
+		c.uncheckedStyle = uncheckedStyle
+		c.checkedStyle = checkedStyle
+		c.focusStyle = focusStyle
+		c.MarkDirty()
+	}
 	return c
 }
 
 // SetFieldTextColor sets the text color of the input area.
 func (c *Checkbox) SetFieldTextColor(color tcell.Color) *Checkbox {
-	c.uncheckedStyle = c.uncheckedStyle.Foreground(color)
-	c.checkedStyle = c.checkedStyle.Foreground(color)
-	c.focusStyle = c.focusStyle.Background(color)
+	uncheckedStyle := c.uncheckedStyle.Foreground(color)
+	checkedStyle := c.checkedStyle.Foreground(color)
+	focusStyle := c.focusStyle.Background(color)
+	if c.uncheckedStyle != uncheckedStyle || c.checkedStyle != checkedStyle || c.focusStyle != focusStyle {
+		c.uncheckedStyle = uncheckedStyle
+		c.checkedStyle = checkedStyle
+		c.focusStyle = focusStyle
+		c.MarkDirty()
+	}
 	return c
 }
 
 // SetUncheckedStyle sets the style of the unchecked checkbox.
 func (c *Checkbox) SetUncheckedStyle(style tcell.Style) *Checkbox {
-	c.uncheckedStyle = style
+	if c.uncheckedStyle != style {
+		c.uncheckedStyle = style
+		c.MarkDirty()
+	}
 	return c
 }
 
 // SetCheckedStyle sets the style of the checked checkbox.
 func (c *Checkbox) SetCheckedStyle(style tcell.Style) *Checkbox {
-	c.checkedStyle = style
+	if c.checkedStyle != style {
+		c.checkedStyle = style
+		c.MarkDirty()
+	}
 	return c
 }
 
 // SetActivatedStyle sets the style of the checkbox when it is currently
 // focused.
 func (c *Checkbox) SetActivatedStyle(style tcell.Style) *Checkbox {
-	c.focusStyle = style
+	if c.focusStyle != style {
+		c.focusStyle = style
+		c.MarkDirty()
+	}
 	return c
 }
 
@@ -156,7 +191,10 @@ func (c *Checkbox) SetActivatedStyle(style tcell.Style) *Checkbox {
 // adapting the checkbox's various styles accordingly). See [Escape] in
 // case you want to display square brackets.
 func (c *Checkbox) SetCheckedString(checked string) *Checkbox {
-	c.checkedString = checked
+	if c.checkedString != checked {
+		c.checkedString = checked
+		c.MarkDirty()
+	}
 	return c
 }
 
@@ -165,7 +203,10 @@ func (c *Checkbox) SetCheckedString(checked string) *Checkbox {
 // tags (consider adapting the checkbox's various styles accordingly). See
 // [Escape] in case you want to display square brackets.
 func (c *Checkbox) SetUncheckedString(unchecked string) *Checkbox {
-	c.uncheckedString = unchecked
+	if c.uncheckedString != unchecked {
+		c.uncheckedString = unchecked
+		c.MarkDirty()
+	}
 	return c
 }
 
@@ -173,7 +214,10 @@ func (c *Checkbox) SetUncheckedString(unchecked string) *Checkbox {
 func (c *Checkbox) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldTextColor, fieldBgColor tcell.Color) FormItem {
 	c.labelWidth = labelWidth
 	c.SetLabelColor(labelColor)
-	c.backgroundColor = bgColor
+	if c.backgroundColor != bgColor {
+		c.backgroundColor = bgColor
+		c.MarkDirty()
+	}
 	c.SetFieldTextColor(fieldTextColor)
 	c.SetFieldBackgroundColor(fieldBgColor)
 	return c
@@ -191,7 +235,10 @@ func (c *Checkbox) GetFieldHeight() int {
 
 // SetDisabled sets whether or not the item is disabled / read-only.
 func (c *Checkbox) SetDisabled(disabled bool) FormItem {
-	c.disabled = disabled
+	if c.disabled != disabled {
+		c.disabled = disabled
+		c.MarkDirty()
+	}
 	if c.finished != nil {
 		c.finished(-1)
 	}
@@ -293,10 +340,7 @@ func (c *Checkbox) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 			if key == tcell.KeyRune && event.Str() != " " {
 				break
 			}
-			c.checked = !c.checked
-			if c.changed != nil {
-				c.changed(c.checked)
-			}
+			c.SetChecked(!c.checked)
 		case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape: // We're done.
 			if c.done != nil {
 				c.done(key)
@@ -328,10 +372,7 @@ func (c *Checkbox) MouseHandler() func(action MouseAction, event *tcell.EventMou
 				setFocus(c)
 				consumed = true
 			case MouseLeftClick:
-				c.checked = !c.checked
-				if c.changed != nil {
-					c.changed(c.checked)
-				}
+				c.SetChecked(!c.checked)
 				consumed = true
 			}
 		}

@@ -22,12 +22,12 @@ type ScrollListBuilder func(index int, cursor int) ScrollListItem
 type ScrollList struct {
 	*Box
 
-	Builder     ScrollListBuilder
-	gap         int
-	snapToItems bool
+	Builder      ScrollListBuilder
+	gap          int
+	snapToItems  bool
 	centerCursor bool
-	trackEnd    bool
-	atEnd       bool
+	trackEnd     bool
+	atEnd        bool
 
 	cursor int
 	scroll scrollListState
@@ -74,19 +74,26 @@ func NewScrollList() *ScrollList {
 
 // SetBuilder sets the builder used to create list items on demand.
 func (l *ScrollList) SetBuilder(builder ScrollListBuilder) *ScrollList {
-	l.Builder = builder
+	if l.Builder != nil || builder != nil {
+		l.Builder = builder
+		l.MarkDirty()
+	}
 	return l
 }
 
 // Clear removes all items from the list by clearing the builder and resetting
 // scroll state.
 func (l *ScrollList) Clear() *ScrollList {
+	changed := l.Builder != nil || l.cursor != -1 || l.scroll != (scrollListState{}) || len(l.lastDraw) > 0 || l.lastRect != (scrollListRect{}) || l.atEnd
 	l.Builder = nil
 	l.cursor = -1
 	l.scroll = scrollListState{}
-	l.lastDraw = nil
+	l.setLastDraw(nil)
 	l.lastRect = scrollListRect{}
 	l.atEnd = false
+	if changed {
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -95,36 +102,51 @@ func (l *ScrollList) SetGap(gap int) *ScrollList {
 	if gap < 0 {
 		gap = 0
 	}
-	l.gap = gap
+	if l.gap != gap {
+		l.gap = gap
+		l.MarkDirty()
+	}
 	return l
 }
 
 // SetSnapToItems toggles snapping so only fully visible items are shown.
 func (l *ScrollList) SetSnapToItems(snap bool) *ScrollList {
-	l.snapToItems = snap
+	if l.snapToItems != snap {
+		l.snapToItems = snap
+		l.MarkDirty()
+	}
 	return l
 }
 
 // SetCenterCursor controls whether the cursor is kept centered whenever
 // possible.
 func (l *ScrollList) SetCenterCursor(center bool) *ScrollList {
-	l.centerCursor = center
+	if l.centerCursor != center {
+		l.centerCursor = center
+		l.MarkDirty()
+	}
 	return l
 }
 
 // SetTrackEnd toggles auto-scrolling when the view is already at the end.
 func (l *ScrollList) SetTrackEnd(track bool) *ScrollList {
-	l.trackEnd = track
+	if l.trackEnd != track {
+		l.trackEnd = track
+		l.MarkDirty()
+	}
 	return l
 }
 
 // ScrollToStart resets the scroll position to the top (index 0), without
 // changing the cursor.
 func (l *ScrollList) ScrollToStart() *ScrollList {
-	l.scroll.top = 0
-	l.scroll.offset = 0
-	l.scroll.wantsCursor = false
-	l.atEnd = false
+	if l.scroll.top != 0 || l.scroll.offset != 0 || l.scroll.wantsCursor || l.atEnd {
+		l.scroll.top = 0
+		l.scroll.offset = 0
+		l.scroll.wantsCursor = false
+		l.atEnd = false
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -134,9 +156,13 @@ func (l *ScrollList) ScrollToEnd() *ScrollList {
 	if width <= 0 || height <= 0 {
 		return l
 	}
-	l.scroll.top, l.scroll.offset = l.endScrollState(width, height)
-	l.scroll.wantsCursor = false
-	l.atEnd = true
+	top, offset := l.endScrollState(width, height)
+	if l.scroll.top != top || l.scroll.offset != offset || l.scroll.wantsCursor || !l.atEnd {
+		l.scroll.top, l.scroll.offset = top, offset
+		l.scroll.wantsCursor = false
+		l.atEnd = true
+		l.MarkDirty()
+	}
 	return l
 }
 
@@ -149,6 +175,7 @@ func (l *ScrollList) SetCursor(index int) *ScrollList {
 		l.cursor = index
 		l.atEnd = false
 		l.ensureScroll()
+		l.MarkDirty()
 		if l.changed != nil {
 			l.changed(l.cursor)
 		}
@@ -164,19 +191,24 @@ func (l *ScrollList) Cursor() int {
 // SetPendingScroll sets a pending scroll amount, in lines. Positive numbers
 // scroll down.
 func (l *ScrollList) SetPendingScroll(lines int) *ScrollList {
-	l.scroll.pending = lines
+	if l.scroll.pending != lines {
+		l.scroll.pending = lines
+		l.MarkDirty()
+	}
 	return l
 }
 
 // ScrollUp scrolls the list up by one line.
 func (l *ScrollList) ScrollUp() *ScrollList {
 	l.scroll.pending -= 1
+	l.MarkDirty()
 	return l
 }
 
 // ScrollDown scrolls the list down by one line.
 func (l *ScrollList) ScrollDown() *ScrollList {
 	l.scroll.pending += 1
+	l.MarkDirty()
 	return l
 }
 
@@ -191,6 +223,7 @@ func (l *ScrollList) NextItem() bool {
 		}
 		l.cursor = 0
 		l.ensureScroll()
+		l.MarkDirty()
 		if l.changed != nil {
 			l.changed(l.cursor)
 		}
@@ -201,6 +234,7 @@ func (l *ScrollList) NextItem() bool {
 	}
 	l.cursor++
 	l.ensureScroll()
+	l.MarkDirty()
 	if l.changed != nil {
 		l.changed(l.cursor)
 	}
@@ -220,6 +254,7 @@ func (l *ScrollList) PrevItem() bool {
 	}
 	l.cursor--
 	l.ensureScroll()
+	l.MarkDirty()
 	if l.changed != nil {
 		l.changed(l.cursor)
 	}
@@ -230,6 +265,39 @@ func (l *ScrollList) PrevItem() bool {
 func (l *ScrollList) SetChangedFunc(handler func(index int)) *ScrollList {
 	l.changed = handler
 	return l
+}
+
+func (l *ScrollList) setLastDraw(children []scrollListDrawnItem) {
+	for _, child := range l.lastDraw {
+		unbindDirtyParent(child.item, l.Box)
+	}
+	l.lastDraw = children
+	for _, child := range l.lastDraw {
+		bindDirtyParent(child.item, l.Box)
+	}
+}
+
+// IsDirty returns whether this primitive or one of its visible children needs redraw.
+func (l *ScrollList) IsDirty() bool {
+	if l.Box.IsDirty() {
+		return true
+	}
+	for _, child := range l.lastDraw {
+		if child.item != nil && child.item.IsDirty() {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkClean marks this primitive and visible children as clean.
+func (l *ScrollList) MarkClean() {
+	l.Box.MarkClean()
+	for _, child := range l.lastDraw {
+		if child.item != nil {
+			child.item.MarkClean()
+		}
+	}
 }
 
 // Draw draws this primitive onto the screen.
@@ -323,7 +391,7 @@ rebuild:
 	if len(children) == 0 {
 		l.scroll.top = 0
 		l.scroll.offset = 0
-		l.lastDraw = nil
+		l.setLastDraw(nil)
 		l.lastRect = scrollListRect{x: x, y: y, width: width, height: height}
 		l.atEnd = false
 		return
@@ -352,7 +420,7 @@ rebuild:
 		if len(children) == 0 {
 			l.scroll.top = 0
 			l.scroll.offset = 0
-			l.lastDraw = nil
+			l.setLastDraw(nil)
 			l.lastRect = scrollListRect{x: x, y: y, width: width, height: height}
 			l.atEnd = false
 			return
@@ -438,7 +506,7 @@ rebuild:
 	}
 	l.atEnd = endReached && last.row+last.height <= height
 
-	l.lastDraw = children
+	l.setLastDraw(children)
 	l.lastRect = scrollListRect{x: x, y: y, width: width, height: height}
 
 	clipped := newClippedScreen(screen, x, y, width, height)
@@ -607,7 +675,7 @@ func (l *ScrollList) scrollByItems(delta int, count int, width int, height int) 
 	}
 	l.scroll.offset = 0
 	l.scroll.wantsCursor = false
-	l.lastDraw = nil
+	l.setLastDraw(nil)
 	l.lastRect = scrollListRect{x: 0, y: 0, width: width, height: height}
 }
 

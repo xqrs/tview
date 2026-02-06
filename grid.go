@@ -106,7 +106,19 @@ func NewGrid() *Grid {
 // The resulting widths would be: 30, 15, 15, 15, 20, 15, and 15 cells, a total
 // of 125 cells, 25 cells wider than the available grid width.
 func (g *Grid) SetColumns(columns ...int) *Grid {
-	g.columns = columns
+	changed := len(g.columns) != len(columns)
+	if !changed {
+		for index := range columns {
+			if g.columns[index] != columns[index] {
+				changed = true
+				break
+			}
+		}
+	}
+	if changed {
+		g.columns = columns
+		g.MarkDirty()
+	}
 	return g
 }
 
@@ -117,7 +129,19 @@ func (g *Grid) SetColumns(columns ...int) *Grid {
 // The provided values correspond to row heights, the first value defining
 // the height of the topmost row.
 func (g *Grid) SetRows(rows ...int) *Grid {
-	g.rows = rows
+	changed := len(g.rows) != len(rows)
+	if !changed {
+		for index := range rows {
+			if g.rows[index] != rows[index] {
+				changed = true
+				break
+			}
+		}
+	}
+	if changed {
+		g.rows = rows
+		g.MarkDirty()
+	}
 	return g
 }
 
@@ -125,13 +149,36 @@ func (g *Grid) SetRows(rows ...int) *Grid {
 // all row and column values are set to the given size values. See
 // [Grid.SetColumns] for details on sizes.
 func (g *Grid) SetSize(numRows, numColumns, rowSize, columnSize int) *Grid {
-	g.rows = make([]int, numRows)
-	for index := range g.rows {
-		g.rows[index] = rowSize
+	rows := make([]int, numRows)
+	for index := range rows {
+		rows[index] = rowSize
 	}
-	g.columns = make([]int, numColumns)
-	for index := range g.columns {
-		g.columns[index] = columnSize
+	columns := make([]int, numColumns)
+	for index := range columns {
+		columns[index] = columnSize
+	}
+
+	changed := len(g.rows) != len(rows) || len(g.columns) != len(columns)
+	if !changed {
+		for index := range rows {
+			if g.rows[index] != rows[index] {
+				changed = true
+				break
+			}
+		}
+	}
+	if !changed {
+		for index := range columns {
+			if g.columns[index] != columns[index] {
+				changed = true
+				break
+			}
+		}
+	}
+	if changed {
+		g.rows = rows
+		g.columns = columns
+		g.MarkDirty()
 	}
 	return g
 }
@@ -142,7 +189,10 @@ func (g *Grid) SetMinSize(row, column int) *Grid {
 	if row < 0 || column < 0 {
 		panic("Invalid minimum row/column size")
 	}
-	g.minHeight, g.minWidth = row, column
+	if g.minHeight != row || g.minWidth != column {
+		g.minHeight, g.minWidth = row, column
+		g.MarkDirty()
+	}
 	return g
 }
 
@@ -153,7 +203,10 @@ func (g *Grid) SetGap(row, column int) *Grid {
 	if row < 0 || column < 0 {
 		panic("Invalid gap size")
 	}
-	g.gapRows, g.gapColumns = row, column
+	if g.gapRows != row || g.gapColumns != column {
+		g.gapRows, g.gapColumns = row, column
+		g.MarkDirty()
+	}
 	return g
 }
 
@@ -161,13 +214,19 @@ func (g *Grid) SetGap(row, column int) *Grid {
 // this value to true will cause the gap values (see SetGap()) to be ignored and
 // automatically assumed to be 1 where the border graphics are drawn.
 func (g *Grid) SetBorders(borders bool) *Grid {
-	g.borders = borders
+	if g.borders != borders {
+		g.borders = borders
+		g.MarkDirty()
+	}
 	return g
 }
 
 // SetBordersColor sets the color of the item borders.
 func (g *Grid) SetBordersColor(color tcell.Color) *Grid {
-	g.bordersColor = color
+	if g.bordersColor != color {
+		g.bordersColor = color
+		g.MarkDirty()
+	}
 	return g
 }
 
@@ -199,6 +258,7 @@ func (g *Grid) SetBordersColor(color tcell.Color) *Grid {
 // receives focus. If there are multiple items with a true focus flag, the last
 // visible one that was added will receive focus.
 func (g *Grid) AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *Grid {
+	bindDirtyParent(p, g.Box)
 	g.items = append(g.items, &gridItem{
 		Item:          p,
 		Row:           row,
@@ -209,23 +269,45 @@ func (g *Grid) AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight
 		MinGridWidth:  minGridWidth,
 		Focus:         focus,
 	})
+	g.MarkDirty()
 	return g
 }
 
 // RemoveItem removes all items for the given primitive from the grid, keeping
 // the order of the remaining items intact.
 func (g *Grid) RemoveItem(p Primitive) *Grid {
+	removed := false
 	for index := len(g.items) - 1; index >= 0; index-- {
 		if g.items[index].Item == p {
 			g.items = slices.Delete(g.items, index, index+1)
+			removed = true
 		}
+	}
+	if removed {
+		stillPresent := false
+		for _, item := range g.items {
+			if item.Item == p {
+				stillPresent = true
+				break
+			}
+		}
+		if !stillPresent {
+			unbindDirtyParent(p, g.Box)
+		}
+		g.MarkDirty()
 	}
 	return g
 }
 
 // Clear removes all items from the grid.
 func (g *Grid) Clear() *Grid {
-	g.items = nil
+	if len(g.items) > 0 {
+		for _, item := range g.items {
+			unbindDirtyParent(item.Item, g.Box)
+		}
+		g.items = nil
+		g.MarkDirty()
+	}
 	return g
 }
 
@@ -235,8 +317,34 @@ func (g *Grid) Clear() *Grid {
 // the grid is drawn. The actual position of the grid may also be adjusted such
 // that contained primitives that have focus remain visible.
 func (g *Grid) SetOffset(rows, columns int) *Grid {
-	g.rowOffset, g.columnOffset = rows, columns
+	if g.rowOffset != rows || g.columnOffset != columns {
+		g.rowOffset, g.columnOffset = rows, columns
+		g.MarkDirty()
+	}
 	return g
+}
+
+// IsDirty returns whether this primitive or one of its children needs redraw.
+func (g *Grid) IsDirty() bool {
+	if g.Box.IsDirty() {
+		return true
+	}
+	for _, item := range g.items {
+		if item.Item != nil && item.Item.IsDirty() {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkClean marks this primitive and all children as clean.
+func (g *Grid) MarkClean() {
+	g.Box.MarkClean()
+	for _, item := range g.items {
+		if item.Item != nil {
+			item.Item.MarkClean()
+		}
+	}
 }
 
 // GetOffset returns the current row and column offset (see SetOffset() for
@@ -650,6 +758,7 @@ func (g *Grid) MouseHandler() func(action MouseAction, event *tcell.EventMouse, 
 // InputHandler returns the handler for this primitive.
 func (g *Grid) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
 	return g.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
+		previousRowOffset, previousColumnOffset := g.rowOffset, g.columnOffset
 		if !g.hasFocus {
 			// Pass event on to child primitive.
 			for _, item := range g.items {
@@ -692,6 +801,9 @@ func (g *Grid) InputHandler() func(event *tcell.EventKey, setFocus func(p Primit
 			g.columnOffset--
 		case tcell.KeyRight:
 			g.columnOffset++
+		}
+		if g.rowOffset != previousRowOffset || g.columnOffset != previousColumnOffset {
+			g.MarkDirty()
 		}
 	})
 }

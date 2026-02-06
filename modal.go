@@ -45,19 +45,25 @@ func NewModal() *Modal {
 	m.frame = NewFrame(m.form).SetBorders(0, 0, 1, 0, 0, 0)
 	m.frame.SetBackgroundColor(Styles.ContrastBackgroundColor).
 		SetBorderPadding(1, 1, 1, 1)
+	bindDirtyParent(m.frame, m.Box)
 	return m
 }
 
 // SetBackgroundColor sets the color of the modal frame background.
 func (m *Modal) SetBackgroundColor(color tcell.Color) *Modal {
-	m.form.SetBackgroundColor(color)
-	m.frame.SetBackgroundColor(color)
+	if m.form.GetBackgroundColor() != color || m.frame.GetBackgroundColor() != color {
+		m.form.SetBackgroundColor(color)
+		m.frame.SetBackgroundColor(color)
+	}
 	return m
 }
 
 // SetTextColor sets the color of the message text.
 func (m *Modal) SetTextColor(color tcell.Color) *Modal {
-	m.textColor = color
+	if m.textColor != color {
+		m.textColor = color
+		m.MarkDirty()
+	}
 	return m
 }
 
@@ -98,13 +104,19 @@ func (m *Modal) SetDoneFunc(handler func(buttonIndex int, buttonLabel string)) *
 // breaks but style tag states will not transfer to following lines. Note that
 // words are wrapped, too, based on the final size of the window.
 func (m *Modal) SetText(text string) *Modal {
-	m.text = text
+	if m.text != text {
+		m.text = text
+		m.MarkDirty()
+	}
 	return m
 }
 
 // AddButtons adds buttons to the window. There must be at least one button and
 // a "done" handler so the window can be closed again.
 func (m *Modal) AddButtons(labels []string) *Modal {
+	if len(labels) == 0 {
+		return m
+	}
 	for index, label := range labels {
 		func(i int, l string) {
 			m.form.AddButton(label, func() {
@@ -137,6 +149,21 @@ func (m *Modal) ClearButtons() *Modal {
 func (m *Modal) SetFocus(index int) *Modal {
 	m.form.SetFocus(index)
 	return m
+}
+
+// IsDirty returns whether this primitive or its children need redraw.
+func (m *Modal) IsDirty() bool {
+	if m.Box.IsDirty() {
+		return true
+	}
+	return m.frame.IsDirty() || m.form.IsDirty()
+}
+
+// MarkClean marks this primitive and children as clean.
+func (m *Modal) MarkClean() {
+	m.Box.MarkClean()
+	m.frame.MarkClean()
+	m.form.MarkClean()
 }
 
 // Focus is called when this primitive receives focus.

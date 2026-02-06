@@ -136,7 +136,10 @@ func NewForm() *Form {
 // layouts. In vertical layouts, there is always at least one empty line between
 // the last item and the buttons, if any.
 func (f *Form) SetItemPadding(padding int) *Form {
-	f.itemPadding = padding
+	if f.itemPadding != padding {
+		f.itemPadding = padding
+		f.MarkDirty()
+	}
 	return f
 }
 
@@ -145,72 +148,111 @@ func (f *Form) SetItemPadding(padding int) *Form {
 // positioned from left to right, moving into the next row if there is not
 // enough space.
 func (f *Form) SetHorizontal(horizontal bool) *Form {
-	f.horizontal = horizontal
+	if f.horizontal != horizontal {
+		f.horizontal = horizontal
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetLabelColor sets the color of the labels.
 func (f *Form) SetLabelColor(color tcell.Color) *Form {
-	f.labelColor = color
+	if f.labelColor != color {
+		f.labelColor = color
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetFieldBackgroundColor sets the background color of the input areas.
 func (f *Form) SetFieldBackgroundColor(color tcell.Color) *Form {
-	f.fieldStyle = f.fieldStyle.Background(color)
+	style := f.fieldStyle.Background(color)
+	if f.fieldStyle != style {
+		f.fieldStyle = style
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetFieldTextColor sets the text color of the input areas.
 func (f *Form) SetFieldTextColor(color tcell.Color) *Form {
-	f.fieldStyle = f.fieldStyle.Foreground(color)
+	style := f.fieldStyle.Foreground(color)
+	if f.fieldStyle != style {
+		f.fieldStyle = style
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetFieldStyle sets the style of the input areas. Attributes are currently
 // still ignored to maintain backwards compatibility.
 func (f *Form) SetFieldStyle(style tcell.Style) *Form {
-	f.fieldStyle = style
+	if f.fieldStyle != style {
+		f.fieldStyle = style
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetButtonsAlignment sets how the buttons align horizontally.
 func (f *Form) SetButtonsAlignment(alignment Alignment) *Form {
-	f.buttonsAlignment = alignment
+	if f.buttonsAlignment != alignment {
+		f.buttonsAlignment = alignment
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetButtonBackgroundColor sets the background color of the buttons. This is
 // also the text color of the buttons when they are focused.
 func (f *Form) SetButtonBackgroundColor(color tcell.Color) *Form {
-	f.buttonStyle = f.buttonStyle.Background(color)
-	f.buttonActivatedStyle = f.buttonActivatedStyle.Foreground(color)
+	buttonStyle := f.buttonStyle.Background(color)
+	buttonActivatedStyle := f.buttonActivatedStyle.Foreground(color)
+	if f.buttonStyle != buttonStyle || f.buttonActivatedStyle != buttonActivatedStyle {
+		f.buttonStyle = buttonStyle
+		f.buttonActivatedStyle = buttonActivatedStyle
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetButtonTextColor sets the color of the button texts. This is also the
 // background of the buttons when they are focused.
 func (f *Form) SetButtonTextColor(color tcell.Color) *Form {
-	f.buttonStyle = f.buttonStyle.Foreground(color)
-	f.buttonActivatedStyle = f.buttonActivatedStyle.Background(color)
+	buttonStyle := f.buttonStyle.Foreground(color)
+	buttonActivatedStyle := f.buttonActivatedStyle.Background(color)
+	if f.buttonStyle != buttonStyle || f.buttonActivatedStyle != buttonActivatedStyle {
+		f.buttonStyle = buttonStyle
+		f.buttonActivatedStyle = buttonActivatedStyle
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetButtonStyle sets the style of the buttons when they are not focused.
 func (f *Form) SetButtonStyle(style tcell.Style) *Form {
-	f.buttonStyle = style
+	if f.buttonStyle != style {
+		f.buttonStyle = style
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetButtonActivatedStyle sets the style of the buttons when they are focused.
 func (f *Form) SetButtonActivatedStyle(style tcell.Style) *Form {
-	f.buttonActivatedStyle = style
+	if f.buttonActivatedStyle != style {
+		f.buttonActivatedStyle = style
+		f.MarkDirty()
+	}
 	return f
 }
 
 // SetButtonDisabledStyle sets the style of the buttons when they are disabled.
 func (f *Form) SetButtonDisabledStyle(style tcell.Style) *Form {
-	f.buttonDisabledStyle = style
+	if f.buttonDisabledStyle != style {
+		f.buttonDisabledStyle = style
+		f.MarkDirty()
+	}
 	return f
 }
 
@@ -220,7 +262,10 @@ func (f *Form) SetButtonDisabledStyle(style tcell.Style) *Form {
 // focus, the given element will be focused once. Set to a negative value to
 // focus the first (enabled) element.
 func (f *Form) SetFocus(index int) *Form {
-	f.requestedFocus = index
+	if f.requestedFocus != index {
+		f.requestedFocus = index
+		f.MarkDirty()
+	}
 	return f
 }
 
@@ -251,7 +296,9 @@ func (f *Form) AddTextArea(label, text string, fieldWidth, fieldHeight, maxLengt
 		})
 	}
 	textArea.SetFinishedFunc(f.finished)
+	bindDirtyParent(textArea, f.Box)
 	f.items = append(f.items, textArea)
+	f.MarkDirty()
 	return f
 }
 
@@ -272,7 +319,9 @@ func (f *Form) AddTextView(label, text string, fieldWidth, fieldHeight int, dyna
 		SetScrollable(scrollable).
 		SetText(text)
 	textArea.SetFinishedFunc(f.finished)
+	bindDirtyParent(textArea, f.Box)
 	f.items = append(f.items, textArea)
+	f.MarkDirty()
 	return f
 }
 
@@ -287,7 +336,9 @@ func (f *Form) AddInputField(label, value string, fieldWidth int, changed func(t
 		SetFieldWidth(fieldWidth).
 		SetChangedFunc(changed)
 	inputField.SetFinishedFunc(f.finished)
+	bindDirtyParent(inputField, f.Box)
 	f.items = append(f.items, inputField)
+	f.MarkDirty()
 	return f
 }
 
@@ -308,7 +359,9 @@ func (f *Form) AddPasswordField(label, value string, fieldWidth int, mask rune, 
 		SetMaskCharacter(mask).
 		SetChangedFunc(changed)
 	password.SetFinishedFunc(f.finished)
+	bindDirtyParent(password, f.Box)
 	f.items = append(f.items, password)
+	f.MarkDirty()
 	return f
 }
 
@@ -321,7 +374,9 @@ func (f *Form) AddCheckbox(label string, checked bool, changed func(checked bool
 		SetChecked(checked).
 		SetChangedFunc(changed)
 	checkbox.SetFinishedFunc(f.finished)
+	bindDirtyParent(checkbox, f.Box)
 	f.items = append(f.items, checkbox)
+	f.MarkDirty()
 	return f
 }
 
@@ -331,7 +386,9 @@ func (f *Form) AddButton(label string, selected func()) *Form {
 	button := NewButton(label).
 		SetSelectedFunc(selected).
 		SetExitFunc(f.finished)
+	bindDirtyParent(button, f.Box)
 	f.buttons = append(f.buttons, button)
+	f.MarkDirty()
 	return f
 }
 
@@ -345,7 +402,19 @@ func (f *Form) GetButton(index int) *Button {
 // RemoveButton removes the button at the specified position, starting with 0
 // for the button that was added first.
 func (f *Form) RemoveButton(index int) *Form {
+	button := f.buttons[index]
 	f.buttons = slices.Delete(f.buttons, index, index+1)
+	stillPresent := false
+	for _, existing := range f.buttons {
+		if existing == button {
+			stillPresent = true
+			break
+		}
+	}
+	if !stillPresent {
+		unbindDirtyParent(button, f.Box)
+	}
+	f.MarkDirty()
 	return f
 }
 
@@ -369,16 +438,30 @@ func (f *Form) GetButtonIndex(label string) int {
 // Clear removes all input elements from the form, including the buttons if
 // specified.
 func (f *Form) Clear(includeButtons bool) *Form {
+	changed := len(f.items) > 0
+	for _, item := range f.items {
+		unbindDirtyParent(item, f.Box)
+	}
 	f.items = nil
 	if includeButtons {
+		changed = changed || len(f.buttons) > 0
 		f.ClearButtons()
+	}
+	if changed {
+		f.MarkDirty()
 	}
 	return f
 }
 
 // ClearButtons removes all buttons from the form.
 func (f *Form) ClearButtons() *Form {
-	f.buttons = nil
+	if len(f.buttons) > 0 {
+		for _, button := range f.buttons {
+			unbindDirtyParent(button, f.Box)
+		}
+		f.buttons = nil
+		f.MarkDirty()
+	}
 	return f
 }
 
@@ -394,7 +477,9 @@ func (f *Form) ClearButtons() *Form {
 //   - The field background color
 func (f *Form) AddFormItem(item FormItem) *Form {
 	item.SetFinishedFunc(f.finished)
+	bindDirtyParent(item, f.Box)
 	f.items = append(f.items, item)
+	f.MarkDirty()
 	return f
 }
 
@@ -415,7 +500,19 @@ func (f *Form) GetFormItem(index int) FormItem {
 // index 0. Elements are referenced in the order they were added. Buttons are
 // not included.
 func (f *Form) RemoveFormItem(index int) *Form {
+	item := f.items[index]
 	f.items = slices.Delete(f.items, index, index+1)
+	stillPresent := false
+	for _, existing := range f.items {
+		if existing == item {
+			stillPresent = true
+			break
+		}
+	}
+	if !stillPresent {
+		unbindDirtyParent(item, f.Box)
+	}
+	f.MarkDirty()
 	return f
 }
 
@@ -461,6 +558,39 @@ func (f *Form) GetFocusedItemIndex() (formItem, button int) {
 func (f *Form) SetCancelFunc(callback func()) *Form {
 	f.cancel = callback
 	return f
+}
+
+// IsDirty returns whether this primitive or one of its children needs redraw.
+func (f *Form) IsDirty() bool {
+	if f.Box.IsDirty() {
+		return true
+	}
+	for _, item := range f.items {
+		if item != nil && item.IsDirty() {
+			return true
+		}
+	}
+	for _, button := range f.buttons {
+		if button != nil && button.IsDirty() {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkClean marks this primitive and all children as clean.
+func (f *Form) MarkClean() {
+	f.Box.MarkClean()
+	for _, item := range f.items {
+		if item != nil {
+			item.MarkClean()
+		}
+	}
+	for _, button := range f.buttons {
+		if button != nil {
+			button.MarkClean()
+		}
+	}
 }
 
 // Draw draws this primitive onto the screen.
