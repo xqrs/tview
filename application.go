@@ -550,9 +550,11 @@ func (a *Application) draw() *Application {
 	root.MarkClean()
 
 	// tcell already keeps a logical back buffer and emits only visual deltas in
-	// Show(), so we only need to redraw primitives and let tcell perform output
-	// diffing.
-	screen.Clear()
+	// Show(). Avoid clearing on regular dirty redraws so we don't rewrite the
+	// full logical screen every frame; keep full clears for forced redraws.
+	if forceRedraw {
+		screen.Clear()
+	}
 	root.Draw(screen)
 	screen.Show()
 
