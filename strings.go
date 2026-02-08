@@ -13,8 +13,32 @@ type Segment struct {
 	Style tcell.Style
 }
 
+// NewSegment returns a styled segment.
+func NewSegment(text string, style tcell.Style) Segment {
+	return Segment{Text: text, Style: style}
+}
+
 // Line is a list of styled segments.
 type Line []Segment
+
+// Clone returns a copy of this line with an independent backing array.
+func (l Line) Clone() Line {
+	out := make(Line, len(l))
+	copy(out, l)
+	return out
+}
+
+// NewLine returns a line from the provided segments, skipping empty segments.
+func NewLine(segments ...Segment) Line {
+	line := make(Line, 0, len(segments))
+	for _, segment := range segments {
+		if segment.Text == "" {
+			continue
+		}
+		line = append(line, segment)
+	}
+	return line
+}
 
 // LineBuilder incrementally builds styled lines from text writes.
 type LineBuilder struct {

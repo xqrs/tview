@@ -58,7 +58,6 @@ func NewInputField() *InputField {
 		}
 	})
 	i.textArea.textStyle = tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.PrimaryTextColor)
-	i.textArea.placeholderStyle = tcell.StyleDefault.Background(Styles.ContrastBackgroundColor).Foreground(Styles.ContrastSecondaryTextColor)
 	return i
 }
 
@@ -98,11 +97,10 @@ func (i *InputField) SetLabelWidth(width int) *InputField {
 	return i
 }
 
-// SetPlaceholder sets the text to be displayed when the input text is empty.
-func (i *InputField) SetPlaceholder(text string) *InputField {
-	if i.textArea.placeholder != text {
-		i.textArea.SetPlaceholder(text)
-	}
+// SetPlaceholder sets the styled text to be displayed when the input text is
+// empty.
+func (i *InputField) SetPlaceholder(line Line) *InputField {
+	i.textArea.SetPlaceholder(line)
 	return i
 }
 
@@ -141,21 +139,6 @@ func (i *InputField) SetFieldStyle(style tcell.Style) *InputField {
 // shown).
 func (i *InputField) GetFieldStyle() tcell.Style {
 	return i.textArea.GetTextStyle()
-}
-
-// SetPlaceholderStyle sets the style of the input area (when a placeholder is
-// shown).
-func (i *InputField) SetPlaceholderStyle(style tcell.Style) *InputField {
-	if i.textArea.GetPlaceholderStyle() != style {
-		i.textArea.SetPlaceholderStyle(style)
-	}
-	return i
-}
-
-// GetPlaceholderStyle returns the style of the input area (when a placeholder
-// is shown).
-func (i *InputField) GetPlaceholderStyle() tcell.Style {
-	return i.textArea.GetPlaceholderStyle()
 }
 
 // SetFormAttributes sets attributes shared by all form items.

@@ -39,9 +39,10 @@ const (
 	taActionDelete                // Deleting the next character.
 )
 
-// NewLine is the string sequence to be inserted when hitting the Enter key in a
-// TextArea. The default is "\n" but you may change it to "\r\n" if required.
-var NewLine = "\n"
+// TextAreaNewLine is the string sequence to be inserted when hitting the Enter
+// key in a TextArea. The default is "\n" but you may change it to "\r\n" if
+// required.
+var TextAreaNewLine = "\n"
 
 // textAreaSpan represents a range of text in a text area. The text area widget
 // roughly follows the concept of Piece Chains outlined in
@@ -126,7 +127,7 @@ type textAreaUndoItem struct {
 // visible area, any changes to the text will move it into the visible area. The
 // following keys can also be used to modify the text:
 //
-//   - Enter: Insert a newline character (see [NewLine]).
+//   - Enter: Insert a newline character (see [TextAreaNewLine]).
 //   - Tab: Insert a tab character (\t). It will be rendered like [TabSize]
 //     spaces. (This may eventually be changed to behave like regular tabs.)
 //   - Ctrl-H, Backspace: Delete one character to the left of the cursor.
@@ -200,7 +201,7 @@ type TextArea struct {
 	width, height int
 
 	// The text to be shown in the text area when it is empty.
-	placeholder string
+	placeholder Line
 
 	// The label text shown, usually when part of a form.
 	label string
@@ -219,9 +220,6 @@ type TextArea struct {
 
 	// The style of the selected text.
 	selectedStyle tcell.Style
-
-	// The style of the placeholder text.
-	placeholderStyle tcell.Style
 
 	// Text manipulation related fields:
 
@@ -350,19 +348,18 @@ type TextArea struct {
 // initial text.
 func NewTextArea() *TextArea {
 	t := &TextArea{
-		Box:              NewBox(),
-		wrap:             true,
-		wordWrap:         true,
-		placeholderStyle: tcell.StyleDefault.Background(Styles.PrimitiveBackgroundColor).Foreground(Styles.TertiaryTextColor),
-		labelStyle:       tcell.StyleDefault.Foreground(Styles.SecondaryTextColor),
-		textStyle:        tcell.StyleDefault.Background(Styles.PrimitiveBackgroundColor).Foreground(Styles.PrimaryTextColor),
-		selectedStyle:    tcell.StyleDefault.Background(Styles.PrimaryTextColor).Foreground(Styles.PrimitiveBackgroundColor),
-		spans:            make([]textAreaSpan, 2, pieceChainMinCap), // We reserve some space to avoid reallocations right when editing starts.
-		lastAction:       taActionOther,
-		minCursorPrefix:  minCursorPrefixDefault,
-		minCursorSuffix:  minCursorSuffixDefault,
-		lastWidth:        math.MaxInt / 2, // We need this so some functions work before the first draw.
-		lastHeight:       1,
+		Box:             NewBox(),
+		wrap:            true,
+		wordWrap:        true,
+		labelStyle:      tcell.StyleDefault.Foreground(Styles.SecondaryTextColor),
+		textStyle:       tcell.StyleDefault.Background(Styles.PrimitiveBackgroundColor).Foreground(Styles.PrimaryTextColor),
+		selectedStyle:   tcell.StyleDefault.Background(Styles.PrimaryTextColor).Foreground(Styles.PrimitiveBackgroundColor),
+		spans:           make([]textAreaSpan, 2, pieceChainMinCap), // We reserve some space to avoid reallocations right when editing starts.
+		lastAction:      taActionOther,
+		minCursorPrefix: minCursorPrefixDefault,
+		minCursorSuffix: minCursorSuffixDefault,
+		lastWidth:       math.MaxInt / 2, // We need this so some functions work before the first draw.
+		lastHeight:      1,
 	}
 	t.editText.Grow(editBufferMinCap)
 	t.spans[0] = textAreaSpan{previous: -1, next: 1}
@@ -791,12 +788,11 @@ func (t *TextArea) SetWordWrap(wrapOnWords bool) *TextArea {
 	return t
 }
 
-// SetPlaceholder sets the text to be displayed when the text area is empty.
-func (t *TextArea) SetPlaceholder(placeholder string) *TextArea {
-	if t.placeholder != placeholder {
-		t.placeholder = placeholder
-		t.MarkDirty()
-	}
+// SetPlaceholder sets the styled line to be displayed when the text area is
+// empty.
+func (t *TextArea) SetPlaceholder(placeholder Line) *TextArea {
+	t.placeholder = placeholder.Clone()
+	t.MarkDirty()
 	return t
 }
 
@@ -926,20 +922,6 @@ func (t *TextArea) SetSelectedStyle(style tcell.Style) *TextArea {
 		t.MarkDirty()
 	}
 	return t
-}
-
-// SetPlaceholderStyle sets the style of the placeholder text.
-func (t *TextArea) SetPlaceholderStyle(style tcell.Style) *TextArea {
-	if t.placeholderStyle != style {
-		t.placeholderStyle = style
-		t.MarkDirty()
-	}
-	return t
-}
-
-// GetPlaceholderStyle returns the style of the placeholder text.
-func (t *TextArea) GetPlaceholderStyle() tcell.Style {
-	return t.placeholderStyle
 }
 
 // GetOffset returns the text's offset, that is, the number of rows and columns
@@ -1384,9 +1366,7 @@ func (t *TextArea) Draw(screen tcell.Screen) {
 func (t *TextArea) drawPlaceholder(screen tcell.Screen, x, y, width, height int) {
 	// We use a TextView to draw the placeholder. It will take care of word
 	// wrapping etc.
-	textView := NewTextView().
-		SetText(t.placeholder).
-		SetTextStyle(t.placeholderStyle)
+	textView := NewTextView().SetLines([]Line{t.placeholder})
 	textView.SetRect(x, y, width, height)
 	textView.Draw(screen)
 }
@@ -2160,7 +2140,7 @@ func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 			}
 		case tcell.KeyEnter: // Insert a newline.
 			from, to, row := t.getSelection()
-			t.cursor.pos = t.replace(from, to, NewLine, t.lastAction == taActionTypeSpace)
+			t.cursor.pos = t.replace(from, to, TextAreaNewLine, t.lastAction == taActionTypeSpace)
 			t.cursor.row = -1
 			t.truncateLines(row - 1)
 			t.findCursor(true, row)

@@ -26,10 +26,7 @@ type TreeNode struct {
 	children []*TreeNode
 
 	// The item's text.
-	text string
-
-	// The text style.
-	textStyle tcell.Style
+	line Line
 
 	// The style of selected text.
 	selectedTextStyle tcell.Style
@@ -62,9 +59,9 @@ type TreeNode struct {
 
 // NewTreeNode returns a new tree node.
 func NewTreeNode(text string) *TreeNode {
+	textStyle := tcell.StyleDefault.Foreground(Styles.PrimaryTextColor).Background(Styles.PrimitiveBackgroundColor)
 	return &TreeNode{
-		text:              text,
-		textStyle:         tcell.StyleDefault.Foreground(Styles.PrimaryTextColor).Background(Styles.PrimitiveBackgroundColor),
+		line:              NewLine(NewSegment(text, textStyle)),
 		selectedTextStyle: tcell.StyleDefault.Reverse(true),
 		indent:            2,
 		expanded:          true,
@@ -132,9 +129,16 @@ func (n *TreeNode) SetChildren(childNodes []*TreeNode) *TreeNode {
 	return n
 }
 
-// GetText returns this node's text.
-func (n *TreeNode) GetText() string {
-	return n.text
+// SetLine sets the node's styled text line.
+func (n *TreeNode) SetLine(line Line) *TreeNode {
+	n.line = line.Clone()
+	n.markDirty()
+	return n
+}
+
+// GetLine returns the node's styled text line.
+func (n *TreeNode) GetLine() Line {
+	return n.line.Clone()
 }
 
 // GetChildren returns this node's children.
@@ -252,45 +256,6 @@ func (n *TreeNode) CollapseAll() *TreeNode {
 // IsExpanded returns whether the child nodes of this node are visible.
 func (n *TreeNode) IsExpanded() bool {
 	return n.expanded
-}
-
-// SetText sets the node's text which is displayed.
-func (n *TreeNode) SetText(text string) *TreeNode {
-	if n.text != text {
-		n.text = text
-		n.markDirty()
-	}
-	return n
-}
-
-// GetColor returns the node's text color.
-func (n *TreeNode) GetColor() tcell.Color {
-	color := n.textStyle.GetForeground()
-	return color
-}
-
-// SetColor sets the node's text color.
-func (n *TreeNode) SetColor(color tcell.Color) *TreeNode {
-	textStyle := n.textStyle.Foreground(color)
-	if n.textStyle != textStyle {
-		n.textStyle = textStyle
-		n.markDirty()
-	}
-	return n
-}
-
-// SetTextStyle sets the text style for this node.
-func (n *TreeNode) SetTextStyle(style tcell.Style) *TreeNode {
-	if n.textStyle != style {
-		n.textStyle = style
-		n.markDirty()
-	}
-	return n
-}
-
-// GetTextStyle returns the text style for this node.
-func (n *TreeNode) GetTextStyle() tcell.Style {
-	return n.textStyle
 }
 
 // SetSelectedTextStyle sets the text style for this node when it is selected.
@@ -953,22 +918,94 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 			// Prefix.
 			var prefixWidth int
 			if len(t.prefixes) > 0 {
-				_, _, prefixWidth = printWithStyle(screen, t.prefixes[(node.level-t.topLevel)%len(t.prefixes)], x+node.textX, posY, 0, width-node.textX, AlignmentLeft, node.textStyle, true)
+				prefixStyle := tcell.StyleDefault
+				if len(node.line) > 0 {
+					prefixStyle = node.line[0].Style
+				}
+				_, _, prefixWidth = printWithStyle(screen, t.prefixes[(node.level-t.topLevel)%len(t.prefixes)], x+node.textX, posY, 0, width-node.textX, AlignmentLeft, prefixStyle, true)
 			}
 
 			// Text.
 			if node.textX+prefixWidth < width {
-				style := node.textStyle
 				if node == t.currentNode {
-					style = node.selectedTextStyle
+					posX := 0
+					for _, segment := range node.line {
+						if posX >= width-node.textX-prefixWidth {
+							break
+						}
+						style := mergeStyle(segment.Style, node.selectedTextStyle)
+						_, _, segmentWidth := printWithStyle(
+							screen,
+							segment.Text,
+							x+node.textX+prefixWidth+posX,
+							posY,
+							0,
+							width-node.textX-prefixWidth-posX,
+							AlignmentLeft,
+							style,
+							false,
+						)
+						posX += segmentWidth
+					}
+				} else {
+					posX := 0
+					for _, segment := range node.line {
+						if posX >= width-node.textX-prefixWidth {
+							break
+						}
+						_, _, segmentWidth := printWithStyle(
+							screen,
+							segment.Text,
+							x+node.textX+prefixWidth+posX,
+							posY,
+							0,
+							width-node.textX-prefixWidth-posX,
+							AlignmentLeft,
+							segment.Style,
+							false,
+						)
+						posX += segmentWidth
+					}
 				}
-				printWithStyle(screen, node.text, x+node.textX+prefixWidth, posY, 0, width-node.textX-prefixWidth, AlignmentLeft, style, false)
 			}
 		}
 
 		// Advance.
 		posY++
 	}
+}
+
+func mergeStyle(base, overlay tcell.Style) tcell.Style {
+	if fg := overlay.GetForeground(); fg != tcell.ColorDefault {
+		base = base.Foreground(fg)
+	}
+	if bg := overlay.GetBackground(); bg != tcell.ColorDefault {
+		base = base.Background(bg)
+	}
+
+	if overlay.HasBold() {
+		base = base.Bold(true)
+	}
+	if overlay.HasBlink() {
+		base = base.Blink(true)
+	}
+	if overlay.HasDim() {
+		base = base.Dim(true)
+	}
+	if overlay.HasItalic() {
+		base = base.Italic(true)
+	}
+	if overlay.HasReverse() {
+		base = base.Reverse(true)
+	}
+	if overlay.HasStrikeThrough() {
+		base = base.StrikeThrough(true)
+	}
+	if overlay.HasUnderline() {
+		base = base.Underline(true)
+	}
+
+	return base
 }
 
 // InputHandler returns the handler for this primitive.
