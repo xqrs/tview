@@ -18,15 +18,15 @@ func NewSegment(text string, style tcell.Style) Segment {
 	return Segment{Text: text, Style: style}
 }
 
-// Line is a list of styled segments with wrappedPrefix used on softwrapping.
+// Line is a list of styled segments with indent used on softwrapping.
 type Line struct {
-	Segments      []Segment
-	wrappedPrefix Segment
+	Segments []Segment
+	indent   Segment
 }
 
 // Clone returns a copy of this line with an independent backing array.
 func (l Line) Clone() Line {
-	out := Line{Segments: make([]Segment, len(l.Segments)), wrappedPrefix: l.wrappedPrefix}
+	out := Line{Segments: make([]Segment, len(l.Segments)), indent: l.indent}
 	copy(out.Segments, l.Segments)
 	return out
 }
@@ -43,10 +43,10 @@ func NewLine(segments ...Segment) Line {
 	return line
 }
 
-// WithWrappedPrefix sets the prefix segment that will be inserted on every
+// WithIndent sets the indent segment that will be inserted on every
 // wrapped logical line
-func (l Line) WithWrappedPrefix(prefix Segment) Line {
-	l.wrappedPrefix = prefix
+func (l Line) WithIndent(indent Segment) Line {
+	l.indent = indent
 	return l
 }
 
@@ -114,20 +114,15 @@ func (b *LineBuilder) AppendLine(line Line) {
 
 // NewLine flushes the current line into the builder output.
 func (b *LineBuilder) NewLine() {
-	line := Line{Segments: make([]Segment, len(b.current.Segments)), wrappedPrefix: b.current.wrappedPrefix}
+	line := Line{Segments: make([]Segment, len(b.current.Segments)), indent: b.current.indent}
 	copy(line.Segments, b.current.Segments)
 	b.lines = append(b.lines, line)
 	b.current.Segments = nil
-	b.current.wrappedPrefix = Segment{}
 }
 
-// NewLineWithWrappedPrefix is like NewLine but with wrappedPrefix support.
-func (b *LineBuilder) NewLineWithWrappedPrefix(prefix Segment) {
-	line := Line{Segments: make([]Segment, len(b.current.Segments)), wrappedPrefix: prefix}
-	copy(line.Segments, b.current.Segments)
-	b.lines = append(b.lines, line)
-	b.current.Segments = nil
-	b.current.wrappedPrefix = prefix
+// SetIndent sets default new indentation segment
+func (b *LineBuilder) SetIndent(indent Segment) {
+	b.current.indent = indent
 }
 
 // HasCurrentLine returns true when unflushed segments exist.
