@@ -80,6 +80,13 @@ func (b *LineBuilder) Write(text string, style tcell.Style) {
 	}
 }
 
+// WriteSegments is just like Write but takes multiple arguments.
+func (b *LineBuilder) WriteSegments(segments []Segment) {
+	for _, seg := range segments {
+		b.Write(seg.Text, seg.Style)
+	}
+}
+
 func (b *LineBuilder) writeSegment(text string, style tcell.Style) {
 	if text == "" {
 		return
