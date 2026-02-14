@@ -713,7 +713,9 @@ func (t *TextView) buildWrapped(width int) {
 			mustBreak := false
 
 			if start != 0 {
-				lineWidth = uniseg.StringWidth(logical.line.Indent.Text)
+				for _, seg := range logical.line.Indent {
+					lineWidth += uniseg.StringWidth(seg.Text)
+				}
 			}
 
 			for pos < len(cells) {
@@ -850,8 +852,10 @@ func (t *TextView) Draw(screen tcell.Screen) {
 			skipWidth = t.columnOffset
 			if info.start != 0 {
 				indent := t.lines[info.logical].line.Indent
-				screen.PutStrStyled(x, y+line-t.lineOffset, indent.Text, indent.Style)
-				xPos = uniseg.StringWidth(indent.Text)
+				for _, seg := range indent {
+					screen.PutStrStyled(x, y+line-t.lineOffset, seg.Text, seg.Style)
+					xPos += uniseg.StringWidth(seg.Text)
+				}
 			}
 
 		case AlignmentCenter:

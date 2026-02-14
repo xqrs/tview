@@ -21,7 +21,7 @@ func NewSegment(text string, style tcell.Style) Segment {
 // Line is a list of styled segments with indent used on softwrapping.
 type Line struct {
 	Segments []Segment
-	Indent   Segment
+	Indent   []Segment
 }
 
 // Clone returns a copy of this line with an independent backing array.
@@ -45,7 +45,7 @@ func NewLine(segments ...Segment) Line {
 
 // WithIndent sets the indent segment that will be inserted on every
 // wrapped logical line
-func (l Line) WithIndent(indent Segment) Line {
+func (l Line) WithIndent(indent []Segment) Line {
 	l.Indent = indent
 	return l
 }
@@ -121,7 +121,7 @@ func (b *LineBuilder) NewLine() {
 }
 
 // SetIndent sets default new indentation segment
-func (b *LineBuilder) SetIndent(indent Segment) {
+func (b *LineBuilder) SetIndent(indent []Segment) {
 	b.current.Indent = indent
 }
 
