@@ -303,7 +303,7 @@ func (t *TextView) SetLines(lines []Line) *TextView {
 
 	t.lines = make([]textViewLogicalLine, 0, len(lines))
 	for _, line := range lines {
-		copied := Line{Segments: make([]Segment, 0, len(line.Segments)), indent: line.indent}
+		copied := Line{Segments: make([]Segment, 0, len(line.Segments)), Indent: line.Indent}
 		for _, seg := range line.Segments {
 			if seg.Text == "" {
 				continue
@@ -328,7 +328,7 @@ func (t *TextView) GetLines() []Line {
 
 	out := make([]Line, 0, len(t.lines))
 	for _, logical := range t.lines {
-		copied := Line{Segments: make([]Segment, len(logical.line.Segments)), indent: logical.line.indent}
+		copied := Line{Segments: make([]Segment, len(logical.line.Segments)), Indent: logical.line.Indent}
 		copy(copied.Segments, logical.line.Segments)
 		out = append(out, copied)
 	}
@@ -713,7 +713,7 @@ func (t *TextView) buildWrapped(width int) {
 			mustBreak := false
 
 			if start != 0 {
-				lineWidth = uniseg.StringWidth(logical.line.indent.Text)
+				lineWidth = uniseg.StringWidth(logical.line.Indent.Text)
 			}
 
 			for pos < len(cells) {
@@ -849,7 +849,7 @@ func (t *TextView) Draw(screen tcell.Screen) {
 		case AlignmentLeft:
 			skipWidth = t.columnOffset
 			if info.start != 0 {
-				indent := t.lines[info.logical].line.indent
+				indent := t.lines[info.logical].line.Indent
 				screen.PutStrStyled(x, y+line-t.lineOffset, indent.Text, indent.Style)
 				xPos = uniseg.StringWidth(indent.Text)
 			}
