@@ -21,12 +21,12 @@ func NewSegment(text string, style tcell.Style) Segment {
 // Line is a list of styled segments with indent used on softwrapping.
 type Line struct {
 	Segments []Segment
-	indent   Segment
+	Indent   []Segment
 }
 
 // Clone returns a copy of this line with an independent backing array.
 func (l Line) Clone() Line {
-	out := Line{Segments: make([]Segment, len(l.Segments)), indent: l.indent}
+	out := Line{Segments: make([]Segment, len(l.Segments)), Indent: l.Indent}
 	copy(out.Segments, l.Segments)
 	return out
 }
@@ -45,8 +45,8 @@ func NewLine(segments ...Segment) Line {
 
 // WithIndent sets the indent segment that will be inserted on every
 // wrapped logical line
-func (l Line) WithIndent(indent Segment) Line {
-	l.indent = indent
+func (l Line) WithIndent(indent []Segment) Line {
+	l.Indent = indent
 	return l
 }
 
@@ -77,6 +77,13 @@ func (b *LineBuilder) Write(text string, style tcell.Style) {
 		}
 		b.NewLine()
 		text = text[nl+1:]
+	}
+}
+
+// WriteSegments is just like Write but takes multiple arguments.
+func (b *LineBuilder) WriteSegments(segments []Segment) {
+	for _, seg := range segments {
+		b.Write(seg.Text, seg.Style)
 	}
 }
 
@@ -114,15 +121,15 @@ func (b *LineBuilder) AppendLine(line Line) {
 
 // NewLine flushes the current line into the builder output.
 func (b *LineBuilder) NewLine() {
-	line := Line{Segments: make([]Segment, len(b.current.Segments)), indent: b.current.indent}
+	line := Line{Segments: make([]Segment, len(b.current.Segments)), Indent: b.current.Indent}
 	copy(line.Segments, b.current.Segments)
 	b.lines = append(b.lines, line)
 	b.current.Segments = nil
 }
 
 // SetIndent sets default new indentation segment
-func (b *LineBuilder) SetIndent(indent Segment) {
-	b.current.indent = indent
+func (b *LineBuilder) SetIndent(indent []Segment) {
+	b.current.Indent = indent
 }
 
 // HasCurrentLine returns true when unflushed segments exist.
