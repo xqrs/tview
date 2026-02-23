@@ -37,6 +37,9 @@ type TreeNode struct {
 	// Whether or not this node's children should be displayed.
 	expanded bool
 
+	// Whether or not this node can be expanded, even if children are not loaded yet.
+	expandable bool
+
 	// The additional horizontal indent of this node's text.
 	indent int
 
@@ -65,6 +68,7 @@ func NewTreeNode(text string) *TreeNode {
 		selectedTextStyle: tcell.StyleDefault.Reverse(true),
 		indent:            2,
 		expanded:          true,
+		expandable:        false,
 		selectable:        true,
 		dirty:             true,
 	}
@@ -199,6 +203,22 @@ func (n *TreeNode) SetExpanded(expanded bool) *TreeNode {
 		n.markDirty()
 	}
 	return n
+}
+
+// SetExpandable sets whether this node can be expanded even when there are no
+// loaded child nodes yet.
+func (n *TreeNode) SetExpandable(expandable bool) *TreeNode {
+	if n.expandable != expandable {
+		n.expandable = expandable
+		n.markDirty()
+	}
+	return n
+}
+
+// IsExpandable returns whether this node can be expanded even when there are
+// no loaded child nodes yet.
+func (n *TreeNode) IsExpandable() bool {
+	return n.expandable
 }
 
 // Expand makes the child nodes of this node appear.
@@ -353,6 +373,9 @@ type TreeView struct {
 	// Strings drawn before the nodes, based on their level.
 	prefixes []string
 
+	// Markers drawn before the node text depending on expansion state.
+	markers TreeMarkers
+
 	// Vertical scroll offset.
 	offsetY int
 
@@ -390,6 +413,13 @@ type TreeView struct {
 	lastMouseY int
 }
 
+// TreeMarkers are glyphs drawn before node text.
+type TreeMarkers struct {
+	Expanded  string
+	Collapsed string
+	Leaf      string
+}
+
 // NewTreeView returns a new tree view.
 func NewTreeView() *TreeView {
 	return &TreeView{
@@ -397,7 +427,12 @@ func NewTreeView() *TreeView {
 		centerCursor:  true,
 		graphics:      true,
 		graphicsColor: Styles.GraphicsColor,
-		lastMouseY:    -1,
+		markers: TreeMarkers{
+			Expanded:  "▾ ",
+			Collapsed: "▸ ",
+			Leaf:      "",
+		},
+		lastMouseY: -1,
 	}
 }
 
@@ -541,6 +576,23 @@ func (t *TreeView) SetPrefixes(prefixes []string) *TreeView {
 		t.MarkDirty()
 	}
 	return t
+}
+
+// SetMarkers sets the strings drawn before node text depending on node state.
+// Expanded is used for nodes with children whose children are visible,
+// Collapsed is used for nodes with children whose children are hidden, and
+// Leaf is used for nodes without children.
+func (t *TreeView) SetMarkers(markers TreeMarkers) *TreeView {
+	if t.markers != markers {
+		t.markers = markers
+		t.MarkDirty()
+	}
+	return t
+}
+
+// GetMarkers returns the marker strings currently used by this tree view.
+func (t *TreeView) GetMarkers() TreeMarkers {
+	return t.markers
 }
 
 // SetAlign controls the horizontal alignment of the node texts. If set to true,
@@ -915,32 +967,47 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 
 		// Draw the prefix and the text.
 		if node.textX < width && posY < y+height {
+			marker := t.markers.Leaf
+			if node.expandable || len(node.children) > 0 {
+				if node.expanded {
+					marker = t.markers.Expanded
+				} else {
+					marker = t.markers.Collapsed
+				}
+			}
+
 			// Prefix.
 			var prefixWidth int
+			prefixStyle := tcell.StyleDefault
+			if len(node.line) > 0 {
+				prefixStyle = node.line[0].Style
+			}
 			if len(t.prefixes) > 0 {
-				prefixStyle := tcell.StyleDefault
-				if len(node.line) > 0 {
-					prefixStyle = node.line[0].Style
-				}
 				_, _, prefixWidth = printWithStyle(screen, t.prefixes[(node.level-t.topLevel)%len(t.prefixes)], x+node.textX, posY, 0, width-node.textX, AlignmentLeft, prefixStyle, true)
 			}
 
+			// Marker.
+			markerWidth := 0
+			if marker != "" && node.textX+prefixWidth < width {
+				_, _, markerWidth = printWithStyle(screen, marker, x+node.textX+prefixWidth, posY, 0, width-node.textX-prefixWidth, AlignmentLeft, prefixStyle, true)
+			}
+
 			// Text.
-			if node.textX+prefixWidth < width {
+			if node.textX+prefixWidth+markerWidth < width {
 				if node == t.currentNode {
 					posX := 0
 					for _, segment := range node.line {
-						if posX >= width-node.textX-prefixWidth {
+						if posX >= width-node.textX-prefixWidth-markerWidth {
 							break
 						}
 						style := mergeStyle(segment.Style, node.selectedTextStyle)
 						_, _, segmentWidth := printWithStyle(
 							screen,
 							segment.Text,
-							x+node.textX+prefixWidth+posX,
+							x+node.textX+prefixWidth+markerWidth+posX,
 							posY,
 							0,
-							width-node.textX-prefixWidth-posX,
+							width-node.textX-prefixWidth-markerWidth-posX,
 							AlignmentLeft,
 							style,
 							false,
@@ -950,16 +1017,16 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 				} else {
 					posX := 0
 					for _, segment := range node.line {
-						if posX >= width-node.textX-prefixWidth {
+						if posX >= width-node.textX-prefixWidth-markerWidth {
 							break
 						}
 						_, _, segmentWidth := printWithStyle(
 							screen,
 							segment.Text,
-							x+node.textX+prefixWidth+posX,
+							x+node.textX+prefixWidth+markerWidth+posX,
 							posY,
 							0,
-							width-node.textX-prefixWidth-posX,
+							width-node.textX-prefixWidth-markerWidth-posX,
 							AlignmentLeft,
 							segment.Style,
 							false,
