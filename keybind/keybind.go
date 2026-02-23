@@ -1,15 +1,15 @@
 package keybind
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/gdamore/tcell/v3"
 )
 
 type Keybind struct {
-	keys     []string
-	help     Help
-	disabled bool
+	keys []string
+	help Help
 }
 
 type Option func(*Keybind)
@@ -34,12 +34,6 @@ func WithHelp(key, desc string) Option {
 	}
 }
 
-func WithDisabled() Option {
-	return func(k *Keybind) {
-		k.disabled = true
-	}
-}
-
 func (k Keybind) Keys() []string {
 	return k.keys
 }
@@ -56,19 +50,6 @@ func (k *Keybind) SetHelp(key, desc string) {
 	k.help = Help{Key: key, Desc: desc}
 }
 
-func (k Keybind) Enabled() bool {
-	return !k.disabled && k.keys != nil
-}
-
-func (k *Keybind) SetEnabled(enabled bool) {
-	k.disabled = !enabled
-}
-
-func (k *Keybind) Unbind() {
-	k.keys = nil
-	k.help = Help{}
-}
-
 type Help struct {
 	Key  string
 	Desc string
@@ -81,14 +62,8 @@ func Matches(event *tcell.EventKey, keybinds ...Keybind) bool {
 
 	key := eventKeyString(event)
 	for _, keybind := range keybinds {
-		if !keybind.Enabled() {
-			continue
-		}
-
-		for _, candidate := range keybind.keys {
-			if key == candidate {
-				return true
-			}
+		if slices.Contains(keybind.keys, key) {
+			return true
 		}
 	}
 	return false

@@ -128,9 +128,6 @@ type segment struct {
 func (h *Help) shortHelpSegments(bindings []keybind.Keybind, maxWidth int) []segment {
 	items := make([][]segment, 0, len(bindings))
 	for _, kb := range bindings {
-		if !kb.Enabled() {
-			continue
-		}
 		hp := kb.Help()
 		item := shortItemSegments(h.formatKey(hp.Key), hp.Desc, h.Styles.ShortKeyStyle, h.Styles.ShortDescStyle)
 		if len(item) == 0 {
@@ -183,9 +180,6 @@ func (h *Help) fullHelpSegments(groups [][]keybind.Keybind, maxWidth int) [][]se
 	for _, group := range groups {
 		col := column{}
 		for _, kb := range group {
-			if !kb.Enabled() {
-				continue
-			}
 			hp := kb.Help()
 			if hp.Key == "" && hp.Desc == "" {
 				continue
