@@ -19,11 +19,12 @@ type Help struct {
 	*tview.Box
 	Styles Styles
 
-	keyMap         KeyMap
-	showAll        bool
-	shortSeparator string
-	fullSeparator  string
-	ellipsis       string
+	keyMap           KeyMap
+	showAll          bool
+	compactModifiers bool
+	shortSeparator   string
+	fullSeparator    string
+	ellipsis         string
 }
 
 func New() *Help {
@@ -45,6 +46,12 @@ func (h *Help) SetKeyMap(keyMap KeyMap) *Help {
 // SetShowAll enables or disables full help mode.
 func (h *Help) SetShowAll(showAll bool) *Help {
 	h.showAll = showAll
+	return h
+}
+
+// SetCompactModifiers enables or disables compact modifier rendering.
+func (h *Help) SetCompactModifiers(compact bool) *Help {
+	h.compactModifiers = compact
 	return h
 }
 
@@ -124,7 +131,8 @@ func (h *Help) shortHelpSegments(bindings []keybind.Keybind, maxWidth int) []seg
 		if !kb.Enabled() {
 			continue
 		}
-		item := shortItemSegments(kb, h.Styles.ShortKeyStyle, h.Styles.ShortDescStyle)
+		hp := kb.Help()
+		item := shortItemSegments(h.formatKey(hp.Key), hp.Desc, h.Styles.ShortKeyStyle, h.Styles.ShortDescStyle)
 		if len(item) == 0 {
 			continue
 		}
@@ -182,8 +190,9 @@ func (h *Help) fullHelpSegments(groups [][]keybind.Keybind, maxWidth int) [][]se
 			if hp.Key == "" && hp.Desc == "" {
 				continue
 			}
-			col.entries = append(col.entries, entry{key: hp.Key, desc: hp.Desc})
-			kw := tview.TaggedStringWidth(hp.Key)
+			keyText := h.formatKey(hp.Key)
+			col.entries = append(col.entries, entry{key: keyText, desc: hp.Desc})
+			kw := tview.TaggedStringWidth(keyText)
 			if kw > col.keyW {
 				col.keyW = kw
 			}
@@ -329,18 +338,37 @@ func (h *Help) drawSegments(screen tcell.Screen, x, y, width int, segments []seg
 	}
 }
 
-func shortItemSegments(kb keybind.Keybind, keyStyle, descStyle tcell.Style) []segment {
-	help := kb.Help()
+func shortItemSegments(key, desc string, keyStyle, descStyle tcell.Style) []segment {
 	switch {
-	case help.Key == "" && help.Desc == "":
+	case key == "" && desc == "":
 		return nil
-	case help.Key == "":
-		return []segment{{text: help.Desc, style: descStyle}}
-	case help.Desc == "":
-		return []segment{{text: help.Key, style: keyStyle}}
+	case key == "":
+		return []segment{{text: desc, style: descStyle}}
+	case desc == "":
+		return []segment{{text: key, style: keyStyle}}
 	default:
-		return []segment{{text: help.Key, style: keyStyle}, {text: " ", style: descStyle}, {text: help.Desc, style: descStyle}}
+		return []segment{{text: key, style: keyStyle}, {text: " ", style: descStyle}, {text: desc, style: descStyle}}
 	}
+}
+
+func (h *Help) formatKey(key string) string {
+	if !h.compactModifiers {
+		return key
+	}
+
+	replacer := strings.NewReplacer(
+		"Ctrl+", "^",
+		"ctrl+", "^",
+		"Control+", "^",
+		"control+", "^",
+		"Shift+", "S-",
+		"shift+", "S-",
+		"Alt+", "A-",
+		"alt+", "A-",
+		"Meta+", "M-",
+		"meta+", "M-",
+	)
+	return replacer.Replace(key)
 }
 
 func segmentsWidth(segments []segment) int {
