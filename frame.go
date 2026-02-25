@@ -238,16 +238,12 @@ func (f *Frame) MouseHandler() func(action MouseAction, event *tcell.EventMouse,
 }
 
 // InputHandler returns the handler for this primitive.
-func (f *Frame) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return f.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		if f.primitive == nil {
-			return
-		}
-		if handler := f.primitive.InputHandler(); handler != nil {
-			handler(event, setFocus)
-			return
-		}
-	})
+func (f *Frame) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	if f.primitive == nil {
+		return
+	}
+	f.primitive.InputHandler(event, setFocus)
+	return
 }
 
 // PasteHandler returns the handler for this primitive.

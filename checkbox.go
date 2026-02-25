@@ -324,28 +324,26 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (c *Checkbox) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return c.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		if c.disabled {
-			return
-		}
+func (c *Checkbox) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	if c.disabled {
+		return
+	}
 
-		// Process key event.
-		switch key := event.Key(); key {
-		case tcell.KeyRune, tcell.KeyEnter: // Check.
-			if key == tcell.KeyRune && event.Str() != " " {
-				break
-			}
-			c.SetChecked(!c.checked)
-		case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape: // We're done.
-			if c.done != nil {
-				c.done(key)
-			}
-			if c.finished != nil {
-				c.finished(key)
-			}
+	// Process key event.
+	switch key := event.Key(); key {
+	case tcell.KeyRune, tcell.KeyEnter: // Check.
+		if key == tcell.KeyRune && event.Str() != " " {
+			break
 		}
-	})
+		c.SetChecked(!c.checked)
+	case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape: // We're done.
+		if c.done != nil {
+			c.done(key)
+		}
+		if c.finished != nil {
+			c.finished(key)
+		}
+	}
 }
 
 // MouseHandler returns the mouse handler for this primitive.

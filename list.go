@@ -899,35 +899,33 @@ func (l *List) endScrollState(width int, height int) (int, int) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (l *List) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return l.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		switch event.Key() {
-		case tcell.KeyDown:
-			l.NextItem()
-		case tcell.KeyUp:
-			l.PrevItem()
-		case tcell.KeyPgDn:
-			_, _, width, height := l.GetInnerRect()
-			if l.snapToItems {
-				l.scrollByItems(1, l.visibleItemCount(width, height), width, height)
-			} else {
-				if height < 1 {
-					height = 1
-				}
-				l.scroll.pending += height
+func (l *List) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	switch event.Key() {
+	case tcell.KeyDown:
+		l.NextItem()
+	case tcell.KeyUp:
+		l.PrevItem()
+	case tcell.KeyPgDn:
+		_, _, width, height := l.GetInnerRect()
+		if l.snapToItems {
+			l.scrollByItems(1, l.visibleItemCount(width, height), width, height)
+		} else {
+			if height < 1 {
+				height = 1
 			}
-		case tcell.KeyPgUp:
-			_, _, width, height := l.GetInnerRect()
-			if l.snapToItems {
-				l.scrollByItems(-1, l.visibleItemCount(width, height), width, height)
-			} else {
-				if height < 1 {
-					height = 1
-				}
-				l.scroll.pending -= height
-			}
+			l.scroll.pending += height
 		}
-	})
+	case tcell.KeyPgUp:
+		_, _, width, height := l.GetInnerRect()
+		if l.snapToItems {
+			l.scrollByItems(-1, l.visibleItemCount(width, height), width, height)
+		} else {
+			if height < 1 {
+				height = 1
+			}
+			l.scroll.pending -= height
+		}
+	}
 }
 
 // MouseHandler returns the mouse handler for this primitive.

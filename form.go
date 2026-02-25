@@ -885,26 +885,20 @@ func (f *Form) MouseHandler() func(action MouseAction, event *tcell.EventMouse, 
 }
 
 // InputHandler returns the handler for this primitive.
-func (f *Form) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return f.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		for _, item := range f.items {
-			if item.HasFocus() {
-				if handler := item.InputHandler(); handler != nil {
-					handler(event, setFocus)
-					return
-				}
-			}
+func (f *Form) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	for _, item := range f.items {
+		if item.HasFocus() {
+			item.InputHandler(event, setFocus)
+			return
 		}
+	}
 
-		for _, button := range f.buttons {
-			if button.HasFocus() {
-				if handler := button.InputHandler(); handler != nil {
-					handler(event, setFocus)
-					return
-				}
-			}
+	for _, button := range f.buttons {
+		if button.HasFocus() {
+			button.InputHandler(event, setFocus)
+			return
 		}
-	})
+	}
 }
 
 // PasteHandler returns the handler for this primitive.

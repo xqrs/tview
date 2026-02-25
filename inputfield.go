@@ -288,33 +288,31 @@ func (i *InputField) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (i *InputField) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return i.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		if i.textArea.GetDisabled() {
-			return
-		}
+func (i *InputField) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	if i.textArea.GetDisabled() {
+		return
+	}
 
-		// Finish up.
-		finish := func(key tcell.Key) {
-			if i.done != nil {
-				i.done(key)
-			}
-			if i.finished != nil {
-				i.finished(key)
-			}
+	// Finish up.
+	finish := func(key tcell.Key) {
+		if i.done != nil {
+			i.done(key)
 		}
+		if i.finished != nil {
+			i.finished(key)
+		}
+	}
 
-		// Process special key events for the input field.
-		switch key := event.Key(); key {
-		case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
-			finish(key)
-		case tcell.KeyCtrlV:
-			i.textArea.InputHandler()(event, setFocus)
-		default:
-			// Forward other key events to the text area.
-			i.textArea.InputHandler()(event, setFocus)
-		}
-	})
+	// Process special key events for the input field.
+	switch key := event.Key(); key {
+	case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
+		finish(key)
+	case tcell.KeyCtrlV:
+		i.textArea.InputHandler(event, setFocus)
+	default:
+		// Forward other key events to the text area.
+		i.textArea.InputHandler(event, setFocus)
+	}
 }
 
 // MouseHandler returns the mouse handler for this primitive.

@@ -756,56 +756,52 @@ func (g *Grid) MouseHandler() func(action MouseAction, event *tcell.EventMouse, 
 }
 
 // InputHandler returns the handler for this primitive.
-func (g *Grid) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return g.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		previousRowOffset, previousColumnOffset := g.rowOffset, g.columnOffset
-		if !g.hasFocus {
-			// Pass event on to child primitive.
-			for _, item := range g.items {
-				if item != nil && item.Item.HasFocus() {
-					if handler := item.Item.InputHandler(); handler != nil {
-						handler(event, setFocus)
-						return
-					}
-				}
+func (g *Grid) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	previousRowOffset, previousColumnOffset := g.rowOffset, g.columnOffset
+	if !g.hasFocus {
+		// Pass event on to child primitive.
+		for _, item := range g.items {
+			if item != nil && item.Item.HasFocus() {
+				item.Item.InputHandler(event, setFocus)
+				return
 			}
-			return
 		}
+		return
+	}
 
-		// Process our own key events if we have direct focus.
-		switch event.Key() {
-		case tcell.KeyRune:
-			switch event.Str() {
-			case "g":
-				g.rowOffset, g.columnOffset = 0, 0
-			case "G":
-				g.rowOffset = math.MaxInt32
-			case "j":
-				g.rowOffset++
-			case "k":
-				g.rowOffset--
-			case "h":
-				g.columnOffset--
-			case "l":
-				g.columnOffset++
-			}
-		case tcell.KeyHome:
+	// Process our own key events if we have direct focus.
+	switch event.Key() {
+	case tcell.KeyRune:
+		switch event.Str() {
+		case "g":
 			g.rowOffset, g.columnOffset = 0, 0
-		case tcell.KeyEnd:
+		case "G":
 			g.rowOffset = math.MaxInt32
-		case tcell.KeyUp:
-			g.rowOffset--
-		case tcell.KeyDown:
+		case "j":
 			g.rowOffset++
-		case tcell.KeyLeft:
+		case "k":
+			g.rowOffset--
+		case "h":
 			g.columnOffset--
-		case tcell.KeyRight:
+		case "l":
 			g.columnOffset++
 		}
-		if g.rowOffset != previousRowOffset || g.columnOffset != previousColumnOffset {
-			g.MarkDirty()
-		}
-	})
+	case tcell.KeyHome:
+		g.rowOffset, g.columnOffset = 0, 0
+	case tcell.KeyEnd:
+		g.rowOffset = math.MaxInt32
+	case tcell.KeyUp:
+		g.rowOffset--
+	case tcell.KeyDown:
+		g.rowOffset++
+	case tcell.KeyLeft:
+		g.columnOffset--
+	case tcell.KeyRight:
+		g.columnOffset++
+	}
+	if g.rowOffset != previousRowOffset || g.columnOffset != previousColumnOffset {
+		g.MarkDirty()
+	}
 }
 
 // PasteHandler returns the handler for this primitive.

@@ -456,17 +456,13 @@ func (l *Layers) MouseHandler() func(action tview.MouseAction, event *tcell.Even
 }
 
 // InputHandler returns the handler for this primitive.
-func (l *Layers) InputHandler() func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-	return l.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
-		for _, layer := range l.layers {
-			if layer.enabled && layer.item.HasFocus() {
-				if handler := layer.item.InputHandler(); handler != nil {
-					handler(event, setFocus)
-					return
-				}
-			}
+func (l *Layers) InputHandler(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+	for _, layer := range l.layers {
+		if layer.enabled && layer.item.HasFocus() {
+			layer.item.InputHandler(event, setFocus)
+			return
 		}
-	})
+	}
 }
 
 // PasteHandler returns the handler for this primitive.

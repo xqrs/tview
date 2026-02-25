@@ -1076,71 +1076,69 @@ func mergeStyle(base, overlay tcell.Style) tcell.Style {
 }
 
 // InputHandler returns the handler for this primitive.
-func (t *TreeView) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		selectNode := func() {
-			node := t.currentNode
-			if node != nil {
-				if t.selected != nil {
-					t.selected(node)
-				}
-				if node.selected != nil {
-					node.selected()
-				}
+func (t *TreeView) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	selectNode := func() {
+		node := t.currentNode
+		if node != nil {
+			if t.selected != nil {
+				t.selected(node)
+			}
+			if node.selected != nil {
+				node.selected()
 			}
 		}
+	}
 
-		// Because the tree is flattened into a list only at drawing time, we also
-		// postpone the (cursor) movement to drawing time.
-		switch key := event.Key(); key {
-		case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape:
-			if t.done != nil {
-				t.done(key)
-			}
-		case tcell.KeyDown, tcell.KeyRight:
+	// Because the tree is flattened into a list only at drawing time, we also
+	// postpone the (cursor) movement to drawing time.
+	switch key := event.Key(); key {
+	case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape:
+		if t.done != nil {
+			t.done(key)
+		}
+	case tcell.KeyDown, tcell.KeyRight:
+		t.movement = treeMove
+		t.step = 1
+	case tcell.KeyUp, tcell.KeyLeft:
+		t.movement = treeMove
+		t.step = -1
+	case tcell.KeyHome:
+		t.movement = treeHome
+	case tcell.KeyEnd:
+		t.movement = treeEnd
+	case tcell.KeyPgDn, tcell.KeyCtrlF:
+		_, _, _, height := t.GetInnerRect()
+		t.movement = treeMove
+		t.step = height
+	case tcell.KeyPgUp, tcell.KeyCtrlB:
+		_, _, _, height := t.GetInnerRect()
+		t.movement = treeMove
+		t.step = -height
+	case tcell.KeyRune:
+		switch event.Str() {
+		case "g":
+			t.movement = treeHome
+		case "G":
+			t.movement = treeEnd
+		case "j":
 			t.movement = treeMove
 			t.step = 1
-		case tcell.KeyUp, tcell.KeyLeft:
+		case "J":
+			t.movement = treeChild
+		case "k":
 			t.movement = treeMove
 			t.step = -1
-		case tcell.KeyHome:
-			t.movement = treeHome
-		case tcell.KeyEnd:
-			t.movement = treeEnd
-		case tcell.KeyPgDn, tcell.KeyCtrlF:
-			_, _, _, height := t.GetInnerRect()
-			t.movement = treeMove
-			t.step = height
-		case tcell.KeyPgUp, tcell.KeyCtrlB:
-			_, _, _, height := t.GetInnerRect()
-			t.movement = treeMove
-			t.step = -height
-		case tcell.KeyRune:
-			switch event.Str() {
-			case "g":
-				t.movement = treeHome
-			case "G":
-				t.movement = treeEnd
-			case "j":
-				t.movement = treeMove
-				t.step = 1
-			case "J":
-				t.movement = treeChild
-			case "k":
-				t.movement = treeMove
-				t.step = -1
-			case "K":
-				t.movement = treeParent
-			case " ":
-				selectNode()
-			}
-		case tcell.KeyEnter:
+		case "K":
+			t.movement = treeParent
+		case " ":
 			selectNode()
 		}
+	case tcell.KeyEnter:
+		selectNode()
+	}
 
-		t.MarkDirty()
-		t.process(true)
-	})
+	t.MarkDirty()
+	t.process(true)
 }
 
 // MouseHandler returns the mouse handler for this primitive.

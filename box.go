@@ -63,11 +63,6 @@ type Box struct {
 	// focus.
 	focus, blur func()
 
-	// An optional capture function which receives a key event and returns the
-	// event to be forwarded to the primitive's default input handler (nil if
-	// nothing should be forwarded).
-	inputCapture func(event *tcell.EventKey) *tcell.EventKey
-
 	// An optional capture function which receives a mouse event and returns the
 	// event to be forwarded to the primitive's default mouse event handler (at
 	// least one nil if nothing should be forwarded).
@@ -225,26 +220,8 @@ func unbindDirtyParent(child Primitive, parent *Box) {
 	}
 }
 
-// WrapInputHandler wraps an input handler (see [Box.InputHandler]) with the
-// functionality to capture input (see [Box.SetInputCapture]) before passing it
-// on to the provided (default) input handler.
-//
-// This is only meant to be used by subclassing primitives.
-func (b *Box) WrapInputHandler(inputHandler func(*tcell.EventKey, func(p Primitive))) func(*tcell.EventKey, func(p Primitive)) {
-	return func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		if b.inputCapture != nil {
-			event = b.inputCapture(event)
-		}
-		if event != nil && inputHandler != nil {
-			inputHandler(event, setFocus)
-		}
-	}
-}
-
-// InputHandler returns nil. Box has no default input handling.
-func (b *Box) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return b.WrapInputHandler(nil)
-}
+// InputHandler returns a no-op input handler.
+func (b *Box) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {}
 
 // WrapPasteHandler wraps a paste handler (see [Box.PasteHandler]).
 func (b *Box) WrapPasteHandler(pasteHandler func(string, func(p Primitive))) func(string, func(p Primitive)) {
@@ -258,30 +235,6 @@ func (b *Box) WrapPasteHandler(pasteHandler func(string, func(p Primitive))) fun
 // PasteHandler returns nil. Box has no default paste handling.
 func (b *Box) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
 	return b.WrapPasteHandler(nil)
-}
-
-// SetInputCapture installs a function which captures key events before they are
-// forwarded to the primitive's default key event handler. This function can
-// then choose to forward that key event (or a different one) to the default
-// handler by returning it. If nil is returned, the default handler will not
-// be called.
-//
-// Providing a nil handler will remove a previously existing handler.
-//
-// This function can also be used on container primitives (like Flex, Grid, or
-// Form) as keyboard events will be handed down until they are handled.
-//
-// Pasted key events are not forwarded to the input capture function if pasting
-// is enabled (see [Application.EnablePaste]).
-func (b *Box) SetInputCapture(capture func(event *tcell.EventKey) *tcell.EventKey) *Box {
-	b.inputCapture = capture
-	return b
-}
-
-// GetInputCapture returns the function installed with SetInputCapture() or nil
-// if no such function has been installed.
-func (b *Box) GetInputCapture() func(event *tcell.EventKey) *tcell.EventKey {
-	return b.inputCapture
 }
 
 // WrapMouseHandler wraps a mouse event handler (see [Box.MouseHandler]) with the

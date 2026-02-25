@@ -83,11 +83,6 @@ type Application struct {
 	// The root primitive to be seen on the screen.
 	root Primitive
 
-	// An optional capture function which receives a key event and returns the
-	// event to be forwarded to the default input handler (nil if nothing should
-	// be forwarded).
-	inputCapture func(event *tcell.EventKey) *tcell.EventKey
-
 	events chan tcell.Event
 
 	// Functions queued from goroutines, used to serialize updates to primitives.
@@ -114,33 +109,6 @@ func NewApplication() *Application {
 		events:  make(chan tcell.Event, queueSize),
 		updates: make(chan queuedUpdate, queueSize),
 	}
-}
-
-// SetInputCapture sets a function which captures all key events before they are
-// forwarded to the key event handler of the primitive which currently has
-// focus. This function can then choose to forward that key event (or a
-// different one) by returning it or stop the key event processing by returning
-// nil.
-//
-// The only default global key event is Ctrl-C which stops the application. It
-// requires special handling:
-//
-//   - If you do not wish to change the default behavior, return the original
-//     event object passed to your input capture function.
-//   - If you wish to block Ctrl-C from any functionality, return nil.
-//   - If you do not wish Ctrl-C to stop the application but still want to
-//     forward the Ctrl-C event to primitives down the hierarchy, return a new
-//     key event with the same key and modifiers, e.g.
-//     tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModNone).
-func (a *Application) SetInputCapture(capture func(event *tcell.EventKey) *tcell.EventKey) *Application {
-	a.inputCapture = capture
-	return a
-}
-
-// GetInputCapture returns the function installed with SetInputCapture() or nil
-// if no such function has been installed.
-func (a *Application) GetInputCapture() func(event *tcell.EventKey) *tcell.EventKey {
-	return a.inputCapture
 }
 
 // SetMouseCapture sets a function which captures mouse events (consisting of
@@ -249,35 +217,22 @@ EventLoop:
 
 				a.RLock()
 				root := a.root
-				inputCapture := a.inputCapture
 				a.RUnlock()
 
-				// Intercept keys.
 				var draw bool
-				originalEvent := event
-				if inputCapture != nil {
-					event = inputCapture(event)
-					if event == nil {
-						a.draw()
-						break // Don't forward event.
-					}
-					draw = true
-				}
 
 				// Ctrl-C closes the application.
-				if event == originalEvent && event.Key() == tcell.KeyCtrlC {
+				if event.Key() == tcell.KeyCtrlC {
 					a.Stop()
 					break
 				}
 
 				// Pass other key events to the root primitive.
 				if root != nil && root.HasFocus() {
-					if handler := root.InputHandler(); handler != nil {
-						handler(event, func(p Primitive) {
-							a.SetFocus(p)
-						})
-						draw = true
-					}
+					root.InputHandler(event, func(p Primitive) {
+						a.SetFocus(p)
+					})
+					draw = true
 				}
 
 				// Redraw.
