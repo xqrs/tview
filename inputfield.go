@@ -316,40 +316,36 @@ func (i *InputField) InputHandler(event *tcell.EventKey, setFocus func(p Primiti
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (i *InputField) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return i.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		if i.textArea.GetDisabled() {
-			return false, nil
-		}
+func (i *InputField) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	if i.textArea.GetDisabled() {
+		return false, nil
+	}
 
-		// Is mouse event within the input field?
-		x, y := event.Position()
-		if !i.InRect(x, y) {
-			return false, nil
-		}
+	// Is mouse event within the input field?
+	x, y := event.Position()
+	if !i.InRect(x, y) {
+		return false, nil
+	}
 
-		// Forward mouse event to the text area.
-		consumed, capture = i.textArea.MouseHandler()(action, event, setFocus)
+	// Forward mouse event to the text area.
+	consumed, capture = i.textArea.MouseHandler(action, event, setFocus)
 
-		// Focus in any case.
-		if action == MouseLeftDown && !consumed {
-			setFocus(i)
-			consumed = true
-		}
+	// Focus in any case.
+	if action == MouseLeftDown && !consumed {
+		setFocus(i)
+		consumed = true
+	}
 
-		return
-	})
+	return
 }
 
-// PasteHandler returns the handler for this primitive.
-func (i *InputField) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
-	return i.WrapPasteHandler(func(pastedText string, setFocus func(p Primitive)) {
-		// Input field may be disabled.
-		if i.textArea.GetDisabled() {
-			return
-		}
+// PasteHandler handles pasted text for this primitive.
+func (i *InputField) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+	// Input field may be disabled.
+	if i.textArea.GetDisabled() {
+		return
+	}
 
-		// Forward the pasted text to the text area.
-		i.textArea.PasteHandler()(pastedText, setFocus)
-	})
+	// Forward the pasted text to the text area.
+	i.textArea.PasteHandler(pastedText, setFocus)
 }

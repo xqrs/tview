@@ -37,27 +37,20 @@ type Primitive interface {
 	// Blur is called by the application when the primitive loses focus.
 	Blur()
 
-	// MouseHandler returns a handler which receives mouse events.
-	// It is called by the Application class.
+	// MouseHandler receives mouse events. It is called by the Application class.
 	//
-	// A value of nil may also be returned to stop the downward propagation of
-	// mouse events.
+	// The setFocus function allows implementations to pass focus to a different
+	// primitive so that future key events are sent to that primitive.
 	//
-	// The Box class provides functionality to intercept mouse events. If you
-	// subclass from Box, it is recommended that you wrap your handler using
-	// Box.WrapMouseHandler() so you inherit that functionality.
-	MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive)
+	// The returned capture primitive (if non-nil) receives follow-up mouse
+	// events until the capture is released.
+	MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive)
 
-	// PasteHandler returns a handler which receives pasted text.
-	// It is called by the Application class.
+	// PasteHandler receives pasted text. It is called by the Application class.
 	//
-	// A value of nil may also be returned to stop the downward propagation of
-	// paste events.
-	//
-	// The Box class may provide functionality to intercept paste events in the
-	// future. If you subclass from Box, it is recommended that you wrap your
-	// handler using Box.WrapPasteHandler() so you inherit that functionality.
-	PasteHandler() func(text string, setFocus func(p Primitive))
+	// The setFocus function allows implementations to pass focus to a different
+	// primitive so that future key events are sent to that primitive.
+	PasteHandler(text string, setFocus func(p Primitive))
 
 	// IsDirty returns true if this primitive needs to be redrawn.
 	IsDirty() bool

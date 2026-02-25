@@ -2365,114 +2365,110 @@ func (t *TextArea) InputHandler(event *tcell.EventKey, setFocus func(p Primitive
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (t *TextArea) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return t.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		if t.disabled {
-			return false, nil
+func (t *TextArea) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	if t.disabled {
+		return false, nil
+	}
+	previousSelectionStart, previousCursor := t.selectionStart, t.cursor
+	previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
+	previousDragging := t.dragging
+	defer func() {
+		if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
+			previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset || previousDragging != t.dragging {
+			t.MarkDirty()
 		}
-		previousSelectionStart, previousCursor := t.selectionStart, t.cursor
-		previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
-		previousDragging := t.dragging
+	}()
+
+	x, y := event.Position()
+	rectX, rectY, _, _ := t.GetInnerRect()
+	if !t.InRect(x, y) {
+		return false, nil
+	}
+
+	// Trigger a "moved" event at the end if requested.
+	if t.moved != nil {
+		selectionStart, cursor := t.selectionStart, t.cursor
 		defer func() {
-			if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
-				previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset || previousDragging != t.dragging {
-				t.MarkDirty()
+			if selectionStart != t.selectionStart || cursor != t.cursor {
+				t.moved()
 			}
 		}()
+	}
 
-		x, y := event.Position()
-		rectX, rectY, _, _ := t.GetInnerRect()
-		if !t.InRect(x, y) {
-			return false, nil
-		}
+	// Turn mouse coordinates into text coordinates.
+	labelWidth := t.labelWidth
+	if labelWidth == 0 && t.label != "" {
+		labelWidth = TaggedStringWidth(t.label)
+	}
+	column := x - rectX - labelWidth
+	row := y - rectY
+	if !t.wrap {
+		column += t.columnOffset
+	}
+	row += t.rowOffset
 
-		// Trigger a "moved" event at the end if requested.
-		if t.moved != nil {
-			selectionStart, cursor := t.selectionStart, t.cursor
-			defer func() {
-				if selectionStart != t.selectionStart || cursor != t.cursor {
-					t.moved()
-				}
-			}()
-		}
-
-		// Turn mouse coordinates into text coordinates.
-		labelWidth := t.labelWidth
-		if labelWidth == 0 && t.label != "" {
-			labelWidth = TaggedStringWidth(t.label)
-		}
-		column := x - rectX - labelWidth
-		row := y - rectY
-		if !t.wrap {
-			column += t.columnOffset
-		}
-		row += t.rowOffset
-
-		// Process mouse actions.
-		switch action {
-		case MouseLeftDown:
-			t.moveCursor(row, column)
-			if event.Modifiers()&tcell.ModShift == 0 {
-				t.selectionStart = t.cursor
-			}
-			setFocus(t)
-			consumed = true
-			capture = t
-			t.dragging = true
-		case MouseMove:
-			if !t.dragging {
-				break
-			}
-			t.moveCursor(row, column)
-			consumed = true
-		case MouseLeftUp:
-			t.moveCursor(row, column)
-			consumed = true
-			capture = nil
-			t.dragging = false
-		case MouseLeftDoubleClick: // Select word.
-			// Left down/up was already triggered so we are at the correct
-			// position.
-			t.moveWordLeft(false)
+	// Process mouse actions.
+	switch action {
+	case MouseLeftDown:
+		t.moveCursor(row, column)
+		if event.Modifiers()&tcell.ModShift == 0 {
 			t.selectionStart = t.cursor
-			t.moveWordRight(true, false)
-			consumed = true
-		case MouseScrollUp:
-			if t.rowOffset > 0 {
-				t.rowOffset--
-			}
-			consumed = true
-		case MouseScrollDown:
-			t.rowOffset++
-			if t.rowOffset >= len(t.lineStarts) {
-				t.rowOffset = max(len(t.lineStarts)-1, 0)
-			}
-			consumed = true
-		case MouseScrollLeft:
-			if t.columnOffset > 0 {
-				t.columnOffset--
-			}
-			consumed = true
-		case MouseScrollRight:
-			t.columnOffset++
-			if t.columnOffset >= t.widestLine {
-				t.columnOffset = max(t.widestLine-1, 0)
-			}
-			consumed = true
 		}
+		setFocus(t)
+		consumed = true
+		capture = t
+		t.dragging = true
+	case MouseMove:
+		if !t.dragging {
+			break
+		}
+		t.moveCursor(row, column)
+		consumed = true
+	case MouseLeftUp:
+		t.moveCursor(row, column)
+		consumed = true
+		capture = nil
+		t.dragging = false
+	case MouseLeftDoubleClick: // Select word.
+		// Left down/up was already triggered so we are at the correct
+		// position.
+		t.moveWordLeft(false)
+		t.selectionStart = t.cursor
+		t.moveWordRight(true, false)
+		consumed = true
+	case MouseScrollUp:
+		if t.rowOffset > 0 {
+			t.rowOffset--
+		}
+		consumed = true
+	case MouseScrollDown:
+		t.rowOffset++
+		if t.rowOffset >= len(t.lineStarts) {
+			t.rowOffset = max(len(t.lineStarts)-1, 0)
+		}
+		consumed = true
+	case MouseScrollLeft:
+		if t.columnOffset > 0 {
+			t.columnOffset--
+		}
+		consumed = true
+	case MouseScrollRight:
+		t.columnOffset++
+		if t.columnOffset >= t.widestLine {
+			t.columnOffset = max(t.widestLine-1, 0)
+		}
+		consumed = true
+	}
 
-		return
-	})
+	return
 }
 
-// PasteHandler returns the handler for this primitive.
-func (t *TextArea) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
-	return t.WrapPasteHandler(func(pastedText string, setFocus func(p Primitive)) {
-		from, to, row := t.getSelection()
-		t.cursor.pos = t.replace(from, to, pastedText, false)
-		t.cursor.row = -1
-		t.truncateLines(row - 1)
-		t.findCursor(true, row)
-		t.selectionStart = t.cursor
-	})
+// PasteHandler handles pasted text for this primitive.
+func (t *TextArea) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+	from, to, row := t.getSelection()
+	t.cursor.pos = t.replace(from, to, pastedText, false)
+	t.cursor.row = -1
+	t.truncateLines(row - 1)
+	t.findCursor(true, row)
+	t.selectionStart = t.cursor
 }

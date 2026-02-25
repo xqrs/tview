@@ -213,28 +213,26 @@ func (f *Frame) HasFocus() bool {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (f *Frame) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return f.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		if !f.InRect(event.Position()) {
-			return false, nil
-		}
+func (f *Frame) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	if !f.InRect(event.Position()) {
+		return false, nil
+	}
 
-		// Pass mouse events on to contained primitive.
-		if f.primitive != nil {
-			consumed, capture = f.primitive.MouseHandler()(action, event, setFocus)
-			if consumed {
-				return true, capture
-			}
+	// Pass mouse events on to contained primitive.
+	if f.primitive != nil {
+		consumed, capture = f.primitive.MouseHandler(action, event, setFocus)
+		if consumed {
+			return true, capture
 		}
+	}
 
-		// Clicking on the frame parts.
-		if action == MouseLeftDown {
-			setFocus(f)
-			consumed = true
-		}
+	// Clicking on the frame parts.
+	if action == MouseLeftDown {
+		setFocus(f)
+		consumed = true
+	}
 
-		return
-	})
+	return
 }
 
 // InputHandler returns the handler for this primitive.
@@ -246,15 +244,10 @@ func (f *Frame) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) 
 	return
 }
 
-// PasteHandler returns the handler for this primitive.
-func (f *Frame) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
-	return f.WrapPasteHandler(func(pastedText string, setFocus func(p Primitive)) {
-		if f.primitive == nil {
-			return
-		}
-		if handler := f.primitive.PasteHandler(); handler != nil {
-			handler(pastedText, setFocus)
-			return
-		}
-	})
+// PasteHandler handles pasted text for this primitive.
+func (f *Frame) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+	if f.primitive == nil {
+		return
+	}
+	f.primitive.PasteHandler(pastedText, setFocus)
 }

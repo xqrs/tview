@@ -1142,66 +1142,64 @@ func (t *TreeView) InputHandler(event *tcell.EventKey, setFocus func(p Primitive
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (t *TreeView) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return t.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		x, y := event.Position()
-		if !t.InRect(x, y) {
-			return false, nil
-		}
+func (t *TreeView) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	x, y := event.Position()
+	if !t.InRect(x, y) {
+		return false, nil
+	}
 
-		switch action {
-		case MouseLeftDown:
+	switch action {
+	case MouseLeftDown:
+		t.lastMouseY = y
+		consumed = true
+	case MouseMove:
+		if event.Buttons()&tcell.Button1 != 0 && t.lastMouseY != -1 {
+			t.movement = treeScroll
+			t.step = t.lastMouseY - y
 			t.lastMouseY = y
-			consumed = true
-		case MouseMove:
-			if event.Buttons()&tcell.Button1 != 0 && t.lastMouseY != -1 {
-				t.movement = treeScroll
-				t.step = t.lastMouseY - y
-				t.lastMouseY = y
-			}
-			consumed = true
-		case MouseLeftUp:
+		}
+		consumed = true
+	case MouseLeftUp:
+		t.lastMouseY = -1
+		consumed = true
+	case MouseLeftClick:
+		setFocus(t)
+		_, rectY, _, _ := t.GetInnerRect()
+		y += t.offsetY - rectY
+		if t.lastMouseY != -1 {
+			y += t.lastMouseY - y
 			t.lastMouseY = -1
-			consumed = true
-		case MouseLeftClick:
-			setFocus(t)
-			_, rectY, _, _ := t.GetInnerRect()
-			y += t.offsetY - rectY
-			if t.lastMouseY != -1 {
-				y += t.lastMouseY - y
-				t.lastMouseY = -1
-				t.movement = treeNone
-			}
-			if y >= 0 && y < len(t.nodes) {
-				node := t.nodes[y]
-				if node.selectable {
-					previousNode := t.currentNode
-					t.currentNode = node
-					if previousNode != node && t.changed != nil {
-						t.changed(node)
-					}
-					if t.selected != nil {
-						t.selected(node)
-					}
-					if node.selected != nil {
-						node.selected()
-					}
+			t.movement = treeNone
+		}
+		if y >= 0 && y < len(t.nodes) {
+			node := t.nodes[y]
+			if node.selectable {
+				previousNode := t.currentNode
+				t.currentNode = node
+				if previousNode != node && t.changed != nil {
+					t.changed(node)
+				}
+				if t.selected != nil {
+					t.selected(node)
+				}
+				if node.selected != nil {
+					node.selected()
 				}
 			}
-			consumed = true
-		case MouseScrollUp:
-			t.movement = treeScroll
-			t.step = -1
-			consumed = true
-		case MouseScrollDown:
-			t.movement = treeScroll
-			t.step = 1
-			consumed = true
 		}
-		if consumed {
-			t.MarkDirty()
-		}
+		consumed = true
+	case MouseScrollUp:
+		t.movement = treeScroll
+		t.step = -1
+		consumed = true
+	case MouseScrollDown:
+		t.movement = treeScroll
+		t.step = 1
+		consumed = true
+	}
+	if consumed {
+		t.MarkDirty()
+	}
 
-		return
-	})
+	return
 }

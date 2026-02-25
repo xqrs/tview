@@ -929,92 +929,90 @@ func (l *List) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (l *List) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return l.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		x, y := event.Position()
-		if l.scrollBarInteraction.dragDelta >= 0 {
-			_, innerY, innerWidth, innerHeight := l.GetInnerRect()
-			contentWidth, _ := l.scrollBarLayout(0, innerWidth)
-			row := y - innerY
-			switch action {
-			case MouseMove:
-				l.dragScrollBarTo(row, innerHeight, contentWidth)
-				return true, l
-			case MouseLeftUp:
-				l.scrollBarInteraction.dragDelta = listScrollBarNoDrag
-				return true, nil
-			case MouseLeftClick:
-				if l.scrollBarInteraction.dragMoved {
-					l.scrollBarInteraction.dragMoved = false
-					return true, nil
-				}
-			}
-		}
-
-		if !l.InRect(x, y) {
-			return false, nil
-		}
-
-		innerX, innerY, innerWidth, innerHeight := l.GetInnerRect()
-		contentWidth, scrollBarX := l.scrollBarLayout(innerX, innerWidth)
-		drawScrollBar := l.shouldDrawScrollBar(innerWidth, innerHeight)
-		if drawScrollBar && x == scrollBarX && y >= innerY && y < innerY+innerHeight {
-			row := y - innerY
-			switch action {
-			case MouseLeftDown:
-				setFocus(l)
-				if l.startScrollBarDrag(row, innerHeight, contentWidth) {
-					return true, l
-				}
-				return true, nil
-			case MouseLeftClick:
-				setFocus(l)
-				if l.scrollBarInteraction.dragMoved {
-					l.scrollBarInteraction.dragMoved = false
-					return true, nil
-				}
-			}
-			if l.handleScrollBarMouse(action, row, innerHeight, contentWidth) {
-				return true, nil
-			}
-			if action == MouseLeftClick {
-				return true, nil
-			}
-		}
-
+func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	x, y := event.Position()
+	if l.scrollBarInteraction.dragDelta >= 0 {
+		_, innerY, innerWidth, innerHeight := l.GetInnerRect()
+		contentWidth, _ := l.scrollBarLayout(0, innerWidth)
+		row := y - innerY
 		switch action {
+		case MouseMove:
+			l.dragScrollBarTo(row, innerHeight, contentWidth)
+			return true, l
+		case MouseLeftUp:
+			l.scrollBarInteraction.dragDelta = listScrollBarNoDrag
+			return true, nil
+		case MouseLeftClick:
+			if l.scrollBarInteraction.dragMoved {
+				l.scrollBarInteraction.dragMoved = false
+				return true, nil
+			}
+		}
+	}
+
+	if !l.InRect(x, y) {
+		return false, nil
+	}
+
+	innerX, innerY, innerWidth, innerHeight := l.GetInnerRect()
+	contentWidth, scrollBarX := l.scrollBarLayout(innerX, innerWidth)
+	drawScrollBar := l.shouldDrawScrollBar(innerWidth, innerHeight)
+	if drawScrollBar && x == scrollBarX && y >= innerY && y < innerY+innerHeight {
+		row := y - innerY
+		switch action {
+		case MouseLeftDown:
+			setFocus(l)
+			if l.startScrollBarDrag(row, innerHeight, contentWidth) {
+				return true, l
+			}
+			return true, nil
 		case MouseLeftClick:
 			setFocus(l)
-			index := l.indexAtPoint(x, y)
-			if index >= 0 {
-				previous := l.cursor
-				l.cursor = index
-				l.ensureScroll()
-				if l.changed != nil && l.cursor != previous {
-					l.changed(l.cursor)
-				}
+			if l.scrollBarInteraction.dragMoved {
+				l.scrollBarInteraction.dragMoved = false
+				return true, nil
 			}
-			return true, nil
-		case MouseScrollUp:
-			_, _, width, height := l.GetInnerRect()
-			if l.snapToItems {
-				l.scrollByItems(-1, 1, width, height)
-			} else {
-				l.scroll.pending -= l.mouseScrollStep()
-			}
-			return true, nil
-		case MouseScrollDown:
-			_, _, width, height := l.GetInnerRect()
-			if l.snapToItems {
-				l.scrollByItems(1, 1, width, height)
-			} else {
-				l.scroll.pending += l.mouseScrollStep()
-			}
+		}
+		if l.handleScrollBarMouse(action, row, innerHeight, contentWidth) {
 			return true, nil
 		}
+		if action == MouseLeftClick {
+			return true, nil
+		}
+	}
 
-		return false, nil
-	})
+	switch action {
+	case MouseLeftClick:
+		setFocus(l)
+		index := l.indexAtPoint(x, y)
+		if index >= 0 {
+			previous := l.cursor
+			l.cursor = index
+			l.ensureScroll()
+			if l.changed != nil && l.cursor != previous {
+				l.changed(l.cursor)
+			}
+		}
+		return true, nil
+	case MouseScrollUp:
+		_, _, width, height := l.GetInnerRect()
+		if l.snapToItems {
+			l.scrollByItems(-1, 1, width, height)
+		} else {
+			l.scroll.pending -= l.mouseScrollStep()
+		}
+		return true, nil
+	case MouseScrollDown:
+		_, _, width, height := l.GetInnerRect()
+		if l.snapToItems {
+			l.scrollByItems(1, 1, width, height)
+		} else {
+			l.scroll.pending += l.mouseScrollStep()
+		}
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (l *List) startScrollBarDrag(row int, height int, contentWidth int) bool {

@@ -734,25 +734,23 @@ ItemLoop:
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (g *Grid) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return g.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		if !g.InRect(event.Position()) {
-			return false, nil
-		}
+func (g *Grid) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	if !g.InRect(event.Position()) {
+		return false, nil
+	}
 
-		// Pass mouse events along to the first child item that takes it.
-		for _, item := range g.items {
-			if item.Item == nil {
-				continue
-			}
-			consumed, capture = item.Item.MouseHandler()(action, event, setFocus)
-			if consumed {
-				return
-			}
+	// Pass mouse events along to the first child item that takes it.
+	for _, item := range g.items {
+		if item.Item == nil {
+			continue
 		}
+		consumed, capture = item.Item.MouseHandler(action, event, setFocus)
+		if consumed {
+			return
+		}
+	}
 
-		return
-	})
+	return
 }
 
 // InputHandler returns the handler for this primitive.
@@ -804,16 +802,12 @@ func (g *Grid) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
 	}
 }
 
-// PasteHandler returns the handler for this primitive.
-func (g *Grid) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
-	return g.WrapPasteHandler(func(pastedText string, setFocus func(p Primitive)) {
-		for _, item := range g.items {
-			if item != nil && item.Item.HasFocus() {
-				if handler := item.Item.PasteHandler(); handler != nil {
-					handler(pastedText, setFocus)
-					return
-				}
-			}
+// PasteHandler handles pasted text for this primitive.
+func (g *Grid) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+	for _, item := range g.items {
+		if item != nil && item.Item.HasFocus() {
+			item.Item.PasteHandler(pastedText, setFocus)
+			return
 		}
-	})
+	}
 }

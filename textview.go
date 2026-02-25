@@ -972,52 +972,50 @@ func (t *TextView) InputHandler(event *tcell.EventKey, setFocus func(p Primitive
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (t *TextView) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return t.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		previousLineOffset, previousTrackEnd := t.lineOffset, t.trackEnd
-		x, y := event.Position()
-		if !t.InRect(x, y) {
-			return false, nil
-		}
+func (t *TextView) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	previousLineOffset, previousTrackEnd := t.lineOffset, t.trackEnd
+	x, y := event.Position()
+	if !t.InRect(x, y) {
+		return false, nil
+	}
 
-		_, _, width, _ := t.GetInnerRect()
-		switch action {
-		case MouseLeftDown:
-			setFocus(t)
-			consumed = true
-		case MouseLeftClick:
-			consumed = true
-		case MouseScrollUp:
-			if !t.scrollable {
-				break
-			}
-			t.trackEnd = false
-			t.lineOffset--
-			consumed = true
-		case MouseScrollDown:
-			if !t.scrollable {
-				break
-			}
-			t.lineOffset++
-			consumed = true
-		case MouseScrollLeft:
-			if !t.scrollable {
-				break
-			}
-			t.columnOffset -= width / 2
-			consumed = true
-		case MouseScrollRight:
-			if !t.scrollable {
-				break
-			}
-			t.columnOffset += width / 2
-			consumed = true
+	_, _, width, _ := t.GetInnerRect()
+	switch action {
+	case MouseLeftDown:
+		setFocus(t)
+		consumed = true
+	case MouseLeftClick:
+		consumed = true
+	case MouseScrollUp:
+		if !t.scrollable {
+			break
 		}
-
-		if t.lineOffset != previousLineOffset || t.trackEnd != previousTrackEnd {
-			t.MarkDirty()
+		t.trackEnd = false
+		t.lineOffset--
+		consumed = true
+	case MouseScrollDown:
+		if !t.scrollable {
+			break
 		}
+		t.lineOffset++
+		consumed = true
+	case MouseScrollLeft:
+		if !t.scrollable {
+			break
+		}
+		t.columnOffset -= width / 2
+		consumed = true
+	case MouseScrollRight:
+		if !t.scrollable {
+			break
+		}
+		t.columnOffset += width / 2
+		consumed = true
+	}
 
-		return consumed, capture
-	})
+	if t.lineOffset != previousLineOffset || t.trackEnd != previousTrackEnd {
+		t.MarkDirty()
+	}
+
+	return consumed, capture
 }

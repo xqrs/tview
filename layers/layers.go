@@ -421,38 +421,36 @@ func (l *Layers) Draw(screen tcell.Screen) {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (l *Layers) MouseHandler() func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, capture tview.Primitive) {
-	return l.WrapMouseHandler(func(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, capture tview.Primitive) {
-		if !l.InRect(event.Position()) {
-			return false, nil
+func (l *Layers) MouseHandler(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, capture tview.Primitive) {
+	if !l.InRect(event.Position()) {
+		return false, nil
+	}
+
+	overlayIndex := l.topVisibleEnabledOverlayIndex()
+
+	// Pass mouse events along to the front-most visible layer that takes it,
+	// but never to layers behind an active overlay layer.
+	for index := len(l.layers) - 1; index >= 0; index-- {
+		layer := l.layers[index]
+		if !layer.visible || !layer.enabled {
+			continue
 		}
-
-		overlayIndex := l.topVisibleEnabledOverlayIndex()
-
-		// Pass mouse events along to the front-most visible layer that takes it,
-		// but never to layers behind an active overlay layer.
-		for index := len(l.layers) - 1; index >= 0; index-- {
-			layer := l.layers[index]
-			if !layer.visible || !layer.enabled {
-				continue
-			}
-			if overlayIndex >= 0 && index < overlayIndex {
-				break
-			}
-			consumed, capture = layer.item.MouseHandler()(action, event, setFocus)
-			if consumed {
-				return
-			}
+		if overlayIndex >= 0 && index < overlayIndex {
+			break
 		}
-
-		// If an overlay layer is active, block input to layers behind it even if
-		// the top layer didn't consume the event.
-		if overlayIndex >= 0 {
-			return true, nil
+		consumed, capture = layer.item.MouseHandler(action, event, setFocus)
+		if consumed {
+			return
 		}
+	}
 
-		return
-	})
+	// If an overlay layer is active, block input to layers behind it even if
+	// the top layer didn't consume the event.
+	if overlayIndex >= 0 {
+		return true, nil
+	}
+
+	return
 }
 
 // InputHandler returns the handler for this primitive.
@@ -465,18 +463,14 @@ func (l *Layers) InputHandler(event *tcell.EventKey, setFocus func(p tview.Primi
 	}
 }
 
-// PasteHandler returns the handler for this primitive.
-func (l *Layers) PasteHandler() func(pastedText string, setFocus func(p tview.Primitive)) {
-	return l.WrapPasteHandler(func(pastedText string, setFocus func(p tview.Primitive)) {
-		for _, layer := range l.layers {
-			if layer.enabled && layer.item.HasFocus() {
-				if handler := layer.item.PasteHandler(); handler != nil {
-					handler(pastedText, setFocus)
-					return
-				}
-			}
+// PasteHandler handles pasted text for this primitive.
+func (l *Layers) PasteHandler(pastedText string, setFocus func(p tview.Primitive)) {
+	for _, layer := range l.layers {
+		if layer.enabled && layer.item.HasFocus() {
+			layer.item.PasteHandler(pastedText, setFocus)
+			return
 		}
-	})
+	}
 }
 
 func (l *Layers) topVisibleEnabledLayer() *layer {
