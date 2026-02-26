@@ -16,23 +16,15 @@ type Primitive interface {
 	// SetRect sets a new position of the primitive.
 	SetRect(x, y, width, height int)
 
-	// InputHandler returns a handler which receives key events when it has focus.
-	// It is called by the Application class.
+	// InputHandler receives key events when this primitive has focus. It is
+	// called by the Application class.
 	//
-	// A value of nil may also be returned, in which case this primitive cannot
-	// receive focus and will not process any key events.
-	//
-	// The handler will receive the key event and a function that allows it to
-	// set the focus to a different primitive, so that future key events are sent
-	// to that primitive.
+	// The setFocus function allows implementations to pass focus to a different
+	// primitive so that future key events are sent to that primitive.
 	//
 	// The Application's Draw() function will be called automatically after the
 	// handler returns.
-	//
-	// The Box class provides functionality to intercept keyboard input. If you
-	// subclass from Box, it is recommended that you wrap your handler using
-	// Box.WrapInputHandler() so you inherit that functionality.
-	InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive))
+	InputHandler(event *tcell.EventKey, setFocus func(p Primitive))
 
 	// Focus is called by the application when the primitive receives focus.
 	// Implementers may call delegate() to pass the focus on to another primitive.
@@ -45,27 +37,20 @@ type Primitive interface {
 	// Blur is called by the application when the primitive loses focus.
 	Blur()
 
-	// MouseHandler returns a handler which receives mouse events.
-	// It is called by the Application class.
+	// MouseHandler receives mouse events. It is called by the Application class.
 	//
-	// A value of nil may also be returned to stop the downward propagation of
-	// mouse events.
+	// The setFocus function allows implementations to pass focus to a different
+	// primitive so that future key events are sent to that primitive.
 	//
-	// The Box class provides functionality to intercept mouse events. If you
-	// subclass from Box, it is recommended that you wrap your handler using
-	// Box.WrapMouseHandler() so you inherit that functionality.
-	MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive)
+	// The returned capture primitive (if non-nil) receives follow-up mouse
+	// events until the capture is released.
+	MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive)
 
-	// PasteHandler returns a handler which receives pasted text.
-	// It is called by the Application class.
+	// PasteHandler receives pasted text. It is called by the Application class.
 	//
-	// A value of nil may also be returned to stop the downward propagation of
-	// paste events.
-	//
-	// The Box class may provide functionality to intercept paste events in the
-	// future. If you subclass from Box, it is recommended that you wrap your
-	// handler using Box.WrapPasteHandler() so you inherit that functionality.
-	PasteHandler() func(text string, setFocus func(p Primitive))
+	// The setFocus function allows implementations to pass focus to a different
+	// primitive so that future key events are sent to that primitive.
+	PasteHandler(text string, setFocus func(p Primitive))
 
 	// IsDirty returns true if this primitive needs to be redrawn.
 	IsDirty() bool

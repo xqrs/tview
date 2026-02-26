@@ -324,55 +324,51 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (c *Checkbox) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return c.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		if c.disabled {
-			return
-		}
+func (c *Checkbox) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	if c.disabled {
+		return
+	}
 
-		// Process key event.
-		switch key := event.Key(); key {
-		case tcell.KeyRune, tcell.KeyEnter: // Check.
-			if key == tcell.KeyRune && event.Str() != " " {
-				break
-			}
-			c.SetChecked(!c.checked)
-		case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape: // We're done.
-			if c.done != nil {
-				c.done(key)
-			}
-			if c.finished != nil {
-				c.finished(key)
-			}
+	// Process key event.
+	switch key := event.Key(); key {
+	case tcell.KeyRune, tcell.KeyEnter: // Check.
+		if key == tcell.KeyRune && event.Str() != " " {
+			break
 		}
-	})
+		c.SetChecked(!c.checked)
+	case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape: // We're done.
+		if c.done != nil {
+			c.done(key)
+		}
+		if c.finished != nil {
+			c.finished(key)
+		}
+	}
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (c *Checkbox) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return c.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		if c.disabled {
-			return false, nil
-		}
+func (c *Checkbox) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	if c.disabled {
+		return false, nil
+	}
 
-		x, y := event.Position()
-		_, rectY, _, _ := c.GetInnerRect()
-		if !c.InRect(x, y) {
-			return false, nil
-		}
+	x, y := event.Position()
+	_, rectY, _, _ := c.GetInnerRect()
+	if !c.InRect(x, y) {
+		return false, nil
+	}
 
-		// Process mouse event.
-		if y == rectY {
-			switch action {
-			case MouseLeftDown:
-				setFocus(c)
-				consumed = true
-			case MouseLeftClick:
-				c.SetChecked(!c.checked)
-				consumed = true
-			}
+	// Process mouse event.
+	if y == rectY {
+		switch action {
+		case MouseLeftDown:
+			setFocus(c)
+			consumed = true
+		case MouseLeftClick:
+			c.SetChecked(!c.checked)
+			consumed = true
 		}
+	}
 
-		return
-	})
+	return
 }

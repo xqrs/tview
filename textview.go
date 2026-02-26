@@ -917,122 +917,118 @@ func (t *TextView) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (t *TextView) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		previousLineOffset, previousColumnOffset, previousTrackEnd := t.lineOffset, t.columnOffset, t.trackEnd
-		key := event.Key()
+func (t *TextView) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	previousLineOffset, previousColumnOffset, previousTrackEnd := t.lineOffset, t.columnOffset, t.trackEnd
+	key := event.Key()
 
-		if key == tcell.KeyEscape || key == tcell.KeyEnter || key == tcell.KeyTab || key == tcell.KeyBacktab {
-			if t.done != nil {
-				t.done(key)
-			}
-			if t.finished != nil {
-				t.finished(key)
-			}
-			return
+	if key == tcell.KeyEscape || key == tcell.KeyEnter || key == tcell.KeyTab || key == tcell.KeyBacktab {
+		if t.done != nil {
+			t.done(key)
 		}
-
-		if !t.scrollable {
-			return
+		if t.finished != nil {
+			t.finished(key)
 		}
+		return
+	}
 
-		switch key {
-		case tcell.KeyRune:
-			switch event.Str() {
-			case "g":
-				t.trackEnd = false
-				t.lineOffset = 0
-				t.columnOffset = 0
-			case "G":
-				t.trackEnd = true
-				t.columnOffset = 0
-			case "j":
-				t.lineOffset++
-			case "k":
-				t.trackEnd = false
-				t.lineOffset--
-			case "h":
-				t.columnOffset--
-			case "l":
-				t.columnOffset++
-			}
-		case tcell.KeyHome:
+	if !t.scrollable {
+		return
+	}
+
+	switch key {
+	case tcell.KeyRune:
+		switch event.Str() {
+		case "g":
 			t.trackEnd = false
 			t.lineOffset = 0
 			t.columnOffset = 0
-		case tcell.KeyEnd:
+		case "G":
 			t.trackEnd = true
 			t.columnOffset = 0
-		case tcell.KeyUp:
+		case "j":
+			t.lineOffset++
+		case "k":
 			t.trackEnd = false
 			t.lineOffset--
-		case tcell.KeyDown:
-			t.lineOffset++
-		case tcell.KeyLeft:
+		case "h":
 			t.columnOffset--
-		case tcell.KeyRight:
+		case "l":
 			t.columnOffset++
-		case tcell.KeyPgDn, tcell.KeyCtrlF:
-			_, _, _, pageSize := t.GetInnerRect()
-			t.lineOffset += pageSize
-		case tcell.KeyPgUp, tcell.KeyCtrlB:
-			_, _, _, pageSize := t.GetInnerRect()
-			t.trackEnd = false
-			t.lineOffset -= pageSize
 		}
-		if t.lineOffset != previousLineOffset || t.columnOffset != previousColumnOffset || t.trackEnd != previousTrackEnd {
-			t.MarkDirty()
-		}
-	})
+	case tcell.KeyHome:
+		t.trackEnd = false
+		t.lineOffset = 0
+		t.columnOffset = 0
+	case tcell.KeyEnd:
+		t.trackEnd = true
+		t.columnOffset = 0
+	case tcell.KeyUp:
+		t.trackEnd = false
+		t.lineOffset--
+	case tcell.KeyDown:
+		t.lineOffset++
+	case tcell.KeyLeft:
+		t.columnOffset--
+	case tcell.KeyRight:
+		t.columnOffset++
+	case tcell.KeyPgDn, tcell.KeyCtrlF:
+		_, _, _, pageSize := t.GetInnerRect()
+		t.lineOffset += pageSize
+	case tcell.KeyPgUp, tcell.KeyCtrlB:
+		_, _, _, pageSize := t.GetInnerRect()
+		t.trackEnd = false
+		t.lineOffset -= pageSize
+	}
+	if t.lineOffset != previousLineOffset || t.columnOffset != previousColumnOffset || t.trackEnd != previousTrackEnd {
+		t.MarkDirty()
+	}
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (t *TextView) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return t.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		previousLineOffset, previousTrackEnd := t.lineOffset, t.trackEnd
-		x, y := event.Position()
-		if !t.InRect(x, y) {
-			return false, nil
-		}
+func (t *TextView) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	previousLineOffset, previousTrackEnd := t.lineOffset, t.trackEnd
+	x, y := event.Position()
+	if !t.InRect(x, y) {
+		return false, nil
+	}
 
-		_, _, width, _ := t.GetInnerRect()
-		switch action {
-		case MouseLeftDown:
-			setFocus(t)
-			consumed = true
-		case MouseLeftClick:
-			consumed = true
-		case MouseScrollUp:
-			if !t.scrollable {
-				break
-			}
-			t.trackEnd = false
-			t.lineOffset--
-			consumed = true
-		case MouseScrollDown:
-			if !t.scrollable {
-				break
-			}
-			t.lineOffset++
-			consumed = true
-		case MouseScrollLeft:
-			if !t.scrollable {
-				break
-			}
-			t.columnOffset -= width / 2
-			consumed = true
-		case MouseScrollRight:
-			if !t.scrollable {
-				break
-			}
-			t.columnOffset += width / 2
-			consumed = true
+	_, _, width, _ := t.GetInnerRect()
+	switch action {
+	case MouseLeftDown:
+		setFocus(t)
+		consumed = true
+	case MouseLeftClick:
+		consumed = true
+	case MouseScrollUp:
+		if !t.scrollable {
+			break
 		}
-
-		if t.lineOffset != previousLineOffset || t.trackEnd != previousTrackEnd {
-			t.MarkDirty()
+		t.trackEnd = false
+		t.lineOffset--
+		consumed = true
+	case MouseScrollDown:
+		if !t.scrollable {
+			break
 		}
+		t.lineOffset++
+		consumed = true
+	case MouseScrollLeft:
+		if !t.scrollable {
+			break
+		}
+		t.columnOffset -= width / 2
+		consumed = true
+	case MouseScrollRight:
+		if !t.scrollable {
+			break
+		}
+		t.columnOffset += width / 2
+		consumed = true
+	}
 
-		return consumed, capture
-	})
+	if t.lineOffset != previousLineOffset || t.trackEnd != previousTrackEnd {
+		t.MarkDirty()
+	}
+
+	return consumed, capture
 }

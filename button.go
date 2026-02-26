@@ -179,49 +179,45 @@ func (b *Button) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (b *Button) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return b.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		if b.disabled {
-			return
-		}
+func (b *Button) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	if b.disabled {
+		return
+	}
 
-		// Process key event.
-		switch key := event.Key(); key {
-		case tcell.KeyEnter: // Selected.
-			if b.selected != nil {
-				b.selected()
-			}
-		case tcell.KeyBacktab, tcell.KeyTab, tcell.KeyEscape: // Leave. No action.
-			if b.exit != nil {
-				b.exit(key)
-			}
+	// Process key event.
+	switch key := event.Key(); key {
+	case tcell.KeyEnter: // Selected.
+		if b.selected != nil {
+			b.selected()
 		}
-	})
+	case tcell.KeyBacktab, tcell.KeyTab, tcell.KeyEscape: // Leave. No action.
+		if b.exit != nil {
+			b.exit(key)
+		}
+	}
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (b *Button) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return b.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		if b.disabled {
-			return false, nil
-		}
+func (b *Button) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	if b.disabled {
+		return false, nil
+	}
 
-		if !b.InRect(event.Position()) {
-			return false, nil
-		}
+	if !b.InRect(event.Position()) {
+		return false, nil
+	}
 
-		// Process mouse event.
-		switch action {
-		case MouseLeftDown:
-			setFocus(b)
-			consumed = true
-		case MouseLeftClick:
-			if b.selected != nil {
-				b.selected()
-			}
-			consumed = true
+	// Process mouse event.
+	switch action {
+	case MouseLeftDown:
+		setFocus(b)
+		consumed = true
+	case MouseLeftClick:
+		if b.selected != nil {
+			b.selected()
 		}
+		consumed = true
+	}
 
-		return
-	})
+	return
 }

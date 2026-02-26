@@ -24,6 +24,16 @@ func Print(screen tcell.Screen, text string, x, y, maxWidth int, alignment Align
 	return end - start, width
 }
 
+// PrintWithStyle prints text onto the screen into the given box at
+// (x,y,maxWidth,1), not exceeding that box, using the provided style.
+//
+// Returns the number of actual bytes of the text printed and the actual width
+// used for the printed runes.
+func PrintWithStyle(screen tcell.Screen, text string, x, y, maxWidth int, alignment Alignment, style tcell.Style) (int, int) {
+	start, end, width := printWithStyle(screen, text, x, y, 0, maxWidth, alignment, style, false)
+	return end - start, width
+}
+
 // printWithStyle works like [Print] but it takes a style instead of just a
 // foreground color. The skipWidth parameter specifies the number of cells
 // skipped at the beginning of the text. It returns the start index, end index

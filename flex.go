@@ -283,51 +283,41 @@ func (f *Flex) HasFocus() bool {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (f *Flex) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return f.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		if !f.InRect(event.Position()) {
-			return false, nil
-		}
+func (f *Flex) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	if !f.InRect(event.Position()) {
+		return false, nil
+	}
 
-		// Pass mouse events along to the first child item that takes it.
-		for _, item := range f.items {
-			if item.Item == nil {
-				continue
-			}
-			consumed, capture = item.Item.MouseHandler()(action, event, setFocus)
-			if consumed {
-				return
-			}
+	// Pass mouse events along to the first child item that takes it.
+	for _, item := range f.items {
+		if item.Item == nil {
+			continue
 		}
+		consumed, capture = item.Item.MouseHandler(action, event, setFocus)
+		if consumed {
+			return
+		}
+	}
 
-		return
-	})
+	return
 }
 
 // InputHandler returns the handler for this primitive.
-func (f *Flex) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return f.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		for _, item := range f.items {
-			if item.Item != nil && item.Item.HasFocus() {
-				if handler := item.Item.InputHandler(); handler != nil {
-					handler(event, setFocus)
-					return
-				}
-			}
+func (f *Flex) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	for _, item := range f.items {
+		if item.Item != nil && item.Item.HasFocus() {
+			item.Item.InputHandler(event, setFocus)
+			return
 		}
-	})
+	}
 }
 
-// PasteHandler returns the handler for this primitive.
-func (f *Flex) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
-	return f.WrapPasteHandler(func(pastedText string, setFocus func(p Primitive)) {
-		for _, item := range f.items {
-			if item.Item != nil && item.Item.HasFocus() {
-				if handler := item.Item.PasteHandler(); handler != nil {
-					handler(pastedText, setFocus)
-					return
-				}
-			}
+// PasteHandler handles pasted text for this primitive.
+func (f *Flex) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+	for _, item := range f.items {
+		if item.Item != nil && item.Item.HasFocus() {
+			item.Item.PasteHandler(pastedText, setFocus)
+			return
 		}
-	})
+	}
 }

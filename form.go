@@ -852,80 +852,66 @@ func (f *Form) HasFocus() bool {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (f *Form) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return f.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		// Determine items to pass mouse events to.
-		for _, item := range f.items {
-			if item.GetDisabled() {
-				continue
-			}
-			consumed, capture = item.MouseHandler()(action, event, setFocus)
-			if consumed {
-				return
-			}
+func (f *Form) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	// Determine items to pass mouse events to.
+	for _, item := range f.items {
+		if item.GetDisabled() {
+			continue
 		}
-		for _, button := range f.buttons {
-			if button.GetDisabled() {
-				continue
-			}
-			consumed, capture = button.MouseHandler()(action, event, setFocus)
-			if consumed {
-				return
-			}
+		consumed, capture = item.MouseHandler(action, event, setFocus)
+		if consumed {
+			return
 		}
+	}
+	for _, button := range f.buttons {
+		if button.GetDisabled() {
+			continue
+		}
+		consumed, capture = button.MouseHandler(action, event, setFocus)
+		if consumed {
+			return
+		}
+	}
 
-		// A mouse down anywhere else will focus this form.
-		if action == MouseLeftDown && f.InRect(event.Position()) {
-			f.Focus(setFocus)
-			consumed = true
-		}
+	// A mouse down anywhere else will focus this form.
+	if action == MouseLeftDown && f.InRect(event.Position()) {
+		f.Focus(setFocus)
+		consumed = true
+	}
 
-		return
-	})
+	return
 }
 
 // InputHandler returns the handler for this primitive.
-func (f *Form) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return f.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		for _, item := range f.items {
-			if item.HasFocus() {
-				if handler := item.InputHandler(); handler != nil {
-					handler(event, setFocus)
-					return
-				}
-			}
+func (f *Form) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	for _, item := range f.items {
+		if item.HasFocus() {
+			item.InputHandler(event, setFocus)
+			return
 		}
+	}
 
-		for _, button := range f.buttons {
-			if button.HasFocus() {
-				if handler := button.InputHandler(); handler != nil {
-					handler(event, setFocus)
-					return
-				}
-			}
+	for _, button := range f.buttons {
+		if button.HasFocus() {
+			button.InputHandler(event, setFocus)
+			return
 		}
-	})
+	}
 }
 
-// PasteHandler returns the handler for this primitive.
-func (f *Form) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
-	return f.WrapPasteHandler(func(pastedText string, setFocus func(p Primitive)) {
-		for _, item := range f.items {
-			if item.HasFocus() {
-				if handler := item.PasteHandler(); handler != nil {
-					handler(pastedText, setFocus)
-					return
-				}
-			}
+// PasteHandler handles pasted text for this primitive.
+func (f *Form) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+	for _, item := range f.items {
+		if item.HasFocus() {
+			item.PasteHandler(pastedText, setFocus)
+			return
 		}
+	}
 
-		for _, button := range f.buttons {
-			if button.HasFocus() {
-				if handler := button.PasteHandler(); handler != nil {
-					handler(pastedText, setFocus)
-					return
-				}
-			}
+	for _, button := range f.buttons {
+		if button.HasFocus() {
+			button.PasteHandler(pastedText, setFocus)
+			return
 		}
-	})
+	}
 }

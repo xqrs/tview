@@ -37,6 +37,9 @@ type TreeNode struct {
 	// Whether or not this node's children should be displayed.
 	expanded bool
 
+	// Whether or not this node can be expanded, even if children are not loaded yet.
+	expandable bool
+
 	// The additional horizontal indent of this node's text.
 	indent int
 
@@ -65,6 +68,7 @@ func NewTreeNode(text string) *TreeNode {
 		selectedTextStyle: tcell.StyleDefault.Reverse(true),
 		indent:            2,
 		expanded:          true,
+		expandable:        false,
 		selectable:        true,
 		dirty:             true,
 	}
@@ -199,6 +203,22 @@ func (n *TreeNode) SetExpanded(expanded bool) *TreeNode {
 		n.markDirty()
 	}
 	return n
+}
+
+// SetExpandable sets whether this node can be expanded even when there are no
+// loaded child nodes yet.
+func (n *TreeNode) SetExpandable(expandable bool) *TreeNode {
+	if n.expandable != expandable {
+		n.expandable = expandable
+		n.markDirty()
+	}
+	return n
+}
+
+// IsExpandable returns whether this node can be expanded even when there are
+// no loaded child nodes yet.
+func (n *TreeNode) IsExpandable() bool {
+	return n.expandable
 }
 
 // Expand makes the child nodes of this node appear.
@@ -353,6 +373,9 @@ type TreeView struct {
 	// Strings drawn before the nodes, based on their level.
 	prefixes []string
 
+	// Markers drawn before the node text depending on expansion state.
+	markers TreeMarkers
+
 	// Vertical scroll offset.
 	offsetY int
 
@@ -390,6 +413,13 @@ type TreeView struct {
 	lastMouseY int
 }
 
+// TreeMarkers are glyphs drawn before node text.
+type TreeMarkers struct {
+	Expanded  string
+	Collapsed string
+	Leaf      string
+}
+
 // NewTreeView returns a new tree view.
 func NewTreeView() *TreeView {
 	return &TreeView{
@@ -397,7 +427,12 @@ func NewTreeView() *TreeView {
 		centerCursor:  true,
 		graphics:      true,
 		graphicsColor: Styles.GraphicsColor,
-		lastMouseY:    -1,
+		markers: TreeMarkers{
+			Expanded:  "▾ ",
+			Collapsed: "▸ ",
+			Leaf:      "",
+		},
+		lastMouseY: -1,
 	}
 }
 
@@ -541,6 +576,23 @@ func (t *TreeView) SetPrefixes(prefixes []string) *TreeView {
 		t.MarkDirty()
 	}
 	return t
+}
+
+// SetMarkers sets the strings drawn before node text depending on node state.
+// Expanded is used for nodes with children whose children are visible,
+// Collapsed is used for nodes with children whose children are hidden, and
+// Leaf is used for nodes without children.
+func (t *TreeView) SetMarkers(markers TreeMarkers) *TreeView {
+	if t.markers != markers {
+		t.markers = markers
+		t.MarkDirty()
+	}
+	return t
+}
+
+// GetMarkers returns the marker strings currently used by this tree view.
+func (t *TreeView) GetMarkers() TreeMarkers {
+	return t.markers
 }
 
 // SetAlign controls the horizontal alignment of the node texts. If set to true,
@@ -915,32 +967,47 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 
 		// Draw the prefix and the text.
 		if node.textX < width && posY < y+height {
+			marker := t.markers.Leaf
+			if node.expandable || len(node.children) > 0 {
+				if node.expanded {
+					marker = t.markers.Expanded
+				} else {
+					marker = t.markers.Collapsed
+				}
+			}
+
 			// Prefix.
 			var prefixWidth int
+			prefixStyle := tcell.StyleDefault
+			if len(node.line.Segments) > 0 {
+				prefixStyle = node.line.Segments[0].Style
+			}
 			if len(t.prefixes) > 0 {
-				prefixStyle := tcell.StyleDefault
-				if len(node.line.Segments) > 0 {
-					prefixStyle = node.line.Segments[0].Style
-				}
 				_, _, prefixWidth = printWithStyle(screen, t.prefixes[(node.level-t.topLevel)%len(t.prefixes)], x+node.textX, posY, 0, width-node.textX, AlignmentLeft, prefixStyle, true)
 			}
 
+			// Marker.
+			markerWidth := 0
+			if marker != "" && node.textX+prefixWidth < width {
+				_, _, markerWidth = printWithStyle(screen, marker, x+node.textX+prefixWidth, posY, 0, width-node.textX-prefixWidth, AlignmentLeft, prefixStyle, true)
+			}
+
 			// Text.
-			if node.textX+prefixWidth < width {
+			if node.textX+prefixWidth+markerWidth < width {
 				if node == t.currentNode {
 					posX := 0
 					for _, segment := range node.line.Segments {
-						if posX >= width-node.textX-prefixWidth {
+						if posX >= width-node.textX-prefixWidth-markerWidth {
 							break
 						}
 						style := mergeStyle(segment.Style, node.selectedTextStyle)
 						_, _, segmentWidth := printWithStyle(
 							screen,
 							segment.Text,
-							x+node.textX+prefixWidth+posX,
+							x+node.textX+prefixWidth+markerWidth+posX,
 							posY,
 							0,
-							width-node.textX-prefixWidth-posX,
+							width-node.textX-prefixWidth-markerWidth-posX,
 							AlignmentLeft,
 							style,
 							false,
@@ -950,16 +1017,16 @@ func (t *TreeView) Draw(screen tcell.Screen) {
 				} else {
 					posX := 0
 					for _, segment := range node.line.Segments {
-						if posX >= width-node.textX-prefixWidth {
+						if posX >= width-node.textX-prefixWidth-markerWidth {
 							break
 						}
 						_, _, segmentWidth := printWithStyle(
 							screen,
 							segment.Text,
-							x+node.textX+prefixWidth+posX,
+							x+node.textX+prefixWidth+markerWidth+posX,
 							posY,
 							0,
-							width-node.textX-prefixWidth-posX,
+							width-node.textX-prefixWidth-markerWidth-posX,
 							AlignmentLeft,
 							segment.Style,
 							false,
@@ -1009,11 +1076,109 @@ func mergeStyle(base, overlay tcell.Style) tcell.Style {
 }
 
 // InputHandler returns the handler for this primitive.
-func (t *TreeView) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		selectNode := func() {
-			node := t.currentNode
-			if node != nil {
+func (t *TreeView) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	selectNode := func() {
+		node := t.currentNode
+		if node != nil {
+			if t.selected != nil {
+				t.selected(node)
+			}
+			if node.selected != nil {
+				node.selected()
+			}
+		}
+	}
+
+	// Because the tree is flattened into a list only at drawing time, we also
+	// postpone the (cursor) movement to drawing time.
+	switch key := event.Key(); key {
+	case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape:
+		if t.done != nil {
+			t.done(key)
+		}
+	case tcell.KeyDown, tcell.KeyRight:
+		t.movement = treeMove
+		t.step = 1
+	case tcell.KeyUp, tcell.KeyLeft:
+		t.movement = treeMove
+		t.step = -1
+	case tcell.KeyHome:
+		t.movement = treeHome
+	case tcell.KeyEnd:
+		t.movement = treeEnd
+	case tcell.KeyPgDn, tcell.KeyCtrlF:
+		_, _, _, height := t.GetInnerRect()
+		t.movement = treeMove
+		t.step = height
+	case tcell.KeyPgUp, tcell.KeyCtrlB:
+		_, _, _, height := t.GetInnerRect()
+		t.movement = treeMove
+		t.step = -height
+	case tcell.KeyRune:
+		switch event.Str() {
+		case "g":
+			t.movement = treeHome
+		case "G":
+			t.movement = treeEnd
+		case "j":
+			t.movement = treeMove
+			t.step = 1
+		case "J":
+			t.movement = treeChild
+		case "k":
+			t.movement = treeMove
+			t.step = -1
+		case "K":
+			t.movement = treeParent
+		case " ":
+			selectNode()
+		}
+	case tcell.KeyEnter:
+		selectNode()
+	}
+
+	t.MarkDirty()
+	t.process(true)
+}
+
+// MouseHandler returns the mouse handler for this primitive.
+func (t *TreeView) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	x, y := event.Position()
+	if !t.InRect(x, y) {
+		return false, nil
+	}
+
+	switch action {
+	case MouseLeftDown:
+		t.lastMouseY = y
+		consumed = true
+	case MouseMove:
+		if event.Buttons()&tcell.Button1 != 0 && t.lastMouseY != -1 {
+			t.movement = treeScroll
+			t.step = t.lastMouseY - y
+			t.lastMouseY = y
+		}
+		consumed = true
+	case MouseLeftUp:
+		t.lastMouseY = -1
+		consumed = true
+	case MouseLeftClick:
+		setFocus(t)
+		_, rectY, _, _ := t.GetInnerRect()
+		y += t.offsetY - rectY
+		if t.lastMouseY != -1 {
+			y += t.lastMouseY - y
+			t.lastMouseY = -1
+			t.movement = treeNone
+		}
+		if y >= 0 && y < len(t.nodes) {
+			node := t.nodes[y]
+			if node.selectable {
+				previousNode := t.currentNode
+				t.currentNode = node
+				if previousNode != node && t.changed != nil {
+					t.changed(node)
+				}
 				if t.selected != nil {
 					t.selected(node)
 				}
@@ -1022,121 +1187,19 @@ func (t *TreeView) InputHandler() func(event *tcell.EventKey, setFocus func(p Pr
 				}
 			}
 		}
-
-		// Because the tree is flattened into a list only at drawing time, we also
-		// postpone the (cursor) movement to drawing time.
-		switch key := event.Key(); key {
-		case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape:
-			if t.done != nil {
-				t.done(key)
-			}
-		case tcell.KeyDown, tcell.KeyRight:
-			t.movement = treeMove
-			t.step = 1
-		case tcell.KeyUp, tcell.KeyLeft:
-			t.movement = treeMove
-			t.step = -1
-		case tcell.KeyHome:
-			t.movement = treeHome
-		case tcell.KeyEnd:
-			t.movement = treeEnd
-		case tcell.KeyPgDn, tcell.KeyCtrlF:
-			_, _, _, height := t.GetInnerRect()
-			t.movement = treeMove
-			t.step = height
-		case tcell.KeyPgUp, tcell.KeyCtrlB:
-			_, _, _, height := t.GetInnerRect()
-			t.movement = treeMove
-			t.step = -height
-		case tcell.KeyRune:
-			switch event.Str() {
-			case "g":
-				t.movement = treeHome
-			case "G":
-				t.movement = treeEnd
-			case "j":
-				t.movement = treeMove
-				t.step = 1
-			case "J":
-				t.movement = treeChild
-			case "k":
-				t.movement = treeMove
-				t.step = -1
-			case "K":
-				t.movement = treeParent
-			case " ":
-				selectNode()
-			}
-		case tcell.KeyEnter:
-			selectNode()
-		}
-
+		consumed = true
+	case MouseScrollUp:
+		t.movement = treeScroll
+		t.step = -1
+		consumed = true
+	case MouseScrollDown:
+		t.movement = treeScroll
+		t.step = 1
+		consumed = true
+	}
+	if consumed {
 		t.MarkDirty()
-		t.process(true)
-	})
-}
+	}
 
-// MouseHandler returns the mouse handler for this primitive.
-func (t *TreeView) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return t.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		x, y := event.Position()
-		if !t.InRect(x, y) {
-			return false, nil
-		}
-
-		switch action {
-		case MouseLeftDown:
-			t.lastMouseY = y
-			consumed = true
-		case MouseMove:
-			if event.Buttons()&tcell.Button1 != 0 && t.lastMouseY != -1 {
-				t.movement = treeScroll
-				t.step = t.lastMouseY - y
-				t.lastMouseY = y
-			}
-			consumed = true
-		case MouseLeftUp:
-			t.lastMouseY = -1
-			consumed = true
-		case MouseLeftClick:
-			setFocus(t)
-			_, rectY, _, _ := t.GetInnerRect()
-			y += t.offsetY - rectY
-			if t.lastMouseY != -1 {
-				y += t.lastMouseY - y
-				t.lastMouseY = -1
-				t.movement = treeNone
-			}
-			if y >= 0 && y < len(t.nodes) {
-				node := t.nodes[y]
-				if node.selectable {
-					previousNode := t.currentNode
-					t.currentNode = node
-					if previousNode != node && t.changed != nil {
-						t.changed(node)
-					}
-					if t.selected != nil {
-						t.selected(node)
-					}
-					if node.selected != nil {
-						node.selected()
-					}
-				}
-			}
-			consumed = true
-		case MouseScrollUp:
-			t.movement = treeScroll
-			t.step = -1
-			consumed = true
-		case MouseScrollDown:
-			t.movement = treeScroll
-			t.step = 1
-			consumed = true
-		}
-		if consumed {
-			t.MarkDirty()
-		}
-
-		return
-	})
+	return
 }

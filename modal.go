@@ -112,16 +112,6 @@ func (m *Modal) AddButtons(labels []string) *Modal {
 					m.done(i, l)
 				}
 			})
-			button := m.form.GetButton(m.form.GetButtonCount() - 1)
-			button.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-				switch event.Key() {
-				case tcell.KeyDown, tcell.KeyRight:
-					return tcell.NewEventKey(tcell.KeyTab, "", tcell.ModNone)
-				case tcell.KeyUp, tcell.KeyLeft:
-					return tcell.NewEventKey(tcell.KeyBacktab, "", tcell.ModNone)
-				}
-				return event
-			})
 		}(index, label)
 	}
 	return m
@@ -198,26 +188,28 @@ func (m *Modal) Draw(screen tcell.Screen) {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (m *Modal) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return m.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		// Pass mouse events on to the form.
-		consumed, capture = m.form.MouseHandler()(action, event, setFocus)
-		if !consumed && action == MouseLeftDown && m.InRect(event.Position()) {
-			setFocus(m)
-			consumed = true
-		}
-		return
-	})
+func (m *Modal) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	// Pass mouse events on to the form.
+	consumed, capture = m.form.MouseHandler(action, event, setFocus)
+	if !consumed && action == MouseLeftDown && m.InRect(event.Position()) {
+		setFocus(m)
+		consumed = true
+	}
+	return
 }
 
 // InputHandler returns the handler for this primitive.
-func (m *Modal) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return m.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		if m.frame.HasFocus() {
-			if handler := m.frame.InputHandler(); handler != nil {
-				handler(event, setFocus)
-				return
-			}
-		}
-	})
+func (m *Modal) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	// Keep arrow-key navigation between modal buttons.
+	switch event.Key() {
+	case tcell.KeyDown, tcell.KeyRight:
+		event = tcell.NewEventKey(tcell.KeyTab, "", tcell.ModNone)
+	case tcell.KeyUp, tcell.KeyLeft:
+		event = tcell.NewEventKey(tcell.KeyBacktab, "", tcell.ModNone)
+	}
+	// Forward the key event to the frame so the focused form button receives Tab/Backtab and Form.finished can move focus to the next/previous button.
+	if m.frame.HasFocus() {
+		m.frame.InputHandler(event, setFocus)
+		return
+	}
 }

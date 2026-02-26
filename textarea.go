@@ -159,7 +159,7 @@ type textAreaUndoItem struct {
 // The Ctrl-Q key was chosen for the "copy" function because the Ctrl-C key is
 // the default key to stop the application. If your application frees up the
 // global Ctrl-C key and you want to bind it to the "copy to clipboard"
-// function, you may use [Box.SetInputCapture] to override the Ctrl-Q key to
+// function, you may use your primitive's InputHandler to remap keys and
 // implement copying to the clipboard. Note that using your terminal's /
 // operating system's key bindings for copy+paste functionality may not have the
 // expected effect as tview will not be able to handle these keys. Pasting text
@@ -1974,507 +1974,501 @@ func (t *TextArea) getSelectedText() string {
 }
 
 // InputHandler returns the handler for this primitive.
-func (t *TextArea) InputHandler() func(event *tcell.EventKey, setFocus func(p Primitive)) {
-	return t.WrapInputHandler(func(event *tcell.EventKey, setFocus func(p Primitive)) {
-		if t.disabled {
-			return
+func (t *TextArea) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+	if t.disabled {
+		return
+	}
+	previousSelectionStart, previousCursor := t.selectionStart, t.cursor
+	previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
+	defer func() {
+		if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
+			previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset {
+			t.MarkDirty()
 		}
-		previousSelectionStart, previousCursor := t.selectionStart, t.cursor
-		previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
+	}()
+
+	// All actions except a few specific ones are "other" actions.
+	newLastAction := taActionOther
+	defer func() {
+		t.lastAction = newLastAction
+	}()
+
+	// Trigger a "moved" event if requested.
+	if t.moved != nil {
+		selectionStart, cursor := t.selectionStart, t.cursor
 		defer func() {
-			if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
-				previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset {
-				t.MarkDirty()
+			if selectionStart != t.selectionStart || cursor != t.cursor {
+				t.moved()
 			}
 		}()
+	}
 
-		// All actions except a few specific ones are "other" actions.
-		newLastAction := taActionOther
-		defer func() {
-			t.lastAction = newLastAction
-		}()
-
-		// Trigger a "moved" event if requested.
-		if t.moved != nil {
-			selectionStart, cursor := t.selectionStart, t.cursor
-			defer func() {
-				if selectionStart != t.selectionStart || cursor != t.cursor {
-					t.moved()
+	// Process the different key events.
+	switch key := event.Key(); key {
+	case tcell.KeyLeft: // Move one grapheme cluster to the left.
+		if event.Modifiers()&tcell.ModAlt == 0 {
+			// Regular movement.
+			if event.Modifiers()&tcell.ModShift == 0 && t.selectionStart.pos != t.cursor.pos {
+				// Move to the start of the selection.
+				if t.selectionStart.row < t.cursor.row || (t.selectionStart.row == t.cursor.row && t.selectionStart.actualColumn < t.cursor.actualColumn) {
+					t.cursor = t.selectionStart
 				}
-			}()
-		}
-
-		// Process the different key events.
-		switch key := event.Key(); key {
-		case tcell.KeyLeft: // Move one grapheme cluster to the left.
-			if event.Modifiers()&tcell.ModAlt == 0 {
-				// Regular movement.
-				if event.Modifiers()&tcell.ModShift == 0 && t.selectionStart.pos != t.cursor.pos {
-					// Move to the start of the selection.
-					if t.selectionStart.row < t.cursor.row || (t.selectionStart.row == t.cursor.row && t.selectionStart.actualColumn < t.cursor.actualColumn) {
-						t.cursor = t.selectionStart
-					}
-					t.findCursor(true, t.cursor.row)
-				} else if event.Modifiers()&tcell.ModMeta != 0 || event.Modifiers()&tcell.ModCtrl != 0 {
-					// This captures Ctrl-Left on some systems.
-					t.moveWordLeft(event.Modifiers()&tcell.ModShift != 0)
-				} else if t.cursor.actualColumn == 0 {
-					// Move to the end of the previous row.
-					if t.cursor.row > 0 {
-						t.moveCursor(t.cursor.row-1, -1)
-					}
-				} else {
-					// Move one grapheme cluster to the left.
-					t.moveCursor(t.cursor.row, t.cursor.actualColumn-1)
-				}
-				if event.Modifiers()&tcell.ModShift == 0 {
-					t.selectionStart = t.cursor
-				}
-			} else if !t.wrap { // This doesn't work on all terminals.
-				// Just scroll.
-				t.columnOffset--
-				if t.columnOffset < 0 {
-					t.columnOffset = 0
-				}
-			}
-		case tcell.KeyRight: // Move one grapheme cluster to the right.
-			if event.Modifiers()&tcell.ModAlt == 0 {
-				// Regular movement.
-				if event.Modifiers()&tcell.ModShift == 0 && t.selectionStart.pos != t.cursor.pos {
-					// Move to the end of the selection.
-					if t.selectionStart.row > t.cursor.row || (t.selectionStart.row == t.cursor.row && t.selectionStart.actualColumn > t.cursor.actualColumn) {
-						t.cursor = t.selectionStart
-					}
-					t.findCursor(true, t.cursor.row)
-				} else if t.cursor.pos[0] != 1 {
-					if event.Modifiers()&tcell.ModMeta != 0 || event.Modifiers()&tcell.ModCtrl != 0 {
-						// This captures Ctrl-Right on some systems.
-						t.moveWordRight(event.Modifiers()&tcell.ModShift != 0, true)
-					} else {
-						// Move one grapheme cluster to the right.
-						var clusterWidth int
-						_, _, _, clusterWidth, t.cursor.pos, _ = t.step("", t.cursor.pos, t.cursor.pos)
-						if len(t.lineStarts) <= t.cursor.row+1 {
-							t.extendLines(t.lastWidth, t.cursor.row+1)
-						}
-						if t.cursor.row+1 < len(t.lineStarts) && t.lineStarts[t.cursor.row+1] == t.cursor.pos {
-							// We've reached the end of the line.
-							t.cursor.row++
-							t.cursor.actualColumn = 0
-							t.cursor.column = 0
-							t.findCursor(true, t.cursor.row)
-						} else {
-							// Move one character to the right.
-							t.moveCursor(t.cursor.row, t.cursor.actualColumn+clusterWidth)
-						}
-					}
-				}
-				if event.Modifiers()&tcell.ModShift == 0 {
-					t.selectionStart = t.cursor
-				}
-			} else if !t.wrap { // This doesn't work on all terminals.
-				// Just scroll.
-				t.columnOffset++
-				if t.columnOffset >= t.widestLine {
-					t.columnOffset = max(t.widestLine-1, 0)
-				}
-			}
-		case tcell.KeyDown: // Move one row down.
-			if event.Modifiers()&tcell.ModAlt == 0 {
-				// Regular movement.
-				column := t.cursor.column
-				t.moveCursor(t.cursor.row+1, t.cursor.column)
-				t.cursor.column = column
-				if event.Modifiers()&tcell.ModShift == 0 {
-					t.selectionStart = t.cursor
-				}
-			} else {
-				// Just scroll.
-				t.rowOffset++
-				if t.rowOffset >= len(t.lineStarts) {
-					t.extendLines(t.lastWidth, t.rowOffset)
-					if t.rowOffset >= len(t.lineStarts) {
-						t.rowOffset = max(len(t.lineStarts)-1, 0)
-					}
-				}
-			}
-		case tcell.KeyUp: // Move one row up.
-			if event.Modifiers()&tcell.ModAlt == 0 {
-				// Regular movement.
-				column := t.cursor.column
-				t.moveCursor(t.cursor.row-1, t.cursor.column)
-				t.cursor.column = column
-				if event.Modifiers()&tcell.ModShift == 0 {
-					t.selectionStart = t.cursor
-				}
-			} else {
-				// Just scroll.
-				t.rowOffset--
-				if t.rowOffset < 0 {
-					t.rowOffset = 0
-				}
-			}
-		case tcell.KeyHome, tcell.KeyCtrlA: // Move to the start of the line.
-			t.moveCursor(t.cursor.row, 0)
-			if event.Modifiers()&tcell.ModShift == 0 {
-				t.selectionStart = t.cursor
-			}
-		case tcell.KeyEnd, tcell.KeyCtrlE: // Move to the end of the line.
-			t.moveCursor(t.cursor.row, -1)
-			if event.Modifiers()&tcell.ModShift == 0 {
-				t.selectionStart = t.cursor
-			}
-		case tcell.KeyPgDn, tcell.KeyCtrlF: // Move one page down.
-			column := t.cursor.column
-			t.moveCursor(t.cursor.row+t.lastHeight, t.cursor.column)
-			t.cursor.column = column
-			if event.Modifiers()&tcell.ModShift == 0 {
-				t.selectionStart = t.cursor
-			}
-		case tcell.KeyPgUp, tcell.KeyCtrlB: // Move one page up.
-			column := t.cursor.column
-			t.moveCursor(t.cursor.row-t.lastHeight, t.cursor.column)
-			t.cursor.column = column
-			if event.Modifiers()&tcell.ModShift == 0 {
-				t.selectionStart = t.cursor
-			}
-		case tcell.KeyEnter: // Insert a newline.
-			from, to, row := t.getSelection()
-			t.cursor.pos = t.replace(from, to, TextAreaNewLine, t.lastAction == taActionTypeSpace)
-			t.cursor.row = -1
-			t.truncateLines(row - 1)
-			t.findCursor(true, row)
-			t.selectionStart = t.cursor
-			newLastAction = taActionTypeSpace
-		case tcell.KeyTab: // Insert a tab character. It will be rendered as TabSize spaces.
-			// But forwarding takes precedence.
-			if t.finished != nil {
-				t.finished(key)
-				return
-			}
-
-			from, to, row := t.getSelection()
-			t.cursor.pos = t.replace(from, to, "\t", t.lastAction == taActionTypeSpace)
-			t.cursor.row = -1
-			t.truncateLines(row - 1)
-			t.findCursor(true, row)
-			t.selectionStart = t.cursor
-			newLastAction = taActionTypeSpace
-		case tcell.KeyBacktab, tcell.KeyEscape: // Only used in forms.
-			if t.finished != nil {
-				t.finished(key)
-				return
-			}
-		case tcell.KeyRune:
-			if event.Modifiers()&tcell.ModAlt > 0 {
-				// We accept some Alt- key combinations.
-				switch event.Str() {
-				case "f":
-					if event.Modifiers()&tcell.ModShift == 0 {
-						t.moveWordRight(false, true)
-						t.selectionStart = t.cursor
-					} else {
-						t.moveWordRight(true, true)
-					}
-				case "b":
-					t.moveWordLeft(true)
-					if event.Modifiers()&tcell.ModShift == 0 {
-						t.selectionStart = t.cursor
-					}
-				}
-			} else {
-				// Other keys are simply accepted as regular characters.
-				str := event.Str()
-				from, to, row := t.getSelection()
-				newLastAction = taActionTypeNonSpace
-				if str == " " {
-					newLastAction = taActionTypeSpace
-				}
-				t.cursor.pos = t.replace(from, to, str, newLastAction == t.lastAction || t.lastAction == taActionTypeNonSpace && newLastAction == taActionTypeSpace)
-				t.cursor.row = -1
-				t.truncateLines(row - 1)
-				t.findCursor(true, row)
-				t.selectionStart = t.cursor
-			}
-		case tcell.KeyBackspace, tcell.KeyBackspace2: // Delete backwards. tcell.KeyBackspace is the same as tcell.CtrlH.
-			from, to, row := t.getSelection()
-			if from != to {
-				// Simply delete the current selection.
-				t.cursor.pos = t.replace(from, to, "", false)
-				t.cursor.row = -1
-				t.truncateLines(row - 1)
-				t.findCursor(true, row)
-				t.selectionStart = t.cursor
-				break
-			}
-
-			beforeCursor := t.cursor
-			if event.Modifiers()&tcell.ModAlt == 0 {
-				// Move the cursor back by one grapheme cluster.
-				if t.cursor.actualColumn == 0 {
-					// Move to the end of the previous row.
-					if t.cursor.row > 0 {
-						t.moveCursor(t.cursor.row-1, -1)
-					}
-				} else {
-					// Move one grapheme cluster to the left.
-					t.moveCursor(t.cursor.row, t.cursor.actualColumn-1)
-				}
-				newLastAction = taActionBackspace
-			} else {
-				// Move the cursor back by one word.
-				t.moveWordLeft(false)
-			}
-
-			// Remove that last grapheme cluster.
-			if t.cursor.pos != beforeCursor.pos {
-				t.cursor, beforeCursor = beforeCursor, t.cursor                                                 // So we put the right position on the stack.
-				t.cursor.pos = t.replace(beforeCursor.pos, t.cursor.pos, "", t.lastAction == taActionBackspace) // Delete the character.
-				t.cursor.row = -1
-				t.truncateLines(beforeCursor.row - 1)
-				t.findCursor(true, beforeCursor.row-1)
-			}
-			t.selectionStart = t.cursor
-		case tcell.KeyDelete, tcell.KeyCtrlD: // Delete forward.
-			from, to, row := t.getSelection()
-			if from != to {
-				// Simply delete the current selection.
-				t.cursor.pos = t.replace(from, to, "", false)
-				t.cursor.row = -1
-				t.truncateLines(row - 1)
-				t.findCursor(true, row)
-				t.selectionStart = t.cursor
-				break
-			}
-
-			if t.cursor.pos[0] != 1 {
-				_, _, _, _, endPos, _ := t.step("", t.cursor.pos, t.cursor.pos)
-				t.cursor.pos = t.replace(t.cursor.pos, endPos, "", t.lastAction == taActionDelete) // Delete the character.
-				t.cursor.pos[2] = endPos[2]
-				t.truncateLines(t.cursor.row - 1)
 				t.findCursor(true, t.cursor.row)
-				newLastAction = taActionDelete
-			}
-			t.selectionStart = t.cursor
-		case tcell.KeyCtrlK: // Delete everything under and to the right of the cursor until before the next newline character.
-			pos := t.cursor.pos
-			endPos := pos
-			var cluster, text string
-			for pos[0] != 1 {
-				var boundaries int
-				oldPos := pos
-				cluster, text, boundaries, _, pos, endPos = t.step(text, pos, endPos)
-				if boundaries&uniseg.MaskLine == uniseg.LineMustBreak {
-					if uniseg.HasTrailingLineBreakInString(cluster) {
-						pos = oldPos
-					}
-					break
+			} else if event.Modifiers()&tcell.ModMeta != 0 || event.Modifiers()&tcell.ModCtrl != 0 {
+				// This captures Ctrl-Left on some systems.
+				t.moveWordLeft(event.Modifiers()&tcell.ModShift != 0)
+			} else if t.cursor.actualColumn == 0 {
+				// Move to the end of the previous row.
+				if t.cursor.row > 0 {
+					t.moveCursor(t.cursor.row-1, -1)
 				}
+			} else {
+				// Move one grapheme cluster to the left.
+				t.moveCursor(t.cursor.row, t.cursor.actualColumn-1)
 			}
-			t.cursor.pos = t.replace(t.cursor.pos, pos, "", false)
-			row := t.cursor.row
-			t.cursor.row = -1
-			t.truncateLines(row - 1)
-			t.findCursor(true, row)
-			t.selectionStart = t.cursor
-		case tcell.KeyCtrlW: // Delete from the start of the current word to the left of the cursor.
-			pos := t.cursor.pos
-			t.moveWordLeft(true)
-			t.cursor.pos = t.replace(t.cursor.pos, pos, "", false)
-			row := t.cursor.row - 1
-			t.cursor.row = -1
-			t.truncateLines(row)
-			t.findCursor(true, row)
-			t.selectionStart = t.cursor
-		case tcell.KeyCtrlU: // Delete the current line.
-			t.deleteLine()
-			t.selectionStart = t.cursor
-		case tcell.KeyCtrlL: // Select everything.
-			t.selectionStart.row, t.selectionStart.column, t.selectionStart.actualColumn = 0, 0, 0
-			t.selectionStart.pos = [3]int{t.spans[0].next, 0, -1}
-			row := t.cursor.row
-			t.cursor.row = -1
-			t.cursor.pos = [3]int{1, 0, -1}
-			t.findCursor(false, row)
-		case tcell.KeyCtrlQ: // Copy to clipboard.
-			if t.cursor != t.selectionStart {
-				t.copyToClipboard(t.getSelectedText())
-				t.selectionStart = t.cursor
-			}
-		case tcell.KeyCtrlX: // Cut to clipboard.
-			if t.cursor != t.selectionStart {
-				t.copyToClipboard(t.getSelectedText())
-				from, to, row := t.getSelection()
-				t.cursor.pos = t.replace(from, to, "", false)
-				t.cursor.row = -1
-				t.truncateLines(row - 1)
-				t.findCursor(true, row)
-				t.selectionStart = t.cursor
-			}
-		case tcell.KeyCtrlV: // Paste from clipboard.
-			from, to, row := t.getSelection()
-			t.cursor.pos = t.replace(from, to, t.pasteFromClipboard(), false)
-			t.cursor.row = -1
-			t.truncateLines(row - 1)
-			t.findCursor(true, row)
-			t.selectionStart = t.cursor
-		case tcell.KeyCtrlZ: // Undo.
-			if t.nextUndo <= 0 {
-				break
-			}
-			for t.nextUndo > 0 {
-				t.nextUndo--
-				undo := t.undoStack[t.nextUndo]
-				t.spans[undo.originalBefore], t.spans[undo.before] = t.spans[undo.before], t.spans[undo.originalBefore]
-				t.spans[undo.originalAfter], t.spans[undo.after] = t.spans[undo.after], t.spans[undo.originalAfter]
-				t.cursor.pos, t.undoStack[t.nextUndo].pos = undo.pos, t.cursor.pos
-				t.length, t.undoStack[t.nextUndo].length = undo.length, t.length
-				if !undo.continuation {
-					break
-				}
-			}
-			t.cursor.row = -1
-			t.truncateLines(0) // This is why Undo is expensive for large texts. (t.lineStarts can get largely unusable after an undo.)
-			t.findCursor(true, 0)
-			t.selectionStart = t.cursor
-			if t.changed != nil {
-				defer t.changed()
-			}
-		case tcell.KeyCtrlY: // Redo.
-			if t.nextUndo >= len(t.undoStack) {
-				break
-			}
-			for t.nextUndo < len(t.undoStack) {
-				undo := t.undoStack[t.nextUndo]
-				t.spans[undo.originalBefore], t.spans[undo.before] = t.spans[undo.before], t.spans[undo.originalBefore]
-				t.spans[undo.originalAfter], t.spans[undo.after] = t.spans[undo.after], t.spans[undo.originalAfter]
-				t.cursor.pos, t.undoStack[t.nextUndo].pos = undo.pos, t.cursor.pos
-				t.length, t.undoStack[t.nextUndo].length = undo.length, t.length
-				t.nextUndo++
-				if t.nextUndo < len(t.undoStack) && !t.undoStack[t.nextUndo].continuation {
-					break
-				}
-			}
-			t.cursor.row = -1
-			t.truncateLines(0) // This is why Redo is expensive for large texts. (t.lineStarts can get largely unusable after an undo.)
-			t.findCursor(true, 0)
-			t.selectionStart = t.cursor
-			if t.changed != nil {
-				defer t.changed()
-			}
-		}
-	})
-}
-
-// MouseHandler returns the mouse handler for this primitive.
-func (t *TextArea) MouseHandler() func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	return t.WrapMouseHandler(func(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-		if t.disabled {
-			return false, nil
-		}
-		previousSelectionStart, previousCursor := t.selectionStart, t.cursor
-		previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
-		previousDragging := t.dragging
-		defer func() {
-			if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
-				previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset || previousDragging != t.dragging {
-				t.MarkDirty()
-			}
-		}()
-
-		x, y := event.Position()
-		rectX, rectY, _, _ := t.GetInnerRect()
-		if !t.InRect(x, y) {
-			return false, nil
-		}
-
-		// Trigger a "moved" event at the end if requested.
-		if t.moved != nil {
-			selectionStart, cursor := t.selectionStart, t.cursor
-			defer func() {
-				if selectionStart != t.selectionStart || cursor != t.cursor {
-					t.moved()
-				}
-			}()
-		}
-
-		// Turn mouse coordinates into text coordinates.
-		labelWidth := t.labelWidth
-		if labelWidth == 0 && t.label != "" {
-			labelWidth = TaggedStringWidth(t.label)
-		}
-		column := x - rectX - labelWidth
-		row := y - rectY
-		if !t.wrap {
-			column += t.columnOffset
-		}
-		row += t.rowOffset
-
-		// Process mouse actions.
-		switch action {
-		case MouseLeftDown:
-			t.moveCursor(row, column)
 			if event.Modifiers()&tcell.ModShift == 0 {
 				t.selectionStart = t.cursor
 			}
-			setFocus(t)
-			consumed = true
-			capture = t
-			t.dragging = true
-		case MouseMove:
-			if !t.dragging {
-				break
+		} else if !t.wrap { // This doesn't work on all terminals.
+			// Just scroll.
+			t.columnOffset--
+			if t.columnOffset < 0 {
+				t.columnOffset = 0
 			}
-			t.moveCursor(row, column)
-			consumed = true
-		case MouseLeftUp:
-			t.moveCursor(row, column)
-			consumed = true
-			capture = nil
-			t.dragging = false
-		case MouseLeftDoubleClick: // Select word.
-			// Left down/up was already triggered so we are at the correct
-			// position.
-			t.moveWordLeft(false)
-			t.selectionStart = t.cursor
-			t.moveWordRight(true, false)
-			consumed = true
-		case MouseScrollUp:
-			if t.rowOffset > 0 {
-				t.rowOffset--
+		}
+	case tcell.KeyRight: // Move one grapheme cluster to the right.
+		if event.Modifiers()&tcell.ModAlt == 0 {
+			// Regular movement.
+			if event.Modifiers()&tcell.ModShift == 0 && t.selectionStart.pos != t.cursor.pos {
+				// Move to the end of the selection.
+				if t.selectionStart.row > t.cursor.row || (t.selectionStart.row == t.cursor.row && t.selectionStart.actualColumn > t.cursor.actualColumn) {
+					t.cursor = t.selectionStart
+				}
+				t.findCursor(true, t.cursor.row)
+			} else if t.cursor.pos[0] != 1 {
+				if event.Modifiers()&tcell.ModMeta != 0 || event.Modifiers()&tcell.ModCtrl != 0 {
+					// This captures Ctrl-Right on some systems.
+					t.moveWordRight(event.Modifiers()&tcell.ModShift != 0, true)
+				} else {
+					// Move one grapheme cluster to the right.
+					var clusterWidth int
+					_, _, _, clusterWidth, t.cursor.pos, _ = t.step("", t.cursor.pos, t.cursor.pos)
+					if len(t.lineStarts) <= t.cursor.row+1 {
+						t.extendLines(t.lastWidth, t.cursor.row+1)
+					}
+					if t.cursor.row+1 < len(t.lineStarts) && t.lineStarts[t.cursor.row+1] == t.cursor.pos {
+						// We've reached the end of the line.
+						t.cursor.row++
+						t.cursor.actualColumn = 0
+						t.cursor.column = 0
+						t.findCursor(true, t.cursor.row)
+					} else {
+						// Move one character to the right.
+						t.moveCursor(t.cursor.row, t.cursor.actualColumn+clusterWidth)
+					}
+				}
 			}
-			consumed = true
-		case MouseScrollDown:
-			t.rowOffset++
-			if t.rowOffset >= len(t.lineStarts) {
-				t.rowOffset = max(len(t.lineStarts)-1, 0)
+			if event.Modifiers()&tcell.ModShift == 0 {
+				t.selectionStart = t.cursor
 			}
-			consumed = true
-		case MouseScrollLeft:
-			if t.columnOffset > 0 {
-				t.columnOffset--
-			}
-			consumed = true
-		case MouseScrollRight:
+		} else if !t.wrap { // This doesn't work on all terminals.
+			// Just scroll.
 			t.columnOffset++
 			if t.columnOffset >= t.widestLine {
 				t.columnOffset = max(t.widestLine-1, 0)
 			}
-			consumed = true
 		}
-
-		return
-	})
-}
-
-// PasteHandler returns the handler for this primitive.
-func (t *TextArea) PasteHandler() func(pastedText string, setFocus func(p Primitive)) {
-	return t.WrapPasteHandler(func(pastedText string, setFocus func(p Primitive)) {
+	case tcell.KeyDown: // Move one row down.
+		if event.Modifiers()&tcell.ModAlt == 0 {
+			// Regular movement.
+			column := t.cursor.column
+			t.moveCursor(t.cursor.row+1, t.cursor.column)
+			t.cursor.column = column
+			if event.Modifiers()&tcell.ModShift == 0 {
+				t.selectionStart = t.cursor
+			}
+		} else {
+			// Just scroll.
+			t.rowOffset++
+			if t.rowOffset >= len(t.lineStarts) {
+				t.extendLines(t.lastWidth, t.rowOffset)
+				if t.rowOffset >= len(t.lineStarts) {
+					t.rowOffset = max(len(t.lineStarts)-1, 0)
+				}
+			}
+		}
+	case tcell.KeyUp: // Move one row up.
+		if event.Modifiers()&tcell.ModAlt == 0 {
+			// Regular movement.
+			column := t.cursor.column
+			t.moveCursor(t.cursor.row-1, t.cursor.column)
+			t.cursor.column = column
+			if event.Modifiers()&tcell.ModShift == 0 {
+				t.selectionStart = t.cursor
+			}
+		} else {
+			// Just scroll.
+			t.rowOffset--
+			if t.rowOffset < 0 {
+				t.rowOffset = 0
+			}
+		}
+	case tcell.KeyHome, tcell.KeyCtrlA: // Move to the start of the line.
+		t.moveCursor(t.cursor.row, 0)
+		if event.Modifiers()&tcell.ModShift == 0 {
+			t.selectionStart = t.cursor
+		}
+	case tcell.KeyEnd, tcell.KeyCtrlE: // Move to the end of the line.
+		t.moveCursor(t.cursor.row, -1)
+		if event.Modifiers()&tcell.ModShift == 0 {
+			t.selectionStart = t.cursor
+		}
+	case tcell.KeyPgDn, tcell.KeyCtrlF: // Move one page down.
+		column := t.cursor.column
+		t.moveCursor(t.cursor.row+t.lastHeight, t.cursor.column)
+		t.cursor.column = column
+		if event.Modifiers()&tcell.ModShift == 0 {
+			t.selectionStart = t.cursor
+		}
+	case tcell.KeyPgUp, tcell.KeyCtrlB: // Move one page up.
+		column := t.cursor.column
+		t.moveCursor(t.cursor.row-t.lastHeight, t.cursor.column)
+		t.cursor.column = column
+		if event.Modifiers()&tcell.ModShift == 0 {
+			t.selectionStart = t.cursor
+		}
+	case tcell.KeyEnter: // Insert a newline.
 		from, to, row := t.getSelection()
-		t.cursor.pos = t.replace(from, to, pastedText, false)
+		t.cursor.pos = t.replace(from, to, TextAreaNewLine, t.lastAction == taActionTypeSpace)
 		t.cursor.row = -1
 		t.truncateLines(row - 1)
 		t.findCursor(true, row)
 		t.selectionStart = t.cursor
-	})
+		newLastAction = taActionTypeSpace
+	case tcell.KeyTab: // Insert a tab character. It will be rendered as TabSize spaces.
+		// But forwarding takes precedence.
+		if t.finished != nil {
+			t.finished(key)
+			return
+		}
+
+		from, to, row := t.getSelection()
+		t.cursor.pos = t.replace(from, to, "\t", t.lastAction == taActionTypeSpace)
+		t.cursor.row = -1
+		t.truncateLines(row - 1)
+		t.findCursor(true, row)
+		t.selectionStart = t.cursor
+		newLastAction = taActionTypeSpace
+	case tcell.KeyBacktab, tcell.KeyEscape: // Only used in forms.
+		if t.finished != nil {
+			t.finished(key)
+			return
+		}
+	case tcell.KeyRune:
+		if event.Modifiers()&tcell.ModAlt > 0 {
+			// We accept some Alt- key combinations.
+			switch event.Str() {
+			case "f":
+				if event.Modifiers()&tcell.ModShift == 0 {
+					t.moveWordRight(false, true)
+					t.selectionStart = t.cursor
+				} else {
+					t.moveWordRight(true, true)
+				}
+			case "b":
+				t.moveWordLeft(true)
+				if event.Modifiers()&tcell.ModShift == 0 {
+					t.selectionStart = t.cursor
+				}
+			}
+		} else {
+			// Other keys are simply accepted as regular characters.
+			str := event.Str()
+			from, to, row := t.getSelection()
+			newLastAction = taActionTypeNonSpace
+			if str == " " {
+				newLastAction = taActionTypeSpace
+			}
+			t.cursor.pos = t.replace(from, to, str, newLastAction == t.lastAction || t.lastAction == taActionTypeNonSpace && newLastAction == taActionTypeSpace)
+			t.cursor.row = -1
+			t.truncateLines(row - 1)
+			t.findCursor(true, row)
+			t.selectionStart = t.cursor
+		}
+	case tcell.KeyBackspace, tcell.KeyBackspace2: // Delete backwards. tcell.KeyBackspace is the same as tcell.CtrlH.
+		from, to, row := t.getSelection()
+		if from != to {
+			// Simply delete the current selection.
+			t.cursor.pos = t.replace(from, to, "", false)
+			t.cursor.row = -1
+			t.truncateLines(row - 1)
+			t.findCursor(true, row)
+			t.selectionStart = t.cursor
+			break
+		}
+
+		beforeCursor := t.cursor
+		if event.Modifiers()&tcell.ModAlt == 0 {
+			// Move the cursor back by one grapheme cluster.
+			if t.cursor.actualColumn == 0 {
+				// Move to the end of the previous row.
+				if t.cursor.row > 0 {
+					t.moveCursor(t.cursor.row-1, -1)
+				}
+			} else {
+				// Move one grapheme cluster to the left.
+				t.moveCursor(t.cursor.row, t.cursor.actualColumn-1)
+			}
+			newLastAction = taActionBackspace
+		} else {
+			// Move the cursor back by one word.
+			t.moveWordLeft(false)
+		}
+
+		// Remove that last grapheme cluster.
+		if t.cursor.pos != beforeCursor.pos {
+			t.cursor, beforeCursor = beforeCursor, t.cursor                                                 // So we put the right position on the stack.
+			t.cursor.pos = t.replace(beforeCursor.pos, t.cursor.pos, "", t.lastAction == taActionBackspace) // Delete the character.
+			t.cursor.row = -1
+			t.truncateLines(beforeCursor.row - 1)
+			t.findCursor(true, beforeCursor.row-1)
+		}
+		t.selectionStart = t.cursor
+	case tcell.KeyDelete, tcell.KeyCtrlD: // Delete forward.
+		from, to, row := t.getSelection()
+		if from != to {
+			// Simply delete the current selection.
+			t.cursor.pos = t.replace(from, to, "", false)
+			t.cursor.row = -1
+			t.truncateLines(row - 1)
+			t.findCursor(true, row)
+			t.selectionStart = t.cursor
+			break
+		}
+
+		if t.cursor.pos[0] != 1 {
+			_, _, _, _, endPos, _ := t.step("", t.cursor.pos, t.cursor.pos)
+			t.cursor.pos = t.replace(t.cursor.pos, endPos, "", t.lastAction == taActionDelete) // Delete the character.
+			t.cursor.pos[2] = endPos[2]
+			t.truncateLines(t.cursor.row - 1)
+			t.findCursor(true, t.cursor.row)
+			newLastAction = taActionDelete
+		}
+		t.selectionStart = t.cursor
+	case tcell.KeyCtrlK: // Delete everything under and to the right of the cursor until before the next newline character.
+		pos := t.cursor.pos
+		endPos := pos
+		var cluster, text string
+		for pos[0] != 1 {
+			var boundaries int
+			oldPos := pos
+			cluster, text, boundaries, _, pos, endPos = t.step(text, pos, endPos)
+			if boundaries&uniseg.MaskLine == uniseg.LineMustBreak {
+				if uniseg.HasTrailingLineBreakInString(cluster) {
+					pos = oldPos
+				}
+				break
+			}
+		}
+		t.cursor.pos = t.replace(t.cursor.pos, pos, "", false)
+		row := t.cursor.row
+		t.cursor.row = -1
+		t.truncateLines(row - 1)
+		t.findCursor(true, row)
+		t.selectionStart = t.cursor
+	case tcell.KeyCtrlW: // Delete from the start of the current word to the left of the cursor.
+		pos := t.cursor.pos
+		t.moveWordLeft(true)
+		t.cursor.pos = t.replace(t.cursor.pos, pos, "", false)
+		row := t.cursor.row - 1
+		t.cursor.row = -1
+		t.truncateLines(row)
+		t.findCursor(true, row)
+		t.selectionStart = t.cursor
+	case tcell.KeyCtrlU: // Delete the current line.
+		t.deleteLine()
+		t.selectionStart = t.cursor
+	case tcell.KeyCtrlL: // Select everything.
+		t.selectionStart.row, t.selectionStart.column, t.selectionStart.actualColumn = 0, 0, 0
+		t.selectionStart.pos = [3]int{t.spans[0].next, 0, -1}
+		row := t.cursor.row
+		t.cursor.row = -1
+		t.cursor.pos = [3]int{1, 0, -1}
+		t.findCursor(false, row)
+	case tcell.KeyCtrlQ: // Copy to clipboard.
+		if t.cursor != t.selectionStart {
+			t.copyToClipboard(t.getSelectedText())
+			t.selectionStart = t.cursor
+		}
+	case tcell.KeyCtrlX: // Cut to clipboard.
+		if t.cursor != t.selectionStart {
+			t.copyToClipboard(t.getSelectedText())
+			from, to, row := t.getSelection()
+			t.cursor.pos = t.replace(from, to, "", false)
+			t.cursor.row = -1
+			t.truncateLines(row - 1)
+			t.findCursor(true, row)
+			t.selectionStart = t.cursor
+		}
+	case tcell.KeyCtrlV: // Paste from clipboard.
+		from, to, row := t.getSelection()
+		t.cursor.pos = t.replace(from, to, t.pasteFromClipboard(), false)
+		t.cursor.row = -1
+		t.truncateLines(row - 1)
+		t.findCursor(true, row)
+		t.selectionStart = t.cursor
+	case tcell.KeyCtrlZ: // Undo.
+		if t.nextUndo <= 0 {
+			break
+		}
+		for t.nextUndo > 0 {
+			t.nextUndo--
+			undo := t.undoStack[t.nextUndo]
+			t.spans[undo.originalBefore], t.spans[undo.before] = t.spans[undo.before], t.spans[undo.originalBefore]
+			t.spans[undo.originalAfter], t.spans[undo.after] = t.spans[undo.after], t.spans[undo.originalAfter]
+			t.cursor.pos, t.undoStack[t.nextUndo].pos = undo.pos, t.cursor.pos
+			t.length, t.undoStack[t.nextUndo].length = undo.length, t.length
+			if !undo.continuation {
+				break
+			}
+		}
+		t.cursor.row = -1
+		t.truncateLines(0) // This is why Undo is expensive for large texts. (t.lineStarts can get largely unusable after an undo.)
+		t.findCursor(true, 0)
+		t.selectionStart = t.cursor
+		if t.changed != nil {
+			defer t.changed()
+		}
+	case tcell.KeyCtrlY: // Redo.
+		if t.nextUndo >= len(t.undoStack) {
+			break
+		}
+		for t.nextUndo < len(t.undoStack) {
+			undo := t.undoStack[t.nextUndo]
+			t.spans[undo.originalBefore], t.spans[undo.before] = t.spans[undo.before], t.spans[undo.originalBefore]
+			t.spans[undo.originalAfter], t.spans[undo.after] = t.spans[undo.after], t.spans[undo.originalAfter]
+			t.cursor.pos, t.undoStack[t.nextUndo].pos = undo.pos, t.cursor.pos
+			t.length, t.undoStack[t.nextUndo].length = undo.length, t.length
+			t.nextUndo++
+			if t.nextUndo < len(t.undoStack) && !t.undoStack[t.nextUndo].continuation {
+				break
+			}
+		}
+		t.cursor.row = -1
+		t.truncateLines(0) // This is why Redo is expensive for large texts. (t.lineStarts can get largely unusable after an undo.)
+		t.findCursor(true, 0)
+		t.selectionStart = t.cursor
+		if t.changed != nil {
+			defer t.changed()
+		}
+	}
+}
+
+// MouseHandler returns the mouse handler for this primitive.
+func (t *TextArea) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+	if t.disabled {
+		return false, nil
+	}
+	previousSelectionStart, previousCursor := t.selectionStart, t.cursor
+	previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
+	previousDragging := t.dragging
+	defer func() {
+		if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
+			previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset || previousDragging != t.dragging {
+			t.MarkDirty()
+		}
+	}()
+
+	x, y := event.Position()
+	rectX, rectY, _, _ := t.GetInnerRect()
+	if !t.InRect(x, y) {
+		return false, nil
+	}
+
+	// Trigger a "moved" event at the end if requested.
+	if t.moved != nil {
+		selectionStart, cursor := t.selectionStart, t.cursor
+		defer func() {
+			if selectionStart != t.selectionStart || cursor != t.cursor {
+				t.moved()
+			}
+		}()
+	}
+
+	// Turn mouse coordinates into text coordinates.
+	labelWidth := t.labelWidth
+	if labelWidth == 0 && t.label != "" {
+		labelWidth = TaggedStringWidth(t.label)
+	}
+	column := x - rectX - labelWidth
+	row := y - rectY
+	if !t.wrap {
+		column += t.columnOffset
+	}
+	row += t.rowOffset
+
+	// Process mouse actions.
+	switch action {
+	case MouseLeftDown:
+		t.moveCursor(row, column)
+		if event.Modifiers()&tcell.ModShift == 0 {
+			t.selectionStart = t.cursor
+		}
+		setFocus(t)
+		consumed = true
+		capture = t
+		t.dragging = true
+	case MouseMove:
+		if !t.dragging {
+			break
+		}
+		t.moveCursor(row, column)
+		consumed = true
+	case MouseLeftUp:
+		t.moveCursor(row, column)
+		consumed = true
+		capture = nil
+		t.dragging = false
+	case MouseLeftDoubleClick: // Select word.
+		// Left down/up was already triggered so we are at the correct
+		// position.
+		t.moveWordLeft(false)
+		t.selectionStart = t.cursor
+		t.moveWordRight(true, false)
+		consumed = true
+	case MouseScrollUp:
+		if t.rowOffset > 0 {
+			t.rowOffset--
+		}
+		consumed = true
+	case MouseScrollDown:
+		t.rowOffset++
+		if t.rowOffset >= len(t.lineStarts) {
+			t.rowOffset = max(len(t.lineStarts)-1, 0)
+		}
+		consumed = true
+	case MouseScrollLeft:
+		if t.columnOffset > 0 {
+			t.columnOffset--
+		}
+		consumed = true
+	case MouseScrollRight:
+		t.columnOffset++
+		if t.columnOffset >= t.widestLine {
+			t.columnOffset = max(t.widestLine-1, 0)
+		}
+		consumed = true
+	}
+
+	return
+}
+
+// PasteHandler handles pasted text for this primitive.
+func (t *TextArea) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+	from, to, row := t.getSelection()
+	t.cursor.pos = t.replace(from, to, pastedText, false)
+	t.cursor.row = -1
+	t.truncateLines(row - 1)
+	t.findCursor(true, row)
+	t.selectionStart = t.cursor
 }
