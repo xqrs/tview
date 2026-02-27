@@ -241,7 +241,6 @@ func (f *Frame) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) 
 		return
 	}
 	f.primitive.InputHandler(event, setFocus)
-	return
 }
 
 // PasteHandler handles pasted text for this primitive.
