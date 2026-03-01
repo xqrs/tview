@@ -133,21 +133,18 @@ func NewVerticalScrollBar(lengths ScrollLengths) *ScrollBar {
 func (s *ScrollBar) SetLengths(lengths ScrollLengths) *ScrollBar {
 	s.contentLen = max(lengths.ContentLen, 0)
 	s.viewportLen = max(lengths.ViewportLen, 0)
-	s.MarkDirty()
 	return s
 }
 
 // SetOffset sets the logical offset.
 func (s *ScrollBar) SetOffset(offset int) *ScrollBar {
 	s.offset = max(offset, 0)
-	s.MarkDirty()
 	return s
 }
 
 // SetGlyphSet applies a glyph set.
 func (s *ScrollBar) SetGlyphSet(g GlyphSet) *ScrollBar {
 	s.glyphSet = g
-	s.MarkDirty()
 	return s
 }
 
@@ -155,7 +152,6 @@ func (s *ScrollBar) SetGlyphSet(g GlyphSet) *ScrollBar {
 func (s *ScrollBar) SetArrows(arrows ScrollBarArrows) *ScrollBar {
 	if s.arrows != arrows {
 		s.arrows = arrows
-		s.MarkDirty()
 	}
 	return s
 }
@@ -164,7 +160,6 @@ func (s *ScrollBar) SetArrows(arrows ScrollBarArrows) *ScrollBar {
 func (s *ScrollBar) SetTrackClickBehavior(behavior TrackClickBehavior) *ScrollBar {
 	if s.trackClickBehavior != behavior {
 		s.trackClickBehavior = behavior
-		s.MarkDirty()
 	}
 	return s
 }
@@ -176,7 +171,6 @@ func (s *ScrollBar) SetScrollStep(step int) *ScrollBar {
 	}
 	if s.scrollStep != step {
 		s.scrollStep = step
-		s.MarkDirty()
 	}
 	return s
 }
@@ -185,7 +179,6 @@ func (s *ScrollBar) SetScrollStep(step int) *ScrollBar {
 func (s *ScrollBar) SetAutoHide(autoHide bool) *ScrollBar {
 	if s.autoHide != autoHide {
 		s.autoHide = autoHide
-		s.MarkDirty()
 	}
 	return s
 }
@@ -196,7 +189,6 @@ func (s *ScrollBar) SetThumbGlyph(glyph string) *ScrollBar {
 		s.glyphSet.ThumbVerticalLower[i] = glyph
 		s.glyphSet.ThumbVerticalUpper[i] = glyph
 	}
-	s.MarkDirty()
 	return s
 }
 
@@ -204,7 +196,6 @@ func (s *ScrollBar) SetThumbGlyph(glyph string) *ScrollBar {
 func (s *ScrollBar) SetThumbStyle(style tcell.Style) *ScrollBar {
 	if s.thumbStyle != style {
 		s.thumbStyle = style
-		s.MarkDirty()
 	}
 	return s
 }
@@ -213,7 +204,6 @@ func (s *ScrollBar) SetThumbStyle(style tcell.Style) *ScrollBar {
 func (s *ScrollBar) SetTrackGlyph(glyph string, visible bool) *ScrollBar {
 	s.glyphSet.TrackVertical = glyph
 	s.showTrack = visible
-	s.MarkDirty()
 	return s
 }
 
@@ -221,7 +211,6 @@ func (s *ScrollBar) SetTrackGlyph(glyph string, visible bool) *ScrollBar {
 func (s *ScrollBar) SetTrackStyle(style tcell.Style) *ScrollBar {
 	if s.trackStyle != style {
 		s.trackStyle = style
-		s.MarkDirty()
 	}
 	return s
 }
@@ -230,7 +219,6 @@ func (s *ScrollBar) SetTrackStyle(style tcell.Style) *ScrollBar {
 func (s *ScrollBar) SetArrowStyle(style tcell.Style) *ScrollBar {
 	if s.arrowStyle != style {
 		s.arrowStyle = style
-		s.MarkDirty()
 	}
 	return s
 }

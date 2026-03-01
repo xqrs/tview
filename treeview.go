@@ -46,9 +46,6 @@ type TreeNode struct {
 	// An optional function which is called when the user selects this node.
 	selected func()
 
-	// Whether this node (or one of its children) needs redraw.
-	dirty bool
-
 	// The hierarchy level (0 for the root, 1 for its children, and so on). This
 	// is only up to date immediately after a call to process() (e.g. via
 	// Draw()).
@@ -70,7 +67,6 @@ func NewTreeNode(text string) *TreeNode {
 		expanded:          true,
 		expandable:        false,
 		selectable:        true,
-		dirty:             true,
 	}
 }
 
@@ -106,7 +102,7 @@ func (n *TreeNode) Walk(callback func(node, parent *TreeNode) bool) *TreeNode {
 // internal tree structure.
 func (n *TreeNode) SetReference(reference any) *TreeNode {
 	n.reference = reference
-	n.markDirty()
+
 	return n
 }
 
@@ -128,7 +124,7 @@ func (n *TreeNode) SetChildren(childNodes []*TreeNode) *TreeNode {
 	}
 	if changed {
 		n.children = childNodes
-		n.markDirty()
+
 	}
 	return n
 }
@@ -136,7 +132,7 @@ func (n *TreeNode) SetChildren(childNodes []*TreeNode) *TreeNode {
 // SetLine sets the node's styled text line.
 func (n *TreeNode) SetLine(line Line) *TreeNode {
 	n.line = line.Clone()
-	n.markDirty()
+
 	return n
 }
 
@@ -154,7 +150,7 @@ func (n *TreeNode) GetChildren() []*TreeNode {
 func (n *TreeNode) ClearChildren() *TreeNode {
 	if len(n.children) > 0 {
 		n.children = nil
-		n.markDirty()
+
 	}
 	return n
 }
@@ -162,7 +158,7 @@ func (n *TreeNode) ClearChildren() *TreeNode {
 // AddChild adds a new child node to this node.
 func (n *TreeNode) AddChild(node *TreeNode) *TreeNode {
 	n.children = append(n.children, node)
-	n.markDirty()
+
 	return n
 }
 
@@ -172,7 +168,7 @@ func (n *TreeNode) RemoveChild(node *TreeNode) *TreeNode {
 	for index, child := range n.children {
 		if child == node {
 			n.children = slices.Delete(n.children, index, index+1)
-			n.markDirty()
+
 			break
 		}
 	}
@@ -184,7 +180,7 @@ func (n *TreeNode) RemoveChild(node *TreeNode) *TreeNode {
 func (n *TreeNode) SetSelectable(selectable bool) *TreeNode {
 	if n.selectable != selectable {
 		n.selectable = selectable
-		n.markDirty()
+
 	}
 	return n
 }
@@ -200,7 +196,7 @@ func (n *TreeNode) SetSelectedFunc(handler func()) *TreeNode {
 func (n *TreeNode) SetExpanded(expanded bool) *TreeNode {
 	if n.expanded != expanded {
 		n.expanded = expanded
-		n.markDirty()
+
 	}
 	return n
 }
@@ -210,7 +206,7 @@ func (n *TreeNode) SetExpanded(expanded bool) *TreeNode {
 func (n *TreeNode) SetExpandable(expandable bool) *TreeNode {
 	if n.expandable != expandable {
 		n.expandable = expandable
-		n.markDirty()
+
 	}
 	return n
 }
@@ -225,7 +221,7 @@ func (n *TreeNode) IsExpandable() bool {
 func (n *TreeNode) Expand() *TreeNode {
 	if !n.expanded {
 		n.expanded = true
-		n.markDirty()
+
 	}
 	return n
 }
@@ -234,42 +230,30 @@ func (n *TreeNode) Expand() *TreeNode {
 func (n *TreeNode) Collapse() *TreeNode {
 	if n.expanded {
 		n.expanded = false
-		n.markDirty()
+
 	}
 	return n
 }
 
 // ExpandAll expands this node and all descendent nodes.
 func (n *TreeNode) ExpandAll() *TreeNode {
-	changed := false
 	n.Walk(func(node, parent *TreeNode) bool {
 		if !node.expanded {
 			node.expanded = true
-			node.dirty = true
-			changed = true
 		}
 		return true
 	})
-	if changed {
-		n.markDirty()
-	}
 	return n
 }
 
 // CollapseAll collapses this node and all descendent nodes.
 func (n *TreeNode) CollapseAll() *TreeNode {
-	changed := false
 	n.Walk(func(node, parent *TreeNode) bool {
 		if node.expanded {
 			node.expanded = false
-			node.dirty = true
-			changed = true
 		}
 		return true
 	})
-	if changed {
-		n.markDirty()
-	}
 	return n
 }
 
@@ -282,7 +266,7 @@ func (n *TreeNode) IsExpanded() bool {
 func (n *TreeNode) SetSelectedTextStyle(style tcell.Style) *TreeNode {
 	if n.selectedTextStyle != style {
 		n.selectedTextStyle = style
-		n.markDirty()
+
 	}
 	return n
 }
@@ -299,7 +283,7 @@ func (n *TreeNode) GetSelectedTextStyle() tcell.Style {
 func (n *TreeNode) SetIndent(indent int) *TreeNode {
 	if n.indent != indent {
 		n.indent = indent
-		n.markDirty()
+
 	}
 	return n
 }
@@ -436,39 +420,10 @@ func NewTreeView() *TreeView {
 	}
 }
 
-func (n *TreeNode) markDirty() {
-	n.dirty = true
-}
-
-func (n *TreeNode) markClean() {
-	n.dirty = false
-	for _, child := range n.children {
-		if child != nil {
-			child.markClean()
-		}
-	}
-}
-
-func (n *TreeNode) isDirty() bool {
-	if n == nil {
-		return false
-	}
-	if n.dirty {
-		return true
-	}
-	for _, child := range n.children {
-		if child != nil && child.isDirty() {
-			return true
-		}
-	}
-	return false
-}
-
 // SetRoot sets the root node of the tree.
 func (t *TreeView) SetRoot(root *TreeNode) *TreeView {
 	if t.root != root {
 		t.root = root
-		t.MarkDirty()
 	}
 	return t
 }
@@ -489,7 +444,6 @@ func (t *TreeView) GetRoot() *TreeNode {
 func (t *TreeView) SetCurrentNode(node *TreeNode) *TreeView {
 	if t.currentNode != node {
 		t.currentNode = node
-		t.MarkDirty()
 	}
 	return t
 }
@@ -535,7 +489,6 @@ func (t *TreeView) GetPath(node *TreeNode) []*TreeNode {
 func (t *TreeView) SetTopLevel(topLevel int) *TreeView {
 	if t.topLevel != topLevel {
 		t.topLevel = topLevel
-		t.MarkDirty()
 	}
 	return t
 }
@@ -545,7 +498,6 @@ func (t *TreeView) SetTopLevel(topLevel int) *TreeView {
 func (t *TreeView) SetCenterCursor(center bool) *TreeView {
 	if t.centerCursor != center {
 		t.centerCursor = center
-		t.MarkDirty()
 	}
 	return t
 }
@@ -573,7 +525,6 @@ func (t *TreeView) SetPrefixes(prefixes []string) *TreeView {
 	}
 	if changed {
 		t.prefixes = prefixes
-		t.MarkDirty()
 	}
 	return t
 }
@@ -585,7 +536,6 @@ func (t *TreeView) SetPrefixes(prefixes []string) *TreeView {
 func (t *TreeView) SetMarkers(markers TreeMarkers) *TreeView {
 	if t.markers != markers {
 		t.markers = markers
-		t.MarkDirty()
 	}
 	return t
 }
@@ -601,7 +551,6 @@ func (t *TreeView) GetMarkers() TreeMarkers {
 func (t *TreeView) SetAlign(align bool) *TreeView {
 	if t.align != align {
 		t.align = align
-		t.MarkDirty()
 	}
 	return t
 }
@@ -611,7 +560,6 @@ func (t *TreeView) SetAlign(align bool) *TreeView {
 func (t *TreeView) SetGraphics(showGraphics bool) *TreeView {
 	if t.graphics != showGraphics {
 		t.graphics = showGraphics
-		t.MarkDirty()
 	}
 	return t
 }
@@ -620,7 +568,6 @@ func (t *TreeView) SetGraphics(showGraphics bool) *TreeView {
 func (t *TreeView) SetGraphicsColor(color tcell.Color) *TreeView {
 	if t.graphicsColor != color {
 		t.graphicsColor = color
-		t.MarkDirty()
 	}
 	return t
 }
@@ -680,25 +627,8 @@ func (t *TreeView) Move(offset int) *TreeView {
 	}
 	t.movement = treeMove
 	t.step = offset
-	t.MarkDirty()
 	t.process(false)
 	return t
-}
-
-// IsDirty returns whether this primitive or its nodes need redraw.
-func (t *TreeView) IsDirty() bool {
-	if t.Box.IsDirty() {
-		return true
-	}
-	return t.root != nil && t.root.isDirty()
-}
-
-// MarkClean marks this primitive and all nodes as clean.
-func (t *TreeView) MarkClean() {
-	t.Box.MarkClean()
-	if t.root != nil {
-		t.root.markClean()
-	}
 }
 
 // process builds the visible tree, populates the "nodes" slice, and processes
@@ -1076,7 +1006,7 @@ func mergeStyle(base, overlay tcell.Style) tcell.Style {
 }
 
 // InputHandler returns the handler for this primitive.
-func (t *TreeView) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (t *TreeView) InputHandler(event *tcell.EventKey) Command {
 	selectNode := func() {
 		node := t.currentNode
 		if node != nil {
@@ -1137,33 +1067,34 @@ func (t *TreeView) InputHandler(event *tcell.EventKey, setFocus func(p Primitive
 		selectNode()
 	}
 
-	t.MarkDirty()
 	t.process(true)
+	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (t *TreeView) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (t *TreeView) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var cmd Command
 	x, y := event.Position()
 	if !t.InRect(x, y) {
-		return false, nil
+		return nil, nil
 	}
 
 	switch action {
 	case MouseLeftDown:
 		t.lastMouseY = y
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseMove:
 		if event.Buttons()&tcell.Button1 != 0 && t.lastMouseY != -1 {
 			t.movement = treeScroll
 			t.step = t.lastMouseY - y
 			t.lastMouseY = y
 		}
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseLeftUp:
 		t.lastMouseY = -1
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseLeftClick:
-		setFocus(t)
+		cmd = AppendCommand(cmd, SetFocusCommand{Target: t})
 		_, rectY, _, _ := t.GetInnerRect()
 		y += t.offsetY - rectY
 		if t.lastMouseY != -1 {
@@ -1187,19 +1118,15 @@ func (t *TreeView) MouseHandler(action MouseAction, event *tcell.EventMouse, set
 				}
 			}
 		}
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseScrollUp:
 		t.movement = treeScroll
 		t.step = -1
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseScrollDown:
 		t.movement = treeScroll
 		t.step = 1
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	}
-	if consumed {
-		t.MarkDirty()
-	}
-
-	return
+	return nil, cmd
 }

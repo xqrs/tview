@@ -71,7 +71,6 @@ func NewFlex() *Flex {
 func (f *Flex) SetDirection(direction int) *Flex {
 	if f.direction != direction {
 		f.direction = direction
-		f.MarkDirty()
 	}
 	return f
 }
@@ -81,7 +80,6 @@ func (f *Flex) SetDirection(direction int) *Flex {
 func (f *Flex) SetFullScreen(fullScreen bool) *Flex {
 	if f.fullScreen != fullScreen {
 		f.fullScreen = fullScreen
-		f.MarkDirty()
 	}
 	return f
 }
@@ -101,34 +99,17 @@ func (f *Flex) SetFullScreen(fullScreen bool) *Flex {
 // You can provide a nil value for the primitive. This will still consume screen
 // space but nothing will be drawn.
 func (f *Flex) AddItem(item Primitive, fixedSize, proportion int, focus bool) *Flex {
-	bindDirtyParent(item, f.Box)
 	f.items = append(f.items, &flexItem{Item: item, FixedSize: fixedSize, Proportion: proportion, Focus: focus})
-	f.MarkDirty()
 	return f
 }
 
 // RemoveItem removes all items for the given primitive from the container,
 // keeping the order of the remaining items intact.
 func (f *Flex) RemoveItem(p Primitive) *Flex {
-	removed := false
 	for index := len(f.items) - 1; index >= 0; index-- {
 		if f.items[index].Item == p {
 			f.items = slices.Delete(f.items, index, index+1)
-			removed = true
 		}
-	}
-	if removed {
-		stillPresent := false
-		for _, item := range f.items {
-			if item.Item == p {
-				stillPresent = true
-				break
-			}
-		}
-		if !stillPresent {
-			unbindDirtyParent(p, f.Box)
-		}
-		f.MarkDirty()
 	}
 	return f
 }
@@ -149,11 +130,7 @@ func (f *Flex) GetItem(index int) Primitive {
 // Clear removes all items from the container.
 func (f *Flex) Clear() *Flex {
 	if len(f.items) > 0 {
-		for _, item := range f.items {
-			unbindDirtyParent(item.Item, f.Box)
-		}
 		f.items = nil
-		f.MarkDirty()
 	}
 	return f
 }
@@ -162,41 +139,13 @@ func (f *Flex) Clear() *Flex {
 // are multiple Flex items with the same primitive, they will all receive the
 // same size. For details regarding the size parameters, see AddItem().
 func (f *Flex) ResizeItem(p Primitive, fixedSize, proportion int) *Flex {
-	changed := false
 	for _, item := range f.items {
 		if item.Item == p && (item.FixedSize != fixedSize || item.Proportion != proportion) {
 			item.FixedSize = fixedSize
 			item.Proportion = proportion
-			changed = true
 		}
-	}
-	if changed {
-		f.MarkDirty()
 	}
 	return f
-}
-
-// IsDirty returns whether this primitive or one of its children needs redraw.
-func (f *Flex) IsDirty() bool {
-	if f.Box.IsDirty() {
-		return true
-	}
-	for _, item := range f.items {
-		if item.Item != nil && item.Item.IsDirty() {
-			return true
-		}
-	}
-	return false
-}
-
-// MarkClean marks this primitive and all children as clean.
-func (f *Flex) MarkClean() {
-	f.Box.MarkClean()
-	for _, item := range f.items {
-		if item.Item != nil {
-			item.Item.MarkClean()
-		}
-	}
 }
 
 // Draw draws this primitive onto the screen.
@@ -283,9 +232,13 @@ func (f *Flex) HasFocus() bool {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (f *Flex) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (f *Flex) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var (
+		capture Primitive
+		cmd     Command
+	)
 	if !f.InRect(event.Position()) {
-		return false, nil
+		return nil, nil
 	}
 
 	// Pass mouse events along to the first child item that takes it.
@@ -293,31 +246,33 @@ func (f *Flex) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocu
 		if item.Item == nil {
 			continue
 		}
-		consumed, capture = item.Item.MouseHandler(action, event, setFocus)
-		if consumed {
-			return
+		var childCmds Command
+		capture, childCmds = item.Item.MouseHandler(action, event)
+		cmd = AppendCommand(cmd, childCmds)
+		if childCmds != nil {
+			return capture, cmd
 		}
 	}
 
-	return
+	return nil, cmd
 }
 
 // InputHandler returns the handler for this primitive.
-func (f *Flex) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (f *Flex) InputHandler(event *tcell.EventKey) Command {
 	for _, item := range f.items {
 		if item.Item != nil && item.Item.HasFocus() {
-			item.Item.InputHandler(event, setFocus)
-			return
+			return item.Item.InputHandler(event)
 		}
 	}
+	return nil
 }
 
 // PasteHandler handles pasted text for this primitive.
-func (f *Flex) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+func (f *Flex) PasteHandler(pastedText string) Command {
 	for _, item := range f.items {
 		if item.Item != nil && item.Item.HasFocus() {
-			item.Item.PasteHandler(pastedText, setFocus)
-			return
+			return item.Item.PasteHandler(pastedText)
 		}
 	}
+	return nil
 }

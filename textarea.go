@@ -156,11 +156,10 @@ type textAreaUndoItem struct {
 //   - Ctrl-V: Replace the selected text with the clipboard text. If no text is
 //     selected, the clipboard text will be inserted at the cursor location.
 //
-// The Ctrl-Q key was chosen for the "copy" function because the Ctrl-C key is
-// the default key to stop the application. If your application frees up the
-// global Ctrl-C key and you want to bind it to the "copy to clipboard"
-// function, you may use your primitive's InputHandler to remap keys and
-// implement copying to the clipboard. Note that using your terminal's /
+// The Ctrl-Q key was chosen for the default "copy" function to avoid clashing
+// with common Ctrl-C quit bindings in user applications. You may remap keys in
+// your primitive's InputHandler and implement copying to the clipboard. Note
+// that using your terminal's /
 // operating system's key bindings for copy+paste functionality may not have the
 // expected effect as tview will not be able to handle these keys. Pasting text
 // using your operating system's or terminal's own methods may be very slow as
@@ -428,7 +427,6 @@ func (t *TextArea) SetText(text string, cursorAtTheEnd bool) *TextArea {
 	if t.lastWidth > 0 && t.moved != nil {
 		t.moved()
 	}
-	t.MarkDirty()
 
 	return t
 }
@@ -627,7 +625,6 @@ func (t *TextArea) GetTextLength() int {
 //
 // The effects of this function can be undone (and redone) by the user.
 func (t *TextArea) Replace(start, end int, text string) *TextArea {
-	previousSelectionStart, previousCursor := t.selectionStart, t.cursor
 	t.Select(start, end)
 	row := t.selectionStart.row
 	t.cursor.pos = t.replace(t.selectionStart.pos, t.cursor.pos, text, false)
@@ -637,9 +634,6 @@ func (t *TextArea) Replace(start, end int, text string) *TextArea {
 	t.selectionStart = t.cursor
 	if t.moved != nil {
 		t.moved()
-	}
-	if previousSelectionStart != t.selectionStart || previousCursor != t.cursor {
-		t.MarkDirty()
 	}
 	// The "changed" event will have been triggered by the "replace" function.
 	return t
@@ -656,9 +650,6 @@ func (t *TextArea) Select(start, end int) *TextArea {
 	defer func() {
 		if (oldFrom != t.selectionStart || oldTo != t.cursor) && t.moved != nil {
 			t.moved()
-		}
-		if oldFrom != t.selectionStart || oldTo != t.cursor {
-			t.MarkDirty()
 		}
 	}()
 
@@ -767,7 +758,6 @@ func (t *TextArea) SetWrap(wrap bool) *TextArea {
 	if t.wrap != wrap {
 		t.wrap = wrap
 		t.reset()
-		t.MarkDirty()
 	}
 	return t
 }
@@ -783,7 +773,6 @@ func (t *TextArea) SetWordWrap(wrapOnWords bool) *TextArea {
 	if t.wordWrap != wrapOnWords {
 		t.wordWrap = wrapOnWords
 		t.reset()
-		t.MarkDirty()
 	}
 	return t
 }
@@ -792,7 +781,6 @@ func (t *TextArea) SetWordWrap(wrapOnWords bool) *TextArea {
 // empty.
 func (t *TextArea) SetPlaceholder(placeholder Line) *TextArea {
 	t.placeholder = placeholder.Clone()
-	t.MarkDirty()
 	return t
 }
 
@@ -800,7 +788,6 @@ func (t *TextArea) SetPlaceholder(placeholder Line) *TextArea {
 func (t *TextArea) SetLabel(label string) *TextArea {
 	if t.label != label {
 		t.label = label
-		t.MarkDirty()
 	}
 	return t
 }
@@ -815,7 +802,6 @@ func (t *TextArea) GetLabel() string {
 func (t *TextArea) SetLabelWidth(width int) *TextArea {
 	if t.labelWidth != width {
 		t.labelWidth = width
-		t.MarkDirty()
 	}
 	return t
 }
@@ -833,7 +819,6 @@ func (t *TextArea) SetSize(rows, columns int) *TextArea {
 	if t.width != columns || t.height != rows {
 		t.width = columns
 		t.height = rows
-		t.MarkDirty()
 	}
 	return t
 }
@@ -852,7 +837,6 @@ func (t *TextArea) GetFieldHeight() int {
 func (t *TextArea) SetDisabled(disabled bool) FormItem {
 	if t.disabled != disabled {
 		t.disabled = disabled
-		t.MarkDirty()
 	}
 	if t.finished != nil {
 		t.finished(-1)
@@ -871,7 +855,6 @@ func (t *TextArea) GetDisabled() bool {
 func (t *TextArea) SetMaxLength(maxLength int) *TextArea {
 	if t.maxLength != maxLength {
 		t.maxLength = maxLength
-		t.MarkDirty()
 	}
 	return t
 }
@@ -882,7 +865,6 @@ func (t *TextArea) setMinCursorPadding(prefix, suffix int) *TextArea {
 	if t.minCursorPrefix != prefix || t.minCursorSuffix != suffix {
 		t.minCursorPrefix = prefix
 		t.minCursorSuffix = suffix
-		t.MarkDirty()
 	}
 	return t
 }
@@ -891,7 +873,6 @@ func (t *TextArea) setMinCursorPadding(prefix, suffix int) *TextArea {
 func (t *TextArea) SetLabelStyle(style tcell.Style) *TextArea {
 	if t.labelStyle != style {
 		t.labelStyle = style
-		t.MarkDirty()
 	}
 	return t
 }
@@ -905,7 +886,6 @@ func (t *TextArea) GetLabelStyle() tcell.Style {
 func (t *TextArea) SetTextStyle(style tcell.Style) *TextArea {
 	if t.textStyle != style {
 		t.textStyle = style
-		t.MarkDirty()
 	}
 	return t
 }
@@ -919,7 +899,6 @@ func (t *TextArea) GetTextStyle() tcell.Style {
 func (t *TextArea) SetSelectedStyle(style tcell.Style) *TextArea {
 	if t.selectedStyle != style {
 		t.selectedStyle = style
-		t.MarkDirty()
 	}
 	return t
 }
@@ -938,7 +917,6 @@ func (t *TextArea) GetOffset() (row, column int) {
 func (t *TextArea) SetOffset(row, column int) *TextArea {
 	if t.rowOffset != row || t.columnOffset != column {
 		t.rowOffset, t.columnOffset = row, column
-		t.MarkDirty()
 	}
 	return t
 }
@@ -1009,27 +987,19 @@ func (t *TextArea) Focus(delegate func(p Primitive)) {
 
 // SetFormAttributes sets attributes shared by all form items.
 func (t *TextArea) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldTextColor, fieldBgColor tcell.Color) FormItem {
-	changed := false
 	if t.labelWidth != labelWidth {
 		t.labelWidth = labelWidth
-		changed = true
 	}
 	if t.backgroundColor != bgColor {
 		t.backgroundColor = bgColor
-		changed = true
 	}
 	labelStyle := t.labelStyle.Foreground(labelColor)
 	if t.labelStyle != labelStyle {
 		t.labelStyle = labelStyle
-		changed = true
 	}
 	textStyle := tcell.StyleDefault.Foreground(fieldTextColor).Background(fieldBgColor)
 	if t.textStyle != textStyle {
 		t.textStyle = textStyle
-		changed = true
-	}
-	if changed {
-		t.MarkDirty()
 	}
 	return t
 }
@@ -1054,7 +1024,6 @@ func (t *TextArea) replace(deleteStart, deleteEnd [3]int, insert string, continu
 	if deleteStart == deleteEnd && insert == "" || t.maxLength > 0 && len(insert) > 0 && t.length+len(insert) >= t.maxLength {
 		return deleteEnd
 	}
-	t.MarkDirty()
 
 	// Notify at the end.
 	if t.changed != nil {
@@ -1974,16 +1943,16 @@ func (t *TextArea) getSelectedText() string {
 }
 
 // InputHandler returns the handler for this primitive.
-func (t *TextArea) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (t *TextArea) InputHandler(event *tcell.EventKey) Command {
 	if t.disabled {
-		return
+		return nil
 	}
+	var cmd Command
 	previousSelectionStart, previousCursor := t.selectionStart, t.cursor
 	previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
 	defer func() {
 		if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
 			previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset {
-			t.MarkDirty()
 		}
 	}()
 
@@ -2149,7 +2118,7 @@ func (t *TextArea) InputHandler(event *tcell.EventKey, setFocus func(p Primitive
 		// But forwarding takes precedence.
 		if t.finished != nil {
 			t.finished(key)
-			return
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		}
 
 		from, to, row := t.getSelection()
@@ -2162,7 +2131,7 @@ func (t *TextArea) InputHandler(event *tcell.EventKey, setFocus func(p Primitive
 	case tcell.KeyBacktab, tcell.KeyEscape: // Only used in forms.
 		if t.finished != nil {
 			t.finished(key)
-			return
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		}
 	case tcell.KeyRune:
 		if event.Modifiers()&tcell.ModAlt > 0 {
@@ -2362,12 +2331,17 @@ func (t *TextArea) InputHandler(event *tcell.EventKey, setFocus func(p Primitive
 			defer t.changed()
 		}
 	}
+	return AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (t *TextArea) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (t *TextArea) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var (
+		capture Primitive
+		cmd     Command
+	)
 	if t.disabled {
-		return false, nil
+		return nil, nil
 	}
 	previousSelectionStart, previousCursor := t.selectionStart, t.cursor
 	previousRowOffset, previousColumnOffset := t.rowOffset, t.columnOffset
@@ -2375,14 +2349,13 @@ func (t *TextArea) MouseHandler(action MouseAction, event *tcell.EventMouse, set
 	defer func() {
 		if previousSelectionStart != t.selectionStart || previousCursor != t.cursor ||
 			previousRowOffset != t.rowOffset || previousColumnOffset != t.columnOffset || previousDragging != t.dragging {
-			t.MarkDirty()
 		}
 	}()
 
 	x, y := event.Position()
 	rectX, rectY, _, _ := t.GetInnerRect()
 	if !t.InRect(x, y) {
-		return false, nil
+		return nil, nil
 	}
 
 	// Trigger a "moved" event at the end if requested.
@@ -2414,8 +2387,8 @@ func (t *TextArea) MouseHandler(action MouseAction, event *tcell.EventMouse, set
 		if event.Modifiers()&tcell.ModShift == 0 {
 			t.selectionStart = t.cursor
 		}
-		setFocus(t)
-		consumed = true
+		cmd = AppendCommand(cmd, SetFocusCommand{Target: t})
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 		capture = t
 		t.dragging = true
 	case MouseMove:
@@ -2423,10 +2396,10 @@ func (t *TextArea) MouseHandler(action MouseAction, event *tcell.EventMouse, set
 			break
 		}
 		t.moveCursor(row, column)
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseLeftUp:
 		t.moveCursor(row, column)
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 		capture = nil
 		t.dragging = false
 	case MouseLeftDoubleClick: // Select word.
@@ -2435,40 +2408,41 @@ func (t *TextArea) MouseHandler(action MouseAction, event *tcell.EventMouse, set
 		t.moveWordLeft(false)
 		t.selectionStart = t.cursor
 		t.moveWordRight(true, false)
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseScrollUp:
 		if t.rowOffset > 0 {
 			t.rowOffset--
 		}
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseScrollDown:
 		t.rowOffset++
 		if t.rowOffset >= len(t.lineStarts) {
 			t.rowOffset = max(len(t.lineStarts)-1, 0)
 		}
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseScrollLeft:
 		if t.columnOffset > 0 {
 			t.columnOffset--
 		}
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	case MouseScrollRight:
 		t.columnOffset++
 		if t.columnOffset >= t.widestLine {
 			t.columnOffset = max(t.widestLine-1, 0)
 		}
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	}
 
-	return
+	return capture, cmd
 }
 
 // PasteHandler handles pasted text for this primitive.
-func (t *TextArea) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+func (t *TextArea) PasteHandler(pastedText string) Command {
 	from, to, row := t.getSelection()
 	t.cursor.pos = t.replace(from, to, pastedText, false)
 	t.cursor.row = -1
 	t.truncateLines(row - 1)
 	t.findCursor(true, row)
 	t.selectionStart = t.cursor
+	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 }

@@ -48,7 +48,6 @@ func NewFrame(primitive Primitive) *Frame {
 		left:      1,
 		right:     1,
 	}
-	bindDirtyParent(primitive, f.Box)
 
 	return f
 }
@@ -62,11 +61,8 @@ func (f *Frame) SetPrimitive(p Primitive) *Frame {
 	var hasFocus bool
 	if f.primitive != nil {
 		hasFocus = f.primitive.HasFocus()
-		unbindDirtyParent(f.primitive, f.Box)
 	}
 	f.primitive = p
-	bindDirtyParent(f.primitive, f.Box)
-	f.MarkDirty()
 	if hasFocus && f.setFocus != nil {
 		f.setFocus(p) // Restore focus.
 	}
@@ -90,7 +86,6 @@ func (f *Frame) AddText(text string, header bool, alignment Alignment, color tce
 		Alignment: alignment,
 		Color:     color,
 	})
-	f.MarkDirty()
 	return f
 }
 
@@ -98,7 +93,6 @@ func (f *Frame) AddText(text string, header bool, alignment Alignment, color tce
 func (f *Frame) Clear() *Frame {
 	if len(f.text) > 0 {
 		f.text = nil
-		f.MarkDirty()
 	}
 	return f
 }
@@ -109,25 +103,8 @@ func (f *Frame) Clear() *Frame {
 func (f *Frame) SetBorders(top, bottom, header, footer, left, right int) *Frame {
 	if f.top != top || f.bottom != bottom || f.header != header || f.footer != footer || f.left != left || f.right != right {
 		f.top, f.bottom, f.header, f.footer, f.left, f.right = top, bottom, header, footer, left, right
-		f.MarkDirty()
 	}
 	return f
-}
-
-// IsDirty returns whether this primitive or its child needs redraw.
-func (f *Frame) IsDirty() bool {
-	if f.Box.IsDirty() {
-		return true
-	}
-	return f.primitive != nil && f.primitive.IsDirty()
-}
-
-// MarkClean marks this primitive and its child as clean.
-func (f *Frame) MarkClean() {
-	f.Box.MarkClean()
-	if f.primitive != nil {
-		f.primitive.MarkClean()
-	}
 }
 
 // Draw draws this primitive onto the screen.
@@ -213,41 +190,46 @@ func (f *Frame) HasFocus() bool {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (f *Frame) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (f *Frame) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var (
+		capture Primitive
+		cmd     Command
+	)
 	if !f.InRect(event.Position()) {
-		return false, nil
+		return nil, nil
 	}
 
 	// Pass mouse events on to contained primitive.
 	if f.primitive != nil {
-		consumed, capture = f.primitive.MouseHandler(action, event, setFocus)
-		if consumed {
-			return true, capture
+		var childCmds Command
+		capture, childCmds = f.primitive.MouseHandler(action, event)
+		cmd = AppendCommand(cmd, childCmds)
+		if childCmds != nil {
+			return capture, AppendCommand(cmd, ConsumeEventCommand{})
 		}
 	}
 
 	// Clicking on the frame parts.
 	if action == MouseLeftDown {
-		setFocus(f)
-		consumed = true
+		cmd = AppendCommand(cmd, SetFocusCommand{Target: f})
+		cmd = AppendCommand(cmd, ConsumeEventCommand{})
 	}
 
-	return
+	return capture, cmd
 }
 
 // InputHandler returns the handler for this primitive.
-func (f *Frame) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (f *Frame) InputHandler(event *tcell.EventKey) Command {
 	if f.primitive == nil {
-		return
+		return nil
 	}
-	f.primitive.InputHandler(event, setFocus)
-	return
+	return f.primitive.InputHandler(event)
 }
 
 // PasteHandler handles pasted text for this primitive.
-func (f *Frame) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+func (f *Frame) PasteHandler(pastedText string) Command {
 	if f.primitive == nil {
-		return
+		return nil
 	}
-	f.primitive.PasteHandler(pastedText, setFocus)
+	return f.primitive.PasteHandler(pastedText)
 }
