@@ -74,7 +74,6 @@ func NewCheckbox() *Checkbox {
 func (c *Checkbox) SetChecked(checked bool) *Checkbox {
 	if c.checked != checked {
 		c.checked = checked
-		c.MarkDirty()
 		if c.changed != nil {
 			c.changed(checked)
 		}
@@ -91,7 +90,6 @@ func (c *Checkbox) IsChecked() bool {
 func (c *Checkbox) SetLabel(label string) *Checkbox {
 	if c.label != label {
 		c.label = label
-		c.MarkDirty()
 	}
 	return c
 }
@@ -106,7 +104,6 @@ func (c *Checkbox) GetLabel() string {
 func (c *Checkbox) SetLabelWidth(width int) *Checkbox {
 	if c.labelWidth != width {
 		c.labelWidth = width
-		c.MarkDirty()
 	}
 	return c
 }
@@ -116,7 +113,6 @@ func (c *Checkbox) SetLabelColor(color tcell.Color) *Checkbox {
 	style := c.labelStyle.Foreground(color)
 	if c.labelStyle != style {
 		c.labelStyle = style
-		c.MarkDirty()
 	}
 	return c
 }
@@ -125,7 +121,6 @@ func (c *Checkbox) SetLabelColor(color tcell.Color) *Checkbox {
 func (c *Checkbox) SetLabelStyle(style tcell.Style) *Checkbox {
 	if c.labelStyle != style {
 		c.labelStyle = style
-		c.MarkDirty()
 	}
 	return c
 }
@@ -139,7 +134,6 @@ func (c *Checkbox) SetFieldBackgroundColor(color tcell.Color) *Checkbox {
 		c.uncheckedStyle = uncheckedStyle
 		c.checkedStyle = checkedStyle
 		c.focusStyle = focusStyle
-		c.MarkDirty()
 	}
 	return c
 }
@@ -153,7 +147,6 @@ func (c *Checkbox) SetFieldTextColor(color tcell.Color) *Checkbox {
 		c.uncheckedStyle = uncheckedStyle
 		c.checkedStyle = checkedStyle
 		c.focusStyle = focusStyle
-		c.MarkDirty()
 	}
 	return c
 }
@@ -162,7 +155,6 @@ func (c *Checkbox) SetFieldTextColor(color tcell.Color) *Checkbox {
 func (c *Checkbox) SetUncheckedStyle(style tcell.Style) *Checkbox {
 	if c.uncheckedStyle != style {
 		c.uncheckedStyle = style
-		c.MarkDirty()
 	}
 	return c
 }
@@ -171,7 +163,6 @@ func (c *Checkbox) SetUncheckedStyle(style tcell.Style) *Checkbox {
 func (c *Checkbox) SetCheckedStyle(style tcell.Style) *Checkbox {
 	if c.checkedStyle != style {
 		c.checkedStyle = style
-		c.MarkDirty()
 	}
 	return c
 }
@@ -181,7 +172,6 @@ func (c *Checkbox) SetCheckedStyle(style tcell.Style) *Checkbox {
 func (c *Checkbox) SetActivatedStyle(style tcell.Style) *Checkbox {
 	if c.focusStyle != style {
 		c.focusStyle = style
-		c.MarkDirty()
 	}
 	return c
 }
@@ -191,7 +181,6 @@ func (c *Checkbox) SetActivatedStyle(style tcell.Style) *Checkbox {
 func (c *Checkbox) SetCheckedString(checked string) *Checkbox {
 	if c.checkedString != checked {
 		c.checkedString = checked
-		c.MarkDirty()
 	}
 	return c
 }
@@ -201,7 +190,6 @@ func (c *Checkbox) SetCheckedString(checked string) *Checkbox {
 func (c *Checkbox) SetUncheckedString(unchecked string) *Checkbox {
 	if c.uncheckedString != unchecked {
 		c.uncheckedString = unchecked
-		c.MarkDirty()
 	}
 	return c
 }
@@ -212,7 +200,6 @@ func (c *Checkbox) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldT
 	c.SetLabelColor(labelColor)
 	if c.backgroundColor != bgColor {
 		c.backgroundColor = bgColor
-		c.MarkDirty()
 	}
 	c.SetFieldTextColor(fieldTextColor)
 	c.SetFieldBackgroundColor(fieldBgColor)
@@ -233,7 +220,6 @@ func (c *Checkbox) GetFieldHeight() int {
 func (c *Checkbox) SetDisabled(disabled bool) FormItem {
 	if c.disabled != disabled {
 		c.disabled = disabled
-		c.MarkDirty()
 	}
 	if c.finished != nil {
 		c.finished(-1)
@@ -324,9 +310,9 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (c *Checkbox) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (c *Checkbox) InputHandler(event *tcell.EventKey) Command {
 	if c.disabled {
-		return
+		return nil
 	}
 
 	// Process key event.
@@ -344,31 +330,33 @@ func (c *Checkbox) InputHandler(event *tcell.EventKey, setFocus func(p Primitive
 			c.finished(key)
 		}
 	}
+	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (c *Checkbox) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (c *Checkbox) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var cmd Command
 	if c.disabled {
-		return false, nil
+		return nil, nil
 	}
 
 	x, y := event.Position()
 	_, rectY, _, _ := c.GetInnerRect()
 	if !c.InRect(x, y) {
-		return false, nil
+		return nil, nil
 	}
 
 	// Process mouse event.
 	if y == rectY {
 		switch action {
 		case MouseLeftDown:
-			setFocus(c)
-			consumed = true
+			cmd = AppendCommand(cmd, SetFocusCommand{Target: c})
+			cmd = AppendCommand(cmd, ConsumeEventCommand{})
 		case MouseLeftClick:
 			c.SetChecked(!c.checked)
-			consumed = true
+			cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 		}
 	}
 
-	return
+	return nil, cmd
 }

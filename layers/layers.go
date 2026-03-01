@@ -116,7 +116,6 @@ func (l *Layers) GetVisible(name string) bool {
 func (l *Layers) Clear() *Layers {
 	if len(l.layers) > 0 {
 		l.layers = nil
-		l.MarkDirty()
 	}
 	return l
 }
@@ -139,13 +138,11 @@ func (l *Layers) AddLayer(item tview.Primitive, opts ...Option) *Layers {
 		for index, layer := range l.layers {
 			if layer.name == newLayer.name {
 				l.layers = append(l.layers[:index], l.layers[index+1:]...)
-				l.MarkDirty()
 				break
 			}
 		}
 	}
 	l.layers = append(l.layers, newLayer)
-	l.MarkDirty()
 	if l.changed != nil {
 		l.changed()
 	}
@@ -161,7 +158,6 @@ func (l *Layers) RemoveLayer(name string) *Layers {
 	for index, layer := range l.layers {
 		if layer.name == name {
 			l.layers = append(l.layers[:index], l.layers[index+1:]...)
-			l.MarkDirty()
 			if layer.visible && l.changed != nil {
 				l.changed()
 			}
@@ -190,7 +186,6 @@ func (l *Layers) ShowLayer(name string) *Layers {
 	for _, layer := range l.layers {
 		if layer.name == name && !layer.visible {
 			layer.visible = true
-			l.MarkDirty()
 			if l.changed != nil {
 				l.changed()
 			}
@@ -208,7 +203,6 @@ func (l *Layers) HideLayer(name string) *Layers {
 	for _, layer := range l.layers {
 		if layer.name == name && layer.visible {
 			layer.visible = false
-			l.MarkDirty()
 			if l.changed != nil {
 				l.changed()
 			}
@@ -228,7 +222,6 @@ func (l *Layers) SendToFront(name string) *Layers {
 		if layer.name == name {
 			if index < len(l.layers)-1 {
 				l.layers = append(append(l.layers[:index], l.layers[index+1:]...), layer)
-				l.MarkDirty()
 			}
 			if layer.visible && l.changed != nil {
 				l.changed()
@@ -250,7 +243,6 @@ func (l *Layers) SendToBack(name string) *Layers {
 		if ly.name == name {
 			if index > 0 {
 				l.layers = append(append([]*layer{ly}, l.layers[:index]...), l.layers[index+1:]...)
-				l.MarkDirty()
 			}
 			if ly.visible && l.changed != nil {
 				l.changed()
@@ -296,7 +288,6 @@ func (l *Layers) SetLayerEnabled(name string, enabled bool) *Layers {
 				layer.item.Blur()
 			}
 			layer.enabled = enabled
-			l.MarkDirty()
 			if layer.visible && l.changed != nil {
 				l.changed()
 			}
@@ -324,7 +315,6 @@ func (l *Layers) ClearLayerOverlay(name string) *Layers {
 	for _, layer := range l.layers {
 		if layer.name == name && layer.overlay {
 			layer.overlay = false
-			l.MarkDirty()
 			if layer.visible && l.changed != nil {
 				l.changed()
 			}
@@ -339,35 +329,11 @@ func (l *Layers) ClearLayerOverlay(name string) *Layers {
 func (l *Layers) SetBackgroundLayerStyle(style tcell.Style) *Layers {
 	if l.backgroundLayerStyle != style {
 		l.backgroundLayerStyle = style
-		l.MarkDirty()
 		if l.changed != nil {
 			l.changed()
 		}
 	}
 	return l
-}
-
-// IsDirty returns whether this primitive or one of its visible children needs redraw.
-func (l *Layers) IsDirty() bool {
-	if l.Box.IsDirty() {
-		return true
-	}
-	for _, layer := range l.layers {
-		if layer.visible && layer.item != nil && layer.item.IsDirty() {
-			return true
-		}
-	}
-	return false
-}
-
-// MarkClean marks this primitive and all children as clean.
-func (l *Layers) MarkClean() {
-	l.Box.MarkClean()
-	for _, layer := range l.layers {
-		if layer.item != nil {
-			layer.item.MarkClean()
-		}
-	}
 }
 
 // HasFocus returns whether or not this primitive has focus.
@@ -421,9 +387,13 @@ func (l *Layers) Draw(screen tcell.Screen) {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (l *Layers) MouseHandler(action tview.MouseAction, event *tcell.EventMouse, setFocus func(p tview.Primitive)) (consumed bool, capture tview.Primitive) {
+func (l *Layers) MouseHandler(action tview.MouseAction, event *tcell.EventMouse) (tview.Primitive, tview.Command) {
+	var (
+		capture tview.Primitive
+		cmd     tview.Command
+	)
 	if !l.InRect(event.Position()) {
-		return false, nil
+		return nil, nil
 	}
 
 	overlayIndex := l.topVisibleEnabledOverlayIndex()
@@ -438,39 +408,41 @@ func (l *Layers) MouseHandler(action tview.MouseAction, event *tcell.EventMouse,
 		if overlayIndex >= 0 && index < overlayIndex {
 			break
 		}
-		consumed, capture = layer.item.MouseHandler(action, event, setFocus)
-		if consumed {
-			return
+		var childCmds tview.Command
+		capture, childCmds = layer.item.MouseHandler(action, event)
+		cmd = tview.AppendCommand(cmd, childCmds)
+		if childCmds != nil {
+			return capture, cmd
 		}
 	}
 
 	// If an overlay layer is active, block input to layers behind it even if
 	// the top layer didn't consume the event.
 	if overlayIndex >= 0 {
-		return true, nil
+		return nil, tview.AppendCommand(cmd, tview.ConsumeEventCommand{})
 	}
 
-	return
+	return nil, cmd
 }
 
 // InputHandler returns the handler for this primitive.
-func (l *Layers) InputHandler(event *tcell.EventKey, setFocus func(p tview.Primitive)) {
+func (l *Layers) InputHandler(event *tcell.EventKey) tview.Command {
 	for _, layer := range l.layers {
 		if layer.enabled && layer.item.HasFocus() {
-			layer.item.InputHandler(event, setFocus)
-			return
+			return layer.item.InputHandler(event)
 		}
 	}
+	return nil
 }
 
 // PasteHandler handles pasted text for this primitive.
-func (l *Layers) PasteHandler(pastedText string, setFocus func(p tview.Primitive)) {
+func (l *Layers) PasteHandler(pastedText string) tview.Command {
 	for _, layer := range l.layers {
 		if layer.enabled && layer.item.HasFocus() {
-			layer.item.PasteHandler(pastedText, setFocus)
-			return
+			return layer.item.PasteHandler(pastedText)
 		}
 	}
+	return nil
 }
 
 func (l *Layers) topVisibleEnabledLayer() *layer {

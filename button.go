@@ -51,7 +51,6 @@ func NewButton(label string) *Button {
 func (b *Button) SetLabel(label string) *Button {
 	if b.text != label {
 		b.text = label
-		b.MarkDirty()
 	}
 	return b
 }
@@ -66,7 +65,6 @@ func (b *Button) SetLabelColor(color tcell.Color) *Button {
 	style := b.style.Foreground(color)
 	if b.style != style {
 		b.style = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -75,7 +73,6 @@ func (b *Button) SetLabelColor(color tcell.Color) *Button {
 func (b *Button) SetStyle(style tcell.Style) *Button {
 	if b.style != style {
 		b.style = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -86,7 +83,6 @@ func (b *Button) SetLabelColorActivated(color tcell.Color) *Button {
 	style := b.activatedStyle.Foreground(color)
 	if b.activatedStyle != style {
 		b.activatedStyle = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -97,7 +93,6 @@ func (b *Button) SetBackgroundColorActivated(color tcell.Color) *Button {
 	style := b.activatedStyle.Background(color)
 	if b.activatedStyle != style {
 		b.activatedStyle = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -106,7 +101,6 @@ func (b *Button) SetBackgroundColorActivated(color tcell.Color) *Button {
 func (b *Button) SetActivatedStyle(style tcell.Style) *Button {
 	if b.activatedStyle != style {
 		b.activatedStyle = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -115,7 +109,6 @@ func (b *Button) SetActivatedStyle(style tcell.Style) *Button {
 func (b *Button) SetDisabledStyle(style tcell.Style) *Button {
 	if b.disabledStyle != style {
 		b.disabledStyle = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -128,7 +121,6 @@ func (b *Button) SetDisabledStyle(style tcell.Style) *Button {
 func (b *Button) SetDisabled(disabled bool) *Button {
 	if b.disabled != disabled {
 		b.disabled = disabled
-		b.MarkDirty()
 	}
 	return b
 }
@@ -179,9 +171,9 @@ func (b *Button) Draw(screen tcell.Screen) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (b *Button) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (b *Button) InputHandler(event *tcell.EventKey) Command {
 	if b.disabled {
-		return
+		return nil
 	}
 
 	// Process key event.
@@ -195,29 +187,31 @@ func (b *Button) InputHandler(event *tcell.EventKey, setFocus func(p Primitive))
 			b.exit(key)
 		}
 	}
+	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (b *Button) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (b *Button) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var cmd Command
 	if b.disabled {
-		return false, nil
+		return nil, nil
 	}
 
 	if !b.InRect(event.Position()) {
-		return false, nil
+		return nil, nil
 	}
 
 	// Process mouse event.
 	switch action {
 	case MouseLeftDown:
-		setFocus(b)
-		consumed = true
+		cmd = AppendCommand(cmd, SetFocusCommand{Target: b})
+		cmd = AppendCommand(cmd, ConsumeEventCommand{})
 	case MouseLeftClick:
 		if b.selected != nil {
 			b.selected()
 		}
-		consumed = true
+		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 	}
 
-	return
+	return nil, cmd
 }

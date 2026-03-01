@@ -113,7 +113,6 @@ func NewList() *List {
 func (l *List) SetScrollBarVisibility(visibility ScrollBarVisibility) *List {
 	if l.scrollBarVisibility != visibility {
 		l.scrollBarVisibility = visibility
-		l.MarkDirty()
 	}
 	return l
 }
@@ -122,7 +121,6 @@ func (l *List) SetScrollBarVisibility(visibility ScrollBarVisibility) *List {
 func (l *List) SetScrollBar(scrollBar *ScrollBar) *List {
 	if l.scrollBar != scrollBar {
 		l.scrollBar = scrollBar
-		l.MarkDirty()
 	}
 	return l
 }
@@ -131,7 +129,6 @@ func (l *List) SetScrollBar(scrollBar *ScrollBar) *List {
 func (l *List) SetBuilder(builder ListBuilder) *List {
 	if l.Builder != nil || builder != nil {
 		l.Builder = builder
-		l.MarkDirty()
 	}
 	return l
 }
@@ -139,16 +136,12 @@ func (l *List) SetBuilder(builder ListBuilder) *List {
 // Clear removes all items from the list by clearing the builder and resetting
 // scroll state.
 func (l *List) Clear() *List {
-	changed := l.Builder != nil || l.cursor != -1 || l.scroll != (listState{}) || len(l.lastDraw) > 0 || l.lastRect != (listRect{}) || l.atEnd
 	l.Builder = nil
 	l.cursor = -1
 	l.scroll = listState{}
 	l.setLastDraw(nil)
 	l.lastRect = listRect{}
 	l.atEnd = false
-	if changed {
-		l.MarkDirty()
-	}
 	return l
 }
 
@@ -159,7 +152,6 @@ func (l *List) SetGap(gap int) *List {
 	}
 	if l.gap != gap {
 		l.gap = gap
-		l.MarkDirty()
 	}
 	return l
 }
@@ -168,7 +160,6 @@ func (l *List) SetGap(gap int) *List {
 func (l *List) SetSnapToItems(snap bool) *List {
 	if l.snapToItems != snap {
 		l.snapToItems = snap
-		l.MarkDirty()
 	}
 	return l
 }
@@ -178,7 +169,6 @@ func (l *List) SetSnapToItems(snap bool) *List {
 func (l *List) SetCenterCursor(center bool) *List {
 	if l.centerCursor != center {
 		l.centerCursor = center
-		l.MarkDirty()
 	}
 	return l
 }
@@ -187,7 +177,6 @@ func (l *List) SetCenterCursor(center bool) *List {
 func (l *List) SetTrackEnd(track bool) *List {
 	if l.trackEnd != track {
 		l.trackEnd = track
-		l.MarkDirty()
 	}
 	return l
 }
@@ -200,7 +189,6 @@ func (l *List) ScrollToStart() *List {
 		l.scroll.offset = 0
 		l.scroll.wantsCursor = false
 		l.atEnd = false
-		l.MarkDirty()
 	}
 	return l
 }
@@ -216,7 +204,6 @@ func (l *List) ScrollToEnd() *List {
 		l.scroll.top, l.scroll.offset = top, offset
 		l.scroll.wantsCursor = false
 		l.atEnd = true
-		l.MarkDirty()
 	}
 	return l
 }
@@ -230,7 +217,6 @@ func (l *List) SetCursor(index int) *List {
 		l.cursor = index
 		l.atEnd = false
 		l.ensureScroll()
-		l.MarkDirty()
 		if l.changed != nil {
 			l.changed(l.cursor)
 		}
@@ -248,7 +234,6 @@ func (l *List) Cursor() int {
 func (l *List) SetPendingScroll(lines int) *List {
 	if l.scroll.pending != lines {
 		l.scroll.pending = lines
-		l.MarkDirty()
 	}
 	return l
 }
@@ -256,14 +241,12 @@ func (l *List) SetPendingScroll(lines int) *List {
 // ScrollUp scrolls the list up by one line.
 func (l *List) ScrollUp() *List {
 	l.scroll.pending -= 1
-	l.MarkDirty()
 	return l
 }
 
 // ScrollDown scrolls the list down by one line.
 func (l *List) ScrollDown() *List {
 	l.scroll.pending += 1
-	l.MarkDirty()
 	return l
 }
 
@@ -278,7 +261,6 @@ func (l *List) NextItem() bool {
 		}
 		l.cursor = 0
 		l.ensureScroll()
-		l.MarkDirty()
 		if l.changed != nil {
 			l.changed(l.cursor)
 		}
@@ -289,7 +271,6 @@ func (l *List) NextItem() bool {
 	}
 	l.cursor++
 	l.ensureScroll()
-	l.MarkDirty()
 	if l.changed != nil {
 		l.changed(l.cursor)
 	}
@@ -309,7 +290,6 @@ func (l *List) PrevItem() bool {
 	}
 	l.cursor--
 	l.ensureScroll()
-	l.MarkDirty()
 	if l.changed != nil {
 		l.changed(l.cursor)
 	}
@@ -323,42 +303,7 @@ func (l *List) SetChangedFunc(handler func(index int)) *List {
 }
 
 func (l *List) setLastDraw(children []listDrawnItem) {
-	for _, child := range l.lastDraw {
-		unbindDirtyParent(child.item, l.Box)
-	}
 	l.lastDraw = children
-	for _, child := range l.lastDraw {
-		bindDirtyParent(child.item, l.Box)
-	}
-}
-
-// IsDirty returns whether this primitive or one of its visible children needs redraw.
-func (l *List) IsDirty() bool {
-	if l.Box.IsDirty() {
-		return true
-	}
-	if l.scrollBarVisibility != ScrollBarVisibilityNever && l.scrollBar != nil && l.scrollBar.IsDirty() {
-		return true
-	}
-	for _, child := range l.lastDraw {
-		if child.item != nil && child.item.IsDirty() {
-			return true
-		}
-	}
-	return false
-}
-
-// MarkClean marks this primitive and visible children as clean.
-func (l *List) MarkClean() {
-	l.Box.MarkClean()
-	if l.scrollBar != nil {
-		l.scrollBar.MarkClean()
-	}
-	for _, child := range l.lastDraw {
-		if child.item != nil {
-			child.item.MarkClean()
-		}
-	}
 }
 
 // Draw draws this primitive onto the screen.
@@ -899,7 +844,7 @@ func (l *List) endScrollState(width int, height int) (int, int) {
 }
 
 // InputHandler returns the handler for this primitive.
-func (l *List) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (l *List) InputHandler(event *tcell.EventKey) Command {
 	switch event.Key() {
 	case tcell.KeyDown:
 		l.NextItem()
@@ -926,10 +871,12 @@ func (l *List) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
 			l.scroll.pending -= height
 		}
 	}
+	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var cmd Command
 	x, y := event.Position()
 	if l.scrollBarInteraction.dragDelta >= 0 {
 		_, innerY, innerWidth, innerHeight := l.GetInnerRect()
@@ -938,20 +885,20 @@ func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocu
 		switch action {
 		case MouseMove:
 			l.dragScrollBarTo(row, innerHeight, contentWidth)
-			return true, l
+			return l, AppendCommand(nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 		case MouseLeftUp:
 			l.scrollBarInteraction.dragDelta = listScrollBarNoDrag
-			return true, nil
+			return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		case MouseLeftClick:
 			if l.scrollBarInteraction.dragMoved {
 				l.scrollBarInteraction.dragMoved = false
-				return true, nil
+				return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 			}
 		}
 	}
 
 	if !l.InRect(x, y) {
-		return false, nil
+		return nil, nil
 	}
 
 	innerX, innerY, innerWidth, innerHeight := l.GetInnerRect()
@@ -961,29 +908,29 @@ func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocu
 		row := y - innerY
 		switch action {
 		case MouseLeftDown:
-			setFocus(l)
+			cmd = AppendCommand(cmd, SetFocusCommand{Target: l})
 			if l.startScrollBarDrag(row, innerHeight, contentWidth) {
-				return true, l
+				return l, AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
 			}
-			return true, nil
+			return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		case MouseLeftClick:
-			setFocus(l)
+			cmd = AppendCommand(cmd, SetFocusCommand{Target: l})
 			if l.scrollBarInteraction.dragMoved {
 				l.scrollBarInteraction.dragMoved = false
-				return true, nil
+				return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 			}
 		}
 		if l.handleScrollBarMouse(action, row, innerHeight, contentWidth) {
-			return true, nil
+			return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		}
 		if action == MouseLeftClick {
-			return true, nil
+			return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		}
 	}
 
 	switch action {
 	case MouseLeftClick:
-		setFocus(l)
+		cmd = AppendCommand(cmd, SetFocusCommand{Target: l})
 		index := l.indexAtPoint(x, y)
 		if index >= 0 {
 			previous := l.cursor
@@ -993,7 +940,7 @@ func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocu
 				l.changed(l.cursor)
 			}
 		}
-		return true, nil
+		return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 	case MouseScrollUp:
 		_, _, width, height := l.GetInnerRect()
 		if l.snapToItems {
@@ -1001,7 +948,7 @@ func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocu
 		} else {
 			l.scroll.pending -= l.mouseScrollStep()
 		}
-		return true, nil
+		return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 	case MouseScrollDown:
 		_, _, width, height := l.GetInnerRect()
 		if l.snapToItems {
@@ -1009,10 +956,10 @@ func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocu
 		} else {
 			l.scroll.pending += l.mouseScrollStep()
 		}
-		return true, nil
+		return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 	}
 
-	return false, nil
+	return nil, nil
 }
 
 func (l *List) startScrollBarDrag(row int, height int, contentWidth int) bool {

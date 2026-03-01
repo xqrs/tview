@@ -138,7 +138,6 @@ func NewForm() *Form {
 func (f *Form) SetItemPadding(padding int) *Form {
 	if f.itemPadding != padding {
 		f.itemPadding = padding
-		f.MarkDirty()
 	}
 	return f
 }
@@ -150,7 +149,6 @@ func (f *Form) SetItemPadding(padding int) *Form {
 func (f *Form) SetHorizontal(horizontal bool) *Form {
 	if f.horizontal != horizontal {
 		f.horizontal = horizontal
-		f.MarkDirty()
 	}
 	return f
 }
@@ -159,7 +157,6 @@ func (f *Form) SetHorizontal(horizontal bool) *Form {
 func (f *Form) SetLabelColor(color tcell.Color) *Form {
 	if f.labelColor != color {
 		f.labelColor = color
-		f.MarkDirty()
 	}
 	return f
 }
@@ -168,7 +165,6 @@ func (f *Form) SetLabelColor(color tcell.Color) *Form {
 func (f *Form) SetFieldStyle(style tcell.Style) *Form {
 	if f.fieldStyle != style {
 		f.fieldStyle = style
-		f.MarkDirty()
 	}
 	return f
 }
@@ -177,7 +173,6 @@ func (f *Form) SetFieldStyle(style tcell.Style) *Form {
 func (f *Form) SetButtonsAlignment(alignment Alignment) *Form {
 	if f.buttonsAlignment != alignment {
 		f.buttonsAlignment = alignment
-		f.MarkDirty()
 	}
 	return f
 }
@@ -186,7 +181,6 @@ func (f *Form) SetButtonsAlignment(alignment Alignment) *Form {
 func (f *Form) SetButtonStyle(style tcell.Style) *Form {
 	if f.buttonStyle != style {
 		f.buttonStyle = style
-		f.MarkDirty()
 	}
 	return f
 }
@@ -195,7 +189,6 @@ func (f *Form) SetButtonStyle(style tcell.Style) *Form {
 func (f *Form) SetButtonActivatedStyle(style tcell.Style) *Form {
 	if f.buttonActivatedStyle != style {
 		f.buttonActivatedStyle = style
-		f.MarkDirty()
 	}
 	return f
 }
@@ -204,7 +197,6 @@ func (f *Form) SetButtonActivatedStyle(style tcell.Style) *Form {
 func (f *Form) SetButtonDisabledStyle(style tcell.Style) *Form {
 	if f.buttonDisabledStyle != style {
 		f.buttonDisabledStyle = style
-		f.MarkDirty()
 	}
 	return f
 }
@@ -217,7 +209,6 @@ func (f *Form) SetButtonDisabledStyle(style tcell.Style) *Form {
 func (f *Form) SetFocus(index int) *Form {
 	if f.requestedFocus != index {
 		f.requestedFocus = index
-		f.MarkDirty()
 	}
 	return f
 }
@@ -249,9 +240,7 @@ func (f *Form) AddTextArea(label, text string, fieldWidth, fieldHeight, maxLengt
 		})
 	}
 	textArea.SetFinishedFunc(f.finished)
-	bindDirtyParent(textArea, f.Box)
 	f.items = append(f.items, textArea)
-	f.MarkDirty()
 	return f
 }
 
@@ -270,9 +259,7 @@ func (f *Form) AddTextView(label, text string, fieldWidth, fieldHeight int, scro
 		SetScrollable(scrollable).
 		SetText(text)
 	textArea.SetFinishedFunc(f.finished)
-	bindDirtyParent(textArea, f.Box)
 	f.items = append(f.items, textArea)
-	f.MarkDirty()
 	return f
 }
 
@@ -287,9 +274,7 @@ func (f *Form) AddInputField(label, value string, fieldWidth int, changed func(t
 		SetFieldWidth(fieldWidth).
 		SetChangedFunc(changed)
 	inputField.SetFinishedFunc(f.finished)
-	bindDirtyParent(inputField, f.Box)
 	f.items = append(f.items, inputField)
-	f.MarkDirty()
 	return f
 }
 
@@ -310,9 +295,7 @@ func (f *Form) AddPasswordField(label, value string, fieldWidth int, mask rune, 
 		SetMaskCharacter(mask).
 		SetChangedFunc(changed)
 	password.SetFinishedFunc(f.finished)
-	bindDirtyParent(password, f.Box)
 	f.items = append(f.items, password)
-	f.MarkDirty()
 	return f
 }
 
@@ -325,9 +308,7 @@ func (f *Form) AddCheckbox(label string, checked bool, changed func(checked bool
 		SetChecked(checked).
 		SetChangedFunc(changed)
 	checkbox.SetFinishedFunc(f.finished)
-	bindDirtyParent(checkbox, f.Box)
 	f.items = append(f.items, checkbox)
-	f.MarkDirty()
 	return f
 }
 
@@ -337,9 +318,7 @@ func (f *Form) AddButton(label string, selected func()) *Form {
 	button := NewButton(label).
 		SetSelectedFunc(selected).
 		SetExitFunc(f.finished)
-	bindDirtyParent(button, f.Box)
 	f.buttons = append(f.buttons, button)
-	f.MarkDirty()
 	return f
 }
 
@@ -353,19 +332,7 @@ func (f *Form) GetButton(index int) *Button {
 // RemoveButton removes the button at the specified position, starting with 0
 // for the button that was added first.
 func (f *Form) RemoveButton(index int) *Form {
-	button := f.buttons[index]
 	f.buttons = slices.Delete(f.buttons, index, index+1)
-	stillPresent := false
-	for _, existing := range f.buttons {
-		if existing == button {
-			stillPresent = true
-			break
-		}
-	}
-	if !stillPresent {
-		unbindDirtyParent(button, f.Box)
-	}
-	f.MarkDirty()
 	return f
 }
 
@@ -389,17 +356,9 @@ func (f *Form) GetButtonIndex(label string) int {
 // Clear removes all input elements from the form, including the buttons if
 // specified.
 func (f *Form) Clear(includeButtons bool) *Form {
-	changed := len(f.items) > 0
-	for _, item := range f.items {
-		unbindDirtyParent(item, f.Box)
-	}
 	f.items = nil
 	if includeButtons {
-		changed = changed || len(f.buttons) > 0
 		f.ClearButtons()
-	}
-	if changed {
-		f.MarkDirty()
 	}
 	return f
 }
@@ -407,11 +366,7 @@ func (f *Form) Clear(includeButtons bool) *Form {
 // ClearButtons removes all buttons from the form.
 func (f *Form) ClearButtons() *Form {
 	if len(f.buttons) > 0 {
-		for _, button := range f.buttons {
-			unbindDirtyParent(button, f.Box)
-		}
 		f.buttons = nil
-		f.MarkDirty()
 	}
 	return f
 }
@@ -428,9 +383,7 @@ func (f *Form) ClearButtons() *Form {
 //   - The field background color
 func (f *Form) AddFormItem(item FormItem) *Form {
 	item.SetFinishedFunc(f.finished)
-	bindDirtyParent(item, f.Box)
 	f.items = append(f.items, item)
-	f.MarkDirty()
 	return f
 }
 
@@ -451,19 +404,7 @@ func (f *Form) GetFormItem(index int) FormItem {
 // index 0. Elements are referenced in the order they were added. Buttons are
 // not included.
 func (f *Form) RemoveFormItem(index int) *Form {
-	item := f.items[index]
 	f.items = slices.Delete(f.items, index, index+1)
-	stillPresent := false
-	for _, existing := range f.items {
-		if existing == item {
-			stillPresent = true
-			break
-		}
-	}
-	if !stillPresent {
-		unbindDirtyParent(item, f.Box)
-	}
-	f.MarkDirty()
 	return f
 }
 
@@ -509,39 +450,6 @@ func (f *Form) GetFocusedItemIndex() (formItem, button int) {
 func (f *Form) SetCancelFunc(callback func()) *Form {
 	f.cancel = callback
 	return f
-}
-
-// IsDirty returns whether this primitive or one of its children needs redraw.
-func (f *Form) IsDirty() bool {
-	if f.Box.IsDirty() {
-		return true
-	}
-	for _, item := range f.items {
-		if item != nil && item.IsDirty() {
-			return true
-		}
-	}
-	for _, button := range f.buttons {
-		if button != nil && button.IsDirty() {
-			return true
-		}
-	}
-	return false
-}
-
-// MarkClean marks this primitive and all children as clean.
-func (f *Form) MarkClean() {
-	f.Box.MarkClean()
-	for _, item := range f.items {
-		if item != nil {
-			item.MarkClean()
-		}
-	}
-	for _, button := range f.buttons {
-		if button != nil {
-			button.MarkClean()
-		}
-	}
 }
 
 // Draw draws this primitive onto the screen.
@@ -852,66 +760,72 @@ func (f *Form) HasFocus() bool {
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (f *Form) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (f *Form) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var (
+		capture Primitive
+		cmd     Command
+	)
 	// Determine items to pass mouse events to.
 	for _, item := range f.items {
 		if item.GetDisabled() {
 			continue
 		}
-		consumed, capture = item.MouseHandler(action, event, setFocus)
-		if consumed {
-			return
+		var childCmds Command
+		capture, childCmds = item.MouseHandler(action, event)
+		cmd = AppendCommand(cmd, childCmds)
+		if childCmds != nil {
+			return capture, cmd
 		}
 	}
 	for _, button := range f.buttons {
 		if button.GetDisabled() {
 			continue
 		}
-		consumed, capture = button.MouseHandler(action, event, setFocus)
-		if consumed {
-			return
+		var childCmds Command
+		capture, childCmds = button.MouseHandler(action, event)
+		cmd = AppendCommand(cmd, childCmds)
+		if childCmds != nil {
+			return capture, cmd
 		}
 	}
 
 	// A mouse down anywhere else will focus this form.
 	if action == MouseLeftDown && f.InRect(event.Position()) {
-		f.Focus(setFocus)
-		consumed = true
+		cmd = AppendCommand(cmd, SetFocusCommand{Target: f})
+		cmd = AppendCommand(cmd, ConsumeEventCommand{})
 	}
 
-	return
+	return capture, cmd
 }
 
 // InputHandler returns the handler for this primitive.
-func (f *Form) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (f *Form) InputHandler(event *tcell.EventKey) Command {
 	for _, item := range f.items {
 		if item.HasFocus() {
-			item.InputHandler(event, setFocus)
-			return
+			return item.InputHandler(event)
 		}
 	}
 
 	for _, button := range f.buttons {
 		if button.HasFocus() {
-			button.InputHandler(event, setFocus)
-			return
+			return button.InputHandler(event)
 		}
 	}
+	return nil
 }
 
 // PasteHandler handles pasted text for this primitive.
-func (f *Form) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+func (f *Form) PasteHandler(pastedText string) Command {
 	for _, item := range f.items {
 		if item.HasFocus() {
-			item.PasteHandler(pastedText, setFocus)
-			return
+			return item.PasteHandler(pastedText)
 		}
 	}
 
 	for _, button := range f.buttons {
 		if button.HasFocus() {
-			button.PasteHandler(pastedText, setFocus)
-			return
+			return button.PasteHandler(pastedText)
 		}
 	}
+	return nil
 }

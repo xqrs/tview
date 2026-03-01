@@ -1,10 +1,6 @@
 package tview
 
-import (
-	"sync/atomic"
-
-	"github.com/gdamore/tcell/v3"
-)
+import "github.com/gdamore/tcell/v3"
 
 // Box implements the Primitive interface with an empty background and optional
 // elements such as a border and a title. Box itself does not hold any content
@@ -52,13 +48,6 @@ type Box struct {
 	// focus to their children.
 	hasFocus bool
 
-	// dirty indicates whether this primitive needs to be redrawn.
-	dirty atomic.Bool
-
-	// dirtyParent is notified when this primitive transitions from clean to
-	// dirty so containers can be dirtied without scanning all children.
-	dirtyParent atomic.Pointer[Box]
-
 	// Optional callback functions invoked when the primitive receives or loses
 	// focus.
 	focus, blur func()
@@ -80,7 +69,6 @@ func NewBox() *Box {
 		footerStyle:     tcell.StyleDefault.Foreground(Styles.TitleColor),
 		footerAlignment: AlignmentCenter,
 	}
-	b.dirty.Store(true)
 	return b
 }
 
@@ -89,7 +77,6 @@ func (b *Box) SetBorderPadding(top, bottom, left, right int) *Box {
 	if b.paddingTop != top || b.paddingBottom != bottom || b.paddingLeft != left || b.paddingRight != right {
 		b.paddingTop, b.paddingBottom, b.paddingLeft, b.paddingRight = top, bottom, left, right
 		b.innerX = -1 // Mark inner rect as uninitialized.
-		b.MarkDirty()
 	}
 	return b
 }
@@ -154,80 +141,27 @@ func (b *Box) SetRect(x, y, width, height int) {
 		b.width = width
 		b.height = height
 		b.innerX = -1 // Mark inner rect as uninitialized.
-		b.MarkDirty()
-	}
-}
-
-// IsDirty returns whether this primitive needs redrawing.
-func (b *Box) IsDirty() bool {
-	return b.dirty.Load()
-}
-
-// MarkDirty marks this primitive as needing a redraw.
-func (b *Box) MarkDirty() {
-	if b.dirty.Swap(true) {
-		return
-	}
-	if parent := b.dirtyParent.Load(); parent != nil {
-		parent.MarkDirty()
-	}
-}
-
-// MarkClean marks this primitive as clean.
-func (b *Box) MarkClean() {
-	b.dirty.Store(false)
-}
-
-func (b *Box) setDirtyParent(parent *Box) {
-	if parent == nil || parent == b {
-		return
-	}
-	b.dirtyParent.Store(parent)
-}
-
-func (b *Box) clearDirtyParent(parent *Box) {
-	if parent == nil {
-		return
-	}
-	b.dirtyParent.CompareAndSwap(parent, nil)
-}
-
-type dirtyParentSetter interface {
-	setDirtyParent(parent *Box)
-	clearDirtyParent(parent *Box)
-}
-
-func bindDirtyParent(child Primitive, parent *Box) {
-	if child == nil || parent == nil {
-		return
-	}
-	if setter, ok := child.(dirtyParentSetter); ok {
-		setter.setDirtyParent(parent)
-	}
-}
-
-func unbindDirtyParent(child Primitive, parent *Box) {
-	if child == nil || parent == nil {
-		return
-	}
-	if setter, ok := child.(dirtyParentSetter); ok {
-		setter.clearDirtyParent(parent)
 	}
 }
 
 // InputHandler returns a no-op input handler.
-func (b *Box) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {}
+func (b *Box) InputHandler(event *tcell.EventKey) Command {
+	return nil
+}
 
 // PasteHandler handles pasted text for this primitive.
-func (b *Box) PasteHandler(pastedText string, setFocus func(p Primitive)) {}
+func (b *Box) PasteHandler(pastedText string) Command {
+	return nil
+}
 
 // MouseHandler handles mouse events for this primitive.
-func (b *Box) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (b *Box) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var cmd Command
 	if action == MouseLeftDown && b.InRect(event.Position()) {
-		setFocus(b)
-		consumed = true
+		cmd = AppendCommand(cmd, SetFocusCommand{Target: b})
+		cmd = AppendCommand(cmd, ConsumeEventCommand{})
 	}
-	return
+	return nil, cmd
 }
 
 // InRect returns true if the given coordinate is within the bounds of the box's
@@ -249,7 +183,6 @@ func (b *Box) SetBackgroundColor(color tcell.Color) *Box {
 	if b.backgroundColor != color {
 		b.backgroundColor = color
 		b.borderStyle = b.borderStyle.Background(color)
-		b.MarkDirty()
 	}
 	return b
 }
@@ -264,7 +197,6 @@ func (b *Box) SetBorders(flag Borders) *Box {
 	if b.borders != flag {
 		b.borders = flag
 		b.innerX = -1 // Mark inner rect as uninitialized.
-		b.MarkDirty()
 	}
 	return b
 }
@@ -273,7 +205,6 @@ func (b *Box) SetBorders(flag Borders) *Box {
 func (b *Box) SetBorderSet(borderSet BorderSet) *Box {
 	if b.borderSet != borderSet {
 		b.borderSet = borderSet
-		b.MarkDirty()
 	}
 	return b
 }
@@ -287,7 +218,6 @@ func (b *Box) GetBorderSet() BorderSet {
 func (b *Box) SetBorderStyle(style tcell.Style) *Box {
 	if b.borderStyle != style {
 		b.borderStyle = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -307,7 +237,6 @@ func (b *Box) SetTitle(title string) *Box {
 	if b.title != title {
 		b.title = title
 		b.innerX = -1 // Mark inner rect as uninitialized.
-		b.MarkDirty()
 	}
 	return b
 }
@@ -316,7 +245,6 @@ func (b *Box) SetTitle(title string) *Box {
 func (b *Box) SetTitleStyle(style tcell.Style) *Box {
 	if b.titleStyle != style {
 		b.titleStyle = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -325,7 +253,6 @@ func (b *Box) SetTitleStyle(style tcell.Style) *Box {
 func (b *Box) SetTitleAlignment(alignment Alignment) *Box {
 	if b.titleAlignment != alignment {
 		b.titleAlignment = alignment
-		b.MarkDirty()
 	}
 	return b
 }
@@ -340,7 +267,6 @@ func (b *Box) SetFooter(footer string) *Box {
 	if b.footer != footer {
 		b.footer = footer
 		b.innerX = -1 // Mark inner rect as uninitialized.
-		b.MarkDirty()
 	}
 	return b
 }
@@ -349,7 +275,6 @@ func (b *Box) SetFooter(footer string) *Box {
 func (b *Box) SetFooterStyle(style tcell.Style) *Box {
 	if b.footerStyle != style {
 		b.footerStyle = style
-		b.MarkDirty()
 	}
 	return b
 }
@@ -358,7 +283,6 @@ func (b *Box) SetFooterStyle(style tcell.Style) *Box {
 func (b *Box) SetFooterAlignment(alignment Alignment) *Box {
 	if b.footerAlignment != alignment {
 		b.footerAlignment = alignment
-		b.MarkDirty()
 	}
 	return b
 }
@@ -505,7 +429,6 @@ func (b *Box) SetBlurFunc(callback func()) *Box {
 func (b *Box) Focus(delegate func(p Primitive)) {
 	if !b.hasFocus {
 		b.hasFocus = true
-		b.MarkDirty()
 	}
 	if b.focus != nil {
 		b.focus()
@@ -516,7 +439,6 @@ func (b *Box) Focus(delegate func(p Primitive)) {
 func (b *Box) Blur() {
 	if b.hasFocus {
 		b.hasFocus = false
-		b.MarkDirty()
 	}
 	if b.blur != nil {
 		b.blur()

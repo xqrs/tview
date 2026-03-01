@@ -117,7 +117,6 @@ func (g *Grid) SetColumns(columns ...int) *Grid {
 	}
 	if changed {
 		g.columns = columns
-		g.MarkDirty()
 	}
 	return g
 }
@@ -140,7 +139,6 @@ func (g *Grid) SetRows(rows ...int) *Grid {
 	}
 	if changed {
 		g.rows = rows
-		g.MarkDirty()
 	}
 	return g
 }
@@ -178,7 +176,6 @@ func (g *Grid) SetSize(numRows, numColumns, rowSize, columnSize int) *Grid {
 	if changed {
 		g.rows = rows
 		g.columns = columns
-		g.MarkDirty()
 	}
 	return g
 }
@@ -191,7 +188,6 @@ func (g *Grid) SetMinSize(row, column int) *Grid {
 	}
 	if g.minHeight != row || g.minWidth != column {
 		g.minHeight, g.minWidth = row, column
-		g.MarkDirty()
 	}
 	return g
 }
@@ -205,7 +201,6 @@ func (g *Grid) SetGap(row, column int) *Grid {
 	}
 	if g.gapRows != row || g.gapColumns != column {
 		g.gapRows, g.gapColumns = row, column
-		g.MarkDirty()
 	}
 	return g
 }
@@ -216,7 +211,6 @@ func (g *Grid) SetGap(row, column int) *Grid {
 func (g *Grid) SetBorders(borders bool) *Grid {
 	if g.borders != borders {
 		g.borders = borders
-		g.MarkDirty()
 	}
 	return g
 }
@@ -225,7 +219,6 @@ func (g *Grid) SetBorders(borders bool) *Grid {
 func (g *Grid) SetBordersColor(color tcell.Color) *Grid {
 	if g.bordersColor != color {
 		g.bordersColor = color
-		g.MarkDirty()
 	}
 	return g
 }
@@ -258,7 +251,6 @@ func (g *Grid) SetBordersColor(color tcell.Color) *Grid {
 // receives focus. If there are multiple items with a true focus flag, the last
 // visible one that was added will receive focus.
 func (g *Grid) AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight, minGridWidth int, focus bool) *Grid {
-	bindDirtyParent(p, g.Box)
 	g.items = append(g.items, &gridItem{
 		Item:          p,
 		Row:           row,
@@ -269,32 +261,16 @@ func (g *Grid) AddItem(p Primitive, row, column, rowSpan, colSpan, minGridHeight
 		MinGridWidth:  minGridWidth,
 		Focus:         focus,
 	})
-	g.MarkDirty()
 	return g
 }
 
 // RemoveItem removes all items for the given primitive from the grid, keeping
 // the order of the remaining items intact.
 func (g *Grid) RemoveItem(p Primitive) *Grid {
-	removed := false
 	for index := len(g.items) - 1; index >= 0; index-- {
 		if g.items[index].Item == p {
 			g.items = slices.Delete(g.items, index, index+1)
-			removed = true
 		}
-	}
-	if removed {
-		stillPresent := false
-		for _, item := range g.items {
-			if item.Item == p {
-				stillPresent = true
-				break
-			}
-		}
-		if !stillPresent {
-			unbindDirtyParent(p, g.Box)
-		}
-		g.MarkDirty()
 	}
 	return g
 }
@@ -302,11 +278,7 @@ func (g *Grid) RemoveItem(p Primitive) *Grid {
 // Clear removes all items from the grid.
 func (g *Grid) Clear() *Grid {
 	if len(g.items) > 0 {
-		for _, item := range g.items {
-			unbindDirtyParent(item.Item, g.Box)
-		}
 		g.items = nil
-		g.MarkDirty()
 	}
 	return g
 }
@@ -319,32 +291,8 @@ func (g *Grid) Clear() *Grid {
 func (g *Grid) SetOffset(rows, columns int) *Grid {
 	if g.rowOffset != rows || g.columnOffset != columns {
 		g.rowOffset, g.columnOffset = rows, columns
-		g.MarkDirty()
 	}
 	return g
-}
-
-// IsDirty returns whether this primitive or one of its children needs redraw.
-func (g *Grid) IsDirty() bool {
-	if g.Box.IsDirty() {
-		return true
-	}
-	for _, item := range g.items {
-		if item.Item != nil && item.Item.IsDirty() {
-			return true
-		}
-	}
-	return false
-}
-
-// MarkClean marks this primitive and all children as clean.
-func (g *Grid) MarkClean() {
-	g.Box.MarkClean()
-	for _, item := range g.items {
-		if item.Item != nil {
-			item.Item.MarkClean()
-		}
-	}
 }
 
 // GetOffset returns the current row and column offset (see SetOffset() for
@@ -734,9 +682,13 @@ ItemLoop:
 }
 
 // MouseHandler returns the mouse handler for this primitive.
-func (g *Grid) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
+func (g *Grid) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
+	var (
+		capture Primitive
+		cmd     Command
+	)
 	if !g.InRect(event.Position()) {
-		return false, nil
+		return nil, nil
 	}
 
 	// Pass mouse events along to the first child item that takes it.
@@ -744,27 +696,28 @@ func (g *Grid) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocu
 		if item.Item == nil {
 			continue
 		}
-		consumed, capture = item.Item.MouseHandler(action, event, setFocus)
-		if consumed {
-			return
+		var childCmds Command
+		capture, childCmds = item.Item.MouseHandler(action, event)
+		cmd = AppendCommand(cmd, childCmds)
+		if childCmds != nil {
+			return capture, cmd
 		}
 	}
 
-	return
+	return nil, cmd
 }
 
 // InputHandler returns the handler for this primitive.
-func (g *Grid) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+func (g *Grid) InputHandler(event *tcell.EventKey) Command {
 	previousRowOffset, previousColumnOffset := g.rowOffset, g.columnOffset
 	if !g.hasFocus {
 		// Pass event on to child primitive.
 		for _, item := range g.items {
 			if item != nil && item.Item.HasFocus() {
-				item.Item.InputHandler(event, setFocus)
-				return
+				return item.Item.InputHandler(event)
 			}
 		}
-		return
+		return nil
 	}
 
 	// Process our own key events if we have direct focus.
@@ -798,16 +751,17 @@ func (g *Grid) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
 		g.columnOffset++
 	}
 	if g.rowOffset != previousRowOffset || g.columnOffset != previousColumnOffset {
-		g.MarkDirty()
+		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 	}
+	return nil
 }
 
 // PasteHandler handles pasted text for this primitive.
-func (g *Grid) PasteHandler(pastedText string, setFocus func(p Primitive)) {
+func (g *Grid) PasteHandler(pastedText string) Command {
 	for _, item := range g.items {
 		if item != nil && item.Item.HasFocus() {
-			item.Item.PasteHandler(pastedText, setFocus)
-			return
+			return item.Item.PasteHandler(pastedText)
 		}
 	}
+	return nil
 }
