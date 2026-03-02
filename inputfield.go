@@ -51,7 +51,6 @@ func NewInputField() *InputField {
 		Box:      NewBox(),
 		textArea: NewTextArea().SetWrap(false),
 	}
-	bindDirtyParent(i.textArea, i.Box)
 	i.textArea.SetChangedFunc(func() {
 		if i.changed != nil {
 			i.changed(i.textArea.GetText())
@@ -152,7 +151,6 @@ func (i *InputField) SetFormAttributes(labelWidth int, labelColor, bgColor, fiel
 func (i *InputField) SetFieldWidth(width int) *InputField {
 	if i.fieldWidth != width {
 		i.fieldWidth = width
-		i.MarkDirty()
 	}
 	return i
 }
@@ -188,7 +186,6 @@ func (i *InputField) GetDisabled() bool {
 func (i *InputField) SetMaskCharacter(mask rune) *InputField {
 	if mask == 0 {
 		i.textArea.setTransform(nil)
-		i.MarkDirty()
 		return i
 	}
 	maskStr := string(mask)
@@ -196,7 +193,6 @@ func (i *InputField) SetMaskCharacter(mask rune) *InputField {
 	i.textArea.setTransform(func(cluster, rest string, boundaries int) (newCluster string, newBoundaries int) {
 		return maskStr, maskWidth << uniseg.ShiftWidth
 	})
-	i.MarkDirty()
 	return i
 }
 
@@ -249,17 +245,6 @@ func (i *InputField) Blur() {
 	i.Box.Blur()
 }
 
-// IsDirty returns whether this primitive or one of its children needs redraw.
-func (i *InputField) IsDirty() bool {
-	return i.Box.IsDirty() || i.textArea.IsDirty()
-}
-
-// MarkClean marks this primitive and children as clean.
-func (i *InputField) MarkClean() {
-	i.Box.MarkClean()
-	i.textArea.MarkClean()
-}
-
 // Draw draws this primitive onto the screen.
 func (i *InputField) Draw(screen tcell.Screen) {
 	i.DrawForSubclass(screen, i)
@@ -287,65 +272,51 @@ func (i *InputField) Draw(screen tcell.Screen) {
 	i.textArea.Draw(screen)
 }
 
-// InputHandler returns the handler for this primitive.
-func (i *InputField) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
+// HandleEvent handles input events for this primitive.
+func (i *InputField) HandleEvent(event tcell.Event) Command {
 	if i.textArea.GetDisabled() {
-		return
+		return nil
 	}
 
-	// Finish up.
-	finish := func(key tcell.Key) {
-		if i.done != nil {
-			i.done(key)
+	switch event := event.(type) {
+	case *KeyEvent:
+		// Finish up.
+		finish := func(key tcell.Key) {
+			if i.done != nil {
+				i.done(key)
+			}
+			if i.finished != nil {
+				i.finished(key)
+			}
 		}
-		if i.finished != nil {
-			i.finished(key)
+
+		// Process special key events for the input field.
+		switch key := event.Key(); key {
+		case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
+			finish(key)
+			return RedrawCommand{}
+		default:
+			// Forward other key events to the text area.
+			return i.textArea.HandleEvent(event)
 		}
+	case *MouseEvent:
+		// Is mouse event within the input field?
+		x, y := event.Position()
+		if !i.InRect(x, y) {
+			return nil
+		}
+
+		// Forward mouse event to the text area.
+		cmd := i.textArea.HandleEvent(event)
+
+		// Focus in any case.
+		if event.Action == MouseLeftDown && cmd == nil {
+			cmd = SetFocusCommand{Target: i}
+		}
+		return cmd
+	case *PasteEvent:
+		// Forward the pasted text to the text area.
+		return i.textArea.HandleEvent(event)
 	}
-
-	// Process special key events for the input field.
-	switch key := event.Key(); key {
-	case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
-		finish(key)
-	case tcell.KeyCtrlV:
-		i.textArea.InputHandler(event, setFocus)
-	default:
-		// Forward other key events to the text area.
-		i.textArea.InputHandler(event, setFocus)
-	}
-}
-
-// MouseHandler returns the mouse handler for this primitive.
-func (i *InputField) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	if i.textArea.GetDisabled() {
-		return false, nil
-	}
-
-	// Is mouse event within the input field?
-	x, y := event.Position()
-	if !i.InRect(x, y) {
-		return false, nil
-	}
-
-	// Forward mouse event to the text area.
-	consumed, capture = i.textArea.MouseHandler(action, event, setFocus)
-
-	// Focus in any case.
-	if action == MouseLeftDown && !consumed {
-		setFocus(i)
-		consumed = true
-	}
-
-	return
-}
-
-// PasteHandler handles pasted text for this primitive.
-func (i *InputField) PasteHandler(pastedText string, setFocus func(p Primitive)) {
-	// Input field may be disabled.
-	if i.textArea.GetDisabled() {
-		return
-	}
-
-	// Forward the pasted text to the text area.
-	i.textArea.PasteHandler(pastedText, setFocus)
+	return nil
 }

@@ -9,9 +9,8 @@ import (
 )
 
 const (
-	// The size of the event/update/redraw channels.
-	queueSize = 100
-
+	// The size of the queued updates channel.
+	updatesQueueSize = 100
 	// The minimum time between two consecutive redraws.
 	redrawPause = 50 * time.Millisecond
 )
@@ -58,8 +57,8 @@ type queuedUpdate struct {
 // depend on it. However, it provides useful tools to set up an application and
 // plays nicely with all widgets.
 //
-// The following command displays a primitive p on the screen until Ctrl-C is
-// pressed:
+// The following command displays a primitive p on the screen until the
+// application is stopped (for example via QuitCommand):
 //
 //	if err := tview.NewApplication().SetRoot(p, true).Run(); err != nil {
 //	    panic(err)
@@ -83,21 +82,20 @@ type Application struct {
 	// Functions queued from goroutines, used to serialize updates to primitives.
 	updates chan queuedUpdate
 
-	mouseCapturingPrimitive Primitive        // A Primitive returned by a MouseHandler which will capture future mouse events.
+	mouseCapturingPrimitive Primitive        // A primitive requested via SetMouseCaptureCommand to capture future mouse events.
 	lastMouseX, lastMouseY  int              // The last position of the mouse.
 	mouseDownX, mouseDownY  int              // The position of the mouse when its button was last pressed.
 	lastMouseClick          time.Time        // The time when a mouse button was last clicked.
 	lastMouseButtons        tcell.ButtonMask // The last mouse button state.
 
-	// forceRedraw bypasses root dirty checks for the next frame.
+	// forceRedraw requests a full clear before the next frame.
 	forceRedraw bool
 }
 
 // NewApplication creates and returns a new application.
 func NewApplication() *Application {
 	return &Application{
-		events:  make(chan tcell.Event, queueSize),
-		updates: make(chan queuedUpdate, queueSize),
+		updates: make(chan queuedUpdate, updatesQueueSize),
 	}
 }
 
@@ -157,7 +155,9 @@ func (a *Application) Run() error {
 	a.RLock()
 	screen := a.screen
 	a.RUnlock()
+	a.Lock()
 	a.events = screen.EventQ()
+	a.Unlock()
 
 	// Start event loop.
 	var (
@@ -192,25 +192,12 @@ EventLoop:
 				root := a.root
 				a.RUnlock()
 
-				var draw bool
-
-				// Ctrl-C closes the application.
-				if event.Key() == tcell.KeyCtrlC {
-					a.Stop()
-					break
-				}
-
 				// Pass other key events to the root primitive.
 				if root != nil && root.HasFocus() {
-					root.InputHandler(event, func(p Primitive) {
-						a.SetFocus(p)
-					})
-					draw = true
-				}
-
-				// Redraw.
-				if draw {
-					a.draw()
+					cmd := root.HandleEvent(event)
+					if a.executeCommand(cmd) {
+						a.draw()
+					}
 				}
 			case *tcell.EventPaste:
 				if event.Start() {
@@ -223,12 +210,10 @@ EventLoop:
 					a.RUnlock()
 					if root != nil && root.HasFocus() && pasteBuffer.Len() > 0 {
 						// Pass paste event to the root primitive.
-						root.PasteHandler(pasteBuffer.String(), func(p Primitive) {
-							a.SetFocus(p)
-						})
-
-						// Redraw.
-						a.draw()
+						cmd := root.HandleEvent(NewPasteEvent(pasteBuffer.String()))
+						if a.executeCommand(cmd) {
+							a.draw()
+						}
 					}
 				}
 			case *tcell.EventResize:
@@ -248,8 +233,8 @@ EventLoop:
 				lastRedraw = time.Now()
 				a.draw()
 			case *tcell.EventMouse:
-				consumed, isMouseDownAction := a.fireMouseActions(event)
-				if consumed {
+				handled, isMouseDownAction := a.fireMouseActions(event)
+				if handled {
 					a.draw()
 				}
 				a.lastMouseButtons = event.Buttons()
@@ -275,7 +260,7 @@ EventLoop:
 
 // fireMouseActions analyzes the provided mouse event, derives mouse actions
 // from it and then forwards them to the corresponding primitives.
-func (a *Application) fireMouseActions(event *tcell.EventMouse) (consumed, isMouseDownAction bool) {
+func (a *Application) fireMouseActions(event *tcell.EventMouse) (handled, isMouseDownAction bool) {
 	// We want to relay follow-up events to the same target primitive.
 	var targetPrimitive Primitive
 
@@ -287,7 +272,7 @@ func (a *Application) fireMouseActions(event *tcell.EventMouse) (consumed, isMou
 		}
 
 		// Determine the target primitive.
-		var primitive, capturingPrimitive Primitive
+		var primitive Primitive
 		if a.mouseCapturingPrimitive != nil {
 			primitive = a.mouseCapturingPrimitive
 			targetPrimitive = a.mouseCapturingPrimitive
@@ -297,15 +282,11 @@ func (a *Application) fireMouseActions(event *tcell.EventMouse) (consumed, isMou
 			primitive = a.root
 		}
 		if primitive != nil {
-			var wasConsumed bool
-			wasConsumed, capturingPrimitive = primitive.MouseHandler(action, event, func(p Primitive) {
-				a.SetFocus(p)
-			})
-			if wasConsumed {
-				consumed = true
+			cmd := primitive.HandleEvent(NewMouseEvent(*event, action))
+			if a.executeCommand(cmd) {
+				handled = true
 			}
 		}
-		a.mouseCapturingPrimitive = capturingPrimitive
 	}
 
 	x, y := event.Position()
@@ -358,7 +339,7 @@ func (a *Application) fireMouseActions(event *tcell.EventMouse) (consumed, isMou
 		}
 	}
 
-	return consumed, isMouseDownAction
+	return handled, isMouseDownAction
 }
 
 // Stop stops the application, causing Run() to return.
@@ -455,18 +436,9 @@ func (a *Application) draw() *Application {
 	drawWidth, drawHeight := screen.Size()
 	root.SetRect(0, 0, drawWidth, drawHeight)
 
-	// Skip the render pass if nothing changed.
-	if !forceRedraw && !root.IsDirty() {
-		return a
-	}
-
-	// Clear dirty flags before drawing so updates that happen during this draw
-	// cycle can re-dirty the tree and trigger a subsequent frame.
-	root.MarkClean()
-
 	// tcell already keeps a logical back buffer and emits only visual deltas in
-	// Show(). Avoid clearing on regular dirty redraws so we don't rewrite the
-	// full logical screen every frame; keep full clears for forced redraws.
+	// Show(). Avoid clearing on regular redraws so we don't rewrite the full
+	// logical screen every frame; keep full clears for forced redraws.
 	if forceRedraw {
 		screen.Clear()
 	}
@@ -579,6 +551,75 @@ func (a *Application) QueueUpdateDraw(f func()) *Application {
 //
 // It is not recommended for event to be nil.
 func (a *Application) QueueEvent(event tcell.Event) *Application {
-	a.events <- event
+	a.RLock()
+	events := a.events
+	a.RUnlock()
+	if events == nil {
+		return a
+	}
+	events <- event
 	return a
+}
+
+func (a *Application) executeCommand(cmd Command) bool {
+	if cmd == nil {
+		return false
+	}
+
+	a.RLock()
+	screen := a.screen
+	a.RUnlock()
+
+	switch c := cmd.(type) {
+	case BatchCommand:
+		handled := false
+		for _, item := range c {
+			if a.executeCommand(item) {
+				handled = true
+			}
+		}
+		return handled
+	case RedrawCommand:
+		return true
+	case QuitCommand:
+		a.Stop()
+		return false
+	case SetFocusCommand:
+		if c.Target == nil {
+			return false
+		}
+		a.RLock()
+		changed := a.focus != c.Target
+		a.RUnlock()
+		a.SetFocus(c.Target)
+		return changed
+	case SetMouseCaptureCommand:
+		a.mouseCapturingPrimitive = c.Target
+		return false
+	case SetClipboardCommand:
+		if screen != nil && screen.HasClipboard() {
+			screen.SetClipboard([]byte(string(c)))
+			return true
+		}
+	case SetTitleCommand:
+		if screen == nil {
+			return false
+		}
+		screen.SetTitle(string(c))
+		return false
+	case GetClipboardCommand:
+		if screen == nil || !screen.HasClipboard() {
+			return false
+		}
+		// The clipboard contents will arrive as terminal paste input events.
+		screen.GetClipboard()
+		return true
+	case NotifyCommand:
+		if screen != nil {
+			screen.ShowNotification(c.Title, c.Body)
+		}
+		return false
+	}
+
+	return false
 }

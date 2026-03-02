@@ -157,7 +157,6 @@ func NewTextView() *TextView {
 func (t *TextView) SetLabel(label string) *TextView {
 	if t.label != label {
 		t.label = label
-		t.MarkDirty()
 	}
 	return t
 }
@@ -172,7 +171,6 @@ func (t *TextView) GetLabel() string {
 func (t *TextView) SetLabelWidth(width int) *TextView {
 	if t.labelWidth != width {
 		t.labelWidth = width
-		t.MarkDirty()
 	}
 	return t
 }
@@ -182,7 +180,6 @@ func (t *TextView) SetSize(rows, columns int) *TextView {
 	if t.width != columns || t.height != rows {
 		t.width = columns
 		t.height = rows
-		t.MarkDirty()
 	}
 	return t
 }
@@ -216,7 +213,6 @@ func (t *TextView) SetScrollable(scrollable bool) *TextView {
 		if !scrollable {
 			t.trackEnd = true
 		}
-		t.MarkDirty()
 	}
 	return t
 }
@@ -227,7 +223,6 @@ func (t *TextView) SetScrollable(scrollable bool) *TextView {
 func (t *TextView) SetWrap(wrap bool) *TextView {
 	if t.wrap != wrap {
 		t.resetLayout()
-		t.MarkDirty()
 	}
 	t.wrap = wrap
 	return t
@@ -238,7 +233,6 @@ func (t *TextView) SetWrap(wrap bool) *TextView {
 func (t *TextView) SetWordWrap(wrapOnWords bool) *TextView {
 	if t.wordWrap != wrapOnWords {
 		t.resetLayout()
-		t.MarkDirty()
 	}
 	t.wordWrap = wrapOnWords
 	return t
@@ -248,7 +242,6 @@ func (t *TextView) SetWordWrap(wrapOnWords bool) *TextView {
 func (t *TextView) SetMaxLines(maxLines int) *TextView {
 	if t.maxLines != maxLines {
 		t.maxLines = maxLines
-		t.MarkDirty()
 	}
 	return t
 }
@@ -259,7 +252,6 @@ func (t *TextView) SetTextAlign(alignment Alignment) *TextView {
 	if t.alignment != alignment {
 		t.alignment = alignment
 		t.resetLayout()
-		t.MarkDirty()
 	}
 	return t
 }
@@ -275,7 +267,6 @@ func (t *TextView) SetBackgroundColor(color tcell.Color) *Box {
 func (t *TextView) SetTextStyle(style tcell.Style) *TextView {
 	if t.textStyle != style {
 		t.textStyle = style
-		t.MarkDirty()
 	}
 	return t
 }
@@ -289,7 +280,6 @@ func (t *TextView) SetText(text string) *TextView {
 	}
 	t.clear()
 	t.appendText(text, t.textStyle)
-	t.MarkDirty()
 	if t.changed != nil {
 		go t.changed()
 	}
@@ -314,7 +304,6 @@ func (t *TextView) SetLines(lines []Line) *TextView {
 	}
 	t.rebuildCells()
 	t.resetLayout()
-	t.MarkDirty()
 	if t.changed != nil {
 		go t.changed()
 	}
@@ -342,7 +331,6 @@ func (t *TextView) AppendSegments(segments ...Segment) *TextView {
 	for _, seg := range segments {
 		t.appendText(seg.Text, seg.Style)
 	}
-	t.MarkDirty()
 	if t.changed != nil {
 		go t.changed()
 	}
@@ -362,7 +350,6 @@ func (t *TextView) AppendLine(line Line) *TextView {
 	t.lines = append(t.lines, textViewLogicalLine{})
 	t.rebuildCells()
 	t.resetLayout()
-	t.MarkDirty()
 	if t.changed != nil {
 		go t.changed()
 	}
@@ -445,27 +432,19 @@ func (t *TextView) SetFinishedFunc(handler func(key tcell.Key)) FormItem {
 
 // SetFormAttributes sets attributes shared by all form items.
 func (t *TextView) SetFormAttributes(labelWidth int, labelColor, bgColor, fieldTextColor, fieldBgColor tcell.Color) FormItem {
-	changed := false
 	if t.labelWidth != labelWidth {
 		t.labelWidth = labelWidth
-		changed = true
 	}
 	if t.backgroundColor != bgColor {
 		t.backgroundColor = bgColor
-		changed = true
 	}
 	labelStyle := t.labelStyle.Foreground(labelColor)
 	if t.labelStyle != labelStyle {
 		t.labelStyle = labelStyle
-		changed = true
 	}
 	textStyle := tcell.StyleDefault.Foreground(fieldTextColor).Background(bgColor)
 	if t.textStyle != textStyle {
 		t.textStyle = textStyle
-		changed = true
-	}
-	if changed {
-		t.MarkDirty()
 	}
 	return t
 }
@@ -479,7 +458,6 @@ func (t *TextView) ScrollTo(row, column int) *TextView {
 		t.lineOffset = row
 		t.columnOffset = column
 		t.trackEnd = false
-		t.MarkDirty()
 	}
 	return t
 }
@@ -494,7 +472,6 @@ func (t *TextView) ScrollToBeginning() *TextView {
 		t.trackEnd = false
 		t.lineOffset = 0
 		t.columnOffset = 0
-		t.MarkDirty()
 	}
 	return t
 }
@@ -508,7 +485,6 @@ func (t *TextView) ScrollToEnd() *TextView {
 	if !t.trackEnd || t.columnOffset != 0 {
 		t.trackEnd = true
 		t.columnOffset = 0
-		t.MarkDirty()
 	}
 	return t
 }
@@ -536,7 +512,6 @@ func (t *TextView) Clear() *TextView {
 func (t *TextView) clear() {
 	t.lines = nil
 	t.resetLayout()
-	t.MarkDirty()
 }
 
 // Focus is called when this primitive receives focus.
@@ -578,7 +553,6 @@ func (t *TextView) write(p []byte) (n int, err error) {
 	}
 
 	t.appendText(string(p), t.textStyle)
-	t.MarkDirty()
 	return len(p), nil
 }
 
@@ -916,119 +890,117 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	}
 }
 
-// InputHandler returns the handler for this primitive.
-func (t *TextView) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
-	previousLineOffset, previousColumnOffset, previousTrackEnd := t.lineOffset, t.columnOffset, t.trackEnd
-	key := event.Key()
+// HandleEvent handles input events for this primitive.
+func (t *TextView) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *KeyEvent:
+		previousLineOffset, previousColumnOffset, previousTrackEnd := t.lineOffset, t.columnOffset, t.trackEnd
+		key := event.Key()
 
-	if key == tcell.KeyEscape || key == tcell.KeyEnter || key == tcell.KeyTab || key == tcell.KeyBacktab {
-		if t.done != nil {
-			t.done(key)
+		if key == tcell.KeyEscape || key == tcell.KeyEnter || key == tcell.KeyTab || key == tcell.KeyBacktab {
+			if t.done != nil {
+				t.done(key)
+			}
+			if t.finished != nil {
+				t.finished(key)
+			}
+			return RedrawCommand{}
 		}
-		if t.finished != nil {
-			t.finished(key)
+
+		if !t.scrollable {
+			return nil
 		}
-		return
-	}
 
-	if !t.scrollable {
-		return
-	}
-
-	switch key {
-	case tcell.KeyRune:
-		switch event.Str() {
-		case "g":
+		switch key {
+		case tcell.KeyRune:
+			switch event.Str() {
+			case "g":
+				t.trackEnd = false
+				t.lineOffset = 0
+				t.columnOffset = 0
+			case "G":
+				t.trackEnd = true
+				t.columnOffset = 0
+			case "j":
+				t.lineOffset++
+			case "k":
+				t.trackEnd = false
+				t.lineOffset--
+			case "h":
+				t.columnOffset--
+			case "l":
+				t.columnOffset++
+			}
+		case tcell.KeyHome:
 			t.trackEnd = false
 			t.lineOffset = 0
 			t.columnOffset = 0
-		case "G":
+		case tcell.KeyEnd:
 			t.trackEnd = true
 			t.columnOffset = 0
-		case "j":
-			t.lineOffset++
-		case "k":
+		case tcell.KeyUp:
 			t.trackEnd = false
 			t.lineOffset--
-		case "h":
+		case tcell.KeyDown:
+			t.lineOffset++
+		case tcell.KeyLeft:
 			t.columnOffset--
-		case "l":
+		case tcell.KeyRight:
 			t.columnOffset++
+		case tcell.KeyPgDn, tcell.KeyCtrlF:
+			_, _, _, pageSize := t.GetInnerRect()
+			t.lineOffset += pageSize
+		case tcell.KeyPgUp, tcell.KeyCtrlB:
+			_, _, _, pageSize := t.GetInnerRect()
+			t.trackEnd = false
+			t.lineOffset -= pageSize
 		}
-	case tcell.KeyHome:
-		t.trackEnd = false
-		t.lineOffset = 0
-		t.columnOffset = 0
-	case tcell.KeyEnd:
-		t.trackEnd = true
-		t.columnOffset = 0
-	case tcell.KeyUp:
-		t.trackEnd = false
-		t.lineOffset--
-	case tcell.KeyDown:
-		t.lineOffset++
-	case tcell.KeyLeft:
-		t.columnOffset--
-	case tcell.KeyRight:
-		t.columnOffset++
-	case tcell.KeyPgDn, tcell.KeyCtrlF:
-		_, _, _, pageSize := t.GetInnerRect()
-		t.lineOffset += pageSize
-	case tcell.KeyPgUp, tcell.KeyCtrlB:
-		_, _, _, pageSize := t.GetInnerRect()
-		t.trackEnd = false
-		t.lineOffset -= pageSize
-	}
-	if t.lineOffset != previousLineOffset || t.columnOffset != previousColumnOffset || t.trackEnd != previousTrackEnd {
-		t.MarkDirty()
-	}
-}
+		if t.lineOffset != previousLineOffset || t.columnOffset != previousColumnOffset || t.trackEnd != previousTrackEnd {
+			return RedrawCommand{}
+		}
+	case *MouseEvent:
+		var cmd BatchCommand
+		x, y := event.Position()
+		if !t.InRect(x, y) {
+			return nil
+		}
 
-// MouseHandler returns the mouse handler for this primitive.
-func (t *TextView) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	previousLineOffset, previousTrackEnd := t.lineOffset, t.trackEnd
-	x, y := event.Position()
-	if !t.InRect(x, y) {
-		return false, nil
+		_, _, width, _ := t.GetInnerRect()
+		switch event.Action {
+		case MouseLeftDown:
+			cmd = append(cmd, SetFocusCommand{Target: t}, RedrawCommand{})
+		case MouseLeftClick:
+			cmd = append(cmd, RedrawCommand{})
+		case MouseScrollUp:
+			if !t.scrollable {
+				break
+			}
+			t.trackEnd = false
+			t.lineOffset--
+			cmd = append(cmd, RedrawCommand{})
+		case MouseScrollDown:
+			if !t.scrollable {
+				break
+			}
+			t.lineOffset++
+			cmd = append(cmd, RedrawCommand{})
+		case MouseScrollLeft:
+			if !t.scrollable {
+				break
+			}
+			t.columnOffset -= width / 2
+			cmd = append(cmd, RedrawCommand{})
+		case MouseScrollRight:
+			if !t.scrollable {
+				break
+			}
+			t.columnOffset += width / 2
+			cmd = append(cmd, RedrawCommand{})
+		}
+		if len(cmd) == 0 {
+			return nil
+		}
+		return cmd
 	}
-
-	_, _, width, _ := t.GetInnerRect()
-	switch action {
-	case MouseLeftDown:
-		setFocus(t)
-		consumed = true
-	case MouseLeftClick:
-		consumed = true
-	case MouseScrollUp:
-		if !t.scrollable {
-			break
-		}
-		t.trackEnd = false
-		t.lineOffset--
-		consumed = true
-	case MouseScrollDown:
-		if !t.scrollable {
-			break
-		}
-		t.lineOffset++
-		consumed = true
-	case MouseScrollLeft:
-		if !t.scrollable {
-			break
-		}
-		t.columnOffset -= width / 2
-		consumed = true
-	case MouseScrollRight:
-		if !t.scrollable {
-			break
-		}
-		t.columnOffset += width / 2
-		consumed = true
-	}
-
-	if t.lineOffset != previousLineOffset || t.trackEnd != previousTrackEnd {
-		t.MarkDirty()
-	}
-
-	return consumed, capture
+	return nil
 }

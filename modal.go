@@ -45,7 +45,6 @@ func NewModal() *Modal {
 	m.frame = NewFrame(m.form).SetBorders(0, 0, 1, 0, 0, 0)
 	m.frame.SetBackgroundColor(Styles.ContrastBackgroundColor).
 		SetBorderPadding(1, 1, 1, 1)
-	bindDirtyParent(m.frame, m.Box)
 	return m
 }
 
@@ -62,7 +61,6 @@ func (m *Modal) SetBackgroundColor(color tcell.Color) *Modal {
 func (m *Modal) SetTextColor(color tcell.Color) *Modal {
 	if m.textColor != color {
 		m.textColor = color
-		m.MarkDirty()
 	}
 	return m
 }
@@ -94,7 +92,6 @@ func (m *Modal) SetDoneFunc(handler func(buttonIndex int, buttonLabel string)) *
 func (m *Modal) SetText(text string) *Modal {
 	if m.text != text {
 		m.text = text
-		m.MarkDirty()
 	}
 	return m
 }
@@ -127,21 +124,6 @@ func (m *Modal) ClearButtons() *Modal {
 func (m *Modal) SetFocus(index int) *Modal {
 	m.form.SetFocus(index)
 	return m
-}
-
-// IsDirty returns whether this primitive or its children need redraw.
-func (m *Modal) IsDirty() bool {
-	if m.Box.IsDirty() {
-		return true
-	}
-	return m.frame.IsDirty() || m.form.IsDirty()
-}
-
-// MarkClean marks this primitive and children as clean.
-func (m *Modal) MarkClean() {
-	m.Box.MarkClean()
-	m.frame.MarkClean()
-	m.form.MarkClean()
 }
 
 // Focus is called when this primitive receives focus.
@@ -187,29 +169,32 @@ func (m *Modal) Draw(screen tcell.Screen) {
 	m.frame.Draw(screen)
 }
 
-// MouseHandler returns the mouse handler for this primitive.
-func (m *Modal) MouseHandler(action MouseAction, event *tcell.EventMouse, setFocus func(p Primitive)) (consumed bool, capture Primitive) {
-	// Pass mouse events on to the form.
-	consumed, capture = m.form.MouseHandler(action, event, setFocus)
-	if !consumed && action == MouseLeftDown && m.InRect(event.Position()) {
-		setFocus(m)
-		consumed = true
+// HandleEvent handles input events for this primitive.
+func (m *Modal) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *MouseEvent:
+		// Pass mouse events on to the form.
+		cmd := m.form.HandleEvent(event)
+		if cmd == nil && event.Action == MouseLeftDown && m.InRect(event.Position()) {
+			cmd = SetFocusCommand{Target: m}
+		}
+		return cmd
+	case *KeyEvent:
+		// Keep arrow-key navigation between modal buttons.
+		switch event.Key() {
+		case tcell.KeyDown, tcell.KeyRight:
+			event = tcell.NewEventKey(tcell.KeyTab, "", tcell.ModNone)
+		case tcell.KeyUp, tcell.KeyLeft:
+			event = tcell.NewEventKey(tcell.KeyBacktab, "", tcell.ModNone)
+		}
+		// Forward the key event to the frame so the focused form button receives Tab/Backtab and Form.finished can move focus to the next/previous button.
+		if m.frame.HasFocus() {
+			return m.frame.HandleEvent(event)
+		}
+	case *PasteEvent:
+		if m.frame.HasFocus() {
+			return m.frame.HandleEvent(event)
+		}
 	}
-	return
-}
-
-// InputHandler returns the handler for this primitive.
-func (m *Modal) InputHandler(event *tcell.EventKey, setFocus func(p Primitive)) {
-	// Keep arrow-key navigation between modal buttons.
-	switch event.Key() {
-	case tcell.KeyDown, tcell.KeyRight:
-		event = tcell.NewEventKey(tcell.KeyTab, "", tcell.ModNone)
-	case tcell.KeyUp, tcell.KeyLeft:
-		event = tcell.NewEventKey(tcell.KeyBacktab, "", tcell.ModNone)
-	}
-	// Forward the key event to the frame so the focused form button receives Tab/Backtab and Form.finished can move focus to the next/previous button.
-	if m.frame.HasFocus() {
-		m.frame.InputHandler(event, setFocus)
-		return
-	}
+	return nil
 }
