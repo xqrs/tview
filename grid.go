@@ -681,86 +681,74 @@ ItemLoop:
 	}
 }
 
-// MouseHandler returns the mouse handler for this primitive.
-func (g *Grid) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var (
-		capture Primitive
-		cmd     Command
-	)
-	if !g.InRect(event.Position()) {
-		return nil, nil
-	}
-
-	// Pass mouse events along to the first child item that takes it.
-	for _, item := range g.items {
-		if item.Item == nil {
-			continue
+// HandleEvent handles input events for this primitive.
+func (g *Grid) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *MouseEvent:
+		if !g.InRect(event.Position()) {
+			return nil
 		}
-		var childCmds Command
-		capture, childCmds = item.Item.MouseHandler(action, event)
-		cmd = AppendCommand(cmd, childCmds)
-		if childCmds != nil {
-			return capture, cmd
-		}
-	}
 
-	return nil, cmd
-}
-
-// InputHandler returns the handler for this primitive.
-func (g *Grid) InputHandler(event *tcell.EventKey) Command {
-	previousRowOffset, previousColumnOffset := g.rowOffset, g.columnOffset
-	if !g.hasFocus {
-		// Pass event on to child primitive.
+		// Pass mouse events along to the first child item that takes it.
 		for _, item := range g.items {
-			if item != nil && item.Item.HasFocus() {
-				return item.Item.InputHandler(event)
+			if item.Item == nil {
+				continue
+			}
+			childCmds := item.Item.HandleEvent(event)
+			if childCmds != nil {
+				return childCmds
 			}
 		}
-		return nil
-	}
+	case *KeyEvent:
+		previousRowOffset, previousColumnOffset := g.rowOffset, g.columnOffset
+		if !g.hasFocus {
+			// Pass event on to child primitive.
+			for _, item := range g.items {
+				if item != nil && item.Item.HasFocus() {
+					return item.Item.HandleEvent(event)
+				}
+			}
+			return nil
+		}
 
-	// Process our own key events if we have direct focus.
-	switch event.Key() {
-	case tcell.KeyRune:
-		switch event.Str() {
-		case "g":
+		// Process our own key events if we have direct focus.
+		switch event.Key() {
+		case tcell.KeyRune:
+			switch event.Str() {
+			case "g":
+				g.rowOffset, g.columnOffset = 0, 0
+			case "G":
+				g.rowOffset = math.MaxInt32
+			case "j":
+				g.rowOffset++
+			case "k":
+				g.rowOffset--
+			case "h":
+				g.columnOffset--
+			case "l":
+				g.columnOffset++
+			}
+		case tcell.KeyHome:
 			g.rowOffset, g.columnOffset = 0, 0
-		case "G":
+		case tcell.KeyEnd:
 			g.rowOffset = math.MaxInt32
-		case "j":
-			g.rowOffset++
-		case "k":
+		case tcell.KeyUp:
 			g.rowOffset--
-		case "h":
+		case tcell.KeyDown:
+			g.rowOffset++
+		case tcell.KeyLeft:
 			g.columnOffset--
-		case "l":
+		case tcell.KeyRight:
 			g.columnOffset++
 		}
-	case tcell.KeyHome:
-		g.rowOffset, g.columnOffset = 0, 0
-	case tcell.KeyEnd:
-		g.rowOffset = math.MaxInt32
-	case tcell.KeyUp:
-		g.rowOffset--
-	case tcell.KeyDown:
-		g.rowOffset++
-	case tcell.KeyLeft:
-		g.columnOffset--
-	case tcell.KeyRight:
-		g.columnOffset++
-	}
-	if g.rowOffset != previousRowOffset || g.columnOffset != previousColumnOffset {
-		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-	}
-	return nil
-}
-
-// PasteHandler handles pasted text for this primitive.
-func (g *Grid) PasteHandler(pastedText string) Command {
-	for _, item := range g.items {
-		if item != nil && item.Item.HasFocus() {
-			return item.Item.PasteHandler(pastedText)
+		if g.rowOffset != previousRowOffset || g.columnOffset != previousColumnOffset {
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		}
+	case *PasteEvent:
+		for _, item := range g.items {
+			if item != nil && item.Item.HasFocus() {
+				return item.Item.HandleEvent(event)
+			}
 		}
 	}
 	return nil

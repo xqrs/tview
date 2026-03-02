@@ -169,35 +169,32 @@ func (m *Modal) Draw(screen tcell.Screen) {
 	m.frame.Draw(screen)
 }
 
-// MouseHandler returns the mouse handler for this primitive.
-func (m *Modal) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var (
-		capture Primitive
-		cmd     Command
-	)
-	// Pass mouse events on to the form.
-	var childCmds Command
-	capture, childCmds = m.form.MouseHandler(action, event)
-	cmd = AppendCommand(cmd, childCmds)
-	if childCmds == nil && action == MouseLeftDown && m.InRect(event.Position()) {
-		cmd = AppendCommand(cmd, SetFocusCommand{Target: m})
-		cmd = AppendCommand(cmd, ConsumeEventCommand{})
-	}
-	return capture, cmd
-}
-
-// InputHandler returns the handler for this primitive.
-func (m *Modal) InputHandler(event *tcell.EventKey) Command {
-	// Keep arrow-key navigation between modal buttons.
-	switch event.Key() {
-	case tcell.KeyDown, tcell.KeyRight:
-		event = tcell.NewEventKey(tcell.KeyTab, "", tcell.ModNone)
-	case tcell.KeyUp, tcell.KeyLeft:
-		event = tcell.NewEventKey(tcell.KeyBacktab, "", tcell.ModNone)
-	}
-	// Forward the key event to the frame so the focused form button receives Tab/Backtab and Form.finished can move focus to the next/previous button.
-	if m.frame.HasFocus() {
-		return m.frame.InputHandler(event)
+// HandleEvent handles input events for this primitive.
+func (m *Modal) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *MouseEvent:
+		// Pass mouse events on to the form.
+		cmd := m.form.HandleEvent(event)
+		if cmd == nil && event.Action == MouseLeftDown && m.InRect(event.Position()) {
+			cmd = BatchCommand{SetFocusCommand{Target: m}, ConsumeEventCommand{}}
+		}
+		return cmd
+	case *KeyEvent:
+		// Keep arrow-key navigation between modal buttons.
+		switch event.Key() {
+		case tcell.KeyDown, tcell.KeyRight:
+			event = tcell.NewEventKey(tcell.KeyTab, "", tcell.ModNone)
+		case tcell.KeyUp, tcell.KeyLeft:
+			event = tcell.NewEventKey(tcell.KeyBacktab, "", tcell.ModNone)
+		}
+		// Forward the key event to the frame so the focused form button receives Tab/Backtab and Form.finished can move focus to the next/previous button.
+		if m.frame.HasFocus() {
+			return m.frame.HandleEvent(event)
+		}
+	case *PasteEvent:
+		if m.frame.HasFocus() {
+			return m.frame.HandleEvent(event)
+		}
 	}
 	return nil
 }

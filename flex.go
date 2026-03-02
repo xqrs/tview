@@ -231,47 +231,29 @@ func (f *Flex) HasFocus() bool {
 	return f.Box.HasFocus()
 }
 
-// MouseHandler returns the mouse handler for this primitive.
-func (f *Flex) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var (
-		capture Primitive
-		cmd     Command
-	)
-	if !f.InRect(event.Position()) {
-		return nil, nil
-	}
-
-	// Pass mouse events along to the first child item that takes it.
-	for _, item := range f.items {
-		if item.Item == nil {
-			continue
+// HandleEvent handles input events for this primitive.
+func (f *Flex) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *MouseEvent:
+		if !f.InRect(event.Position()) {
+			return nil
 		}
-		var childCmds Command
-		capture, childCmds = item.Item.MouseHandler(action, event)
-		cmd = AppendCommand(cmd, childCmds)
-		if childCmds != nil {
-			return capture, cmd
+
+		// Pass mouse events along to the first child item that takes it.
+		for _, item := range f.items {
+			if item.Item == nil {
+				continue
+			}
+			childCmds := item.Item.HandleEvent(event)
+			if childCmds != nil {
+				return childCmds
+			}
 		}
-	}
-
-	return nil, cmd
-}
-
-// InputHandler returns the handler for this primitive.
-func (f *Flex) InputHandler(event *tcell.EventKey) Command {
-	for _, item := range f.items {
-		if item.Item != nil && item.Item.HasFocus() {
-			return item.Item.InputHandler(event)
-		}
-	}
-	return nil
-}
-
-// PasteHandler handles pasted text for this primitive.
-func (f *Flex) PasteHandler(pastedText string) Command {
-	for _, item := range f.items {
-		if item.Item != nil && item.Item.HasFocus() {
-			return item.Item.PasteHandler(pastedText)
+	case *KeyEvent, *PasteEvent:
+		for _, item := range f.items {
+			if item.Item != nil && item.Item.HasFocus() {
+				return item.Item.HandleEvent(event)
+			}
 		}
 	}
 	return nil

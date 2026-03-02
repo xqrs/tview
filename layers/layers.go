@@ -386,60 +386,43 @@ func (l *Layers) Draw(screen tcell.Screen) {
 	}
 }
 
-// MouseHandler returns the mouse handler for this primitive.
-func (l *Layers) MouseHandler(action tview.MouseAction, event *tcell.EventMouse) (tview.Primitive, tview.Command) {
-	var (
-		capture tview.Primitive
-		cmd     tview.Command
-	)
-	if !l.InRect(event.Position()) {
-		return nil, nil
-	}
-
-	overlayIndex := l.topVisibleEnabledOverlayIndex()
-
-	// Pass mouse events along to the front-most visible layer that takes it,
-	// but never to layers behind an active overlay layer.
-	for index := len(l.layers) - 1; index >= 0; index-- {
-		layer := l.layers[index]
-		if !layer.visible || !layer.enabled {
-			continue
+// HandleEvent handles input events for this primitive.
+func (l *Layers) HandleEvent(event tcell.Event) tview.Command {
+	switch event := event.(type) {
+	case *tview.MouseEvent:
+		if !l.InRect(event.Position()) {
+			return nil
 		}
-		if overlayIndex >= 0 && index < overlayIndex {
-			break
+
+		overlayIndex := l.topVisibleEnabledOverlayIndex()
+
+		// Pass mouse events along to the front-most visible layer that takes it,
+		// but never to layers behind an active overlay layer.
+		for index := len(l.layers) - 1; index >= 0; index-- {
+			layer := l.layers[index]
+			if !layer.visible || !layer.enabled {
+				continue
+			}
+			if overlayIndex >= 0 && index < overlayIndex {
+				break
+			}
+			childCmds := layer.item.HandleEvent(event)
+			if childCmds != nil {
+				return childCmds
+			}
 		}
-		var childCmds tview.Command
-		capture, childCmds = layer.item.MouseHandler(action, event)
-		cmd = tview.AppendCommand(cmd, childCmds)
-		if childCmds != nil {
-			return capture, cmd
+
+		// If an overlay layer is active, block input to layers behind it even if
+		// the top layer didn't consume the event.
+		if overlayIndex >= 0 {
+			return tview.BatchCommand{tview.ConsumeEventCommand{}}
 		}
-	}
-
-	// If an overlay layer is active, block input to layers behind it even if
-	// the top layer didn't consume the event.
-	if overlayIndex >= 0 {
-		return nil, tview.AppendCommand(cmd, tview.ConsumeEventCommand{})
-	}
-
-	return nil, cmd
-}
-
-// InputHandler returns the handler for this primitive.
-func (l *Layers) InputHandler(event *tcell.EventKey) tview.Command {
-	for _, layer := range l.layers {
-		if layer.enabled && layer.item.HasFocus() {
-			return layer.item.InputHandler(event)
-		}
-	}
-	return nil
-}
-
-// PasteHandler handles pasted text for this primitive.
-func (l *Layers) PasteHandler(pastedText string) tview.Command {
-	for _, layer := range l.layers {
-		if layer.enabled && layer.item.HasFocus() {
-			return layer.item.PasteHandler(pastedText)
+		return nil
+	case *tview.KeyEvent, *tview.PasteEvent:
+		for _, layer := range l.layers {
+			if layer.enabled && layer.item.HasFocus() {
+				return layer.item.HandleEvent(event)
+			}
 		}
 	}
 	return nil

@@ -8,20 +8,14 @@ type Primitive interface {
 	// screen's ShowCursor() function but should only do so when they have focus.
 	// (They will need to keep track of this themselves.)
 	Draw(screen tcell.Screen)
+	// HandleEvent receives events when this primitive has focus.
+	HandleEvent(event tcell.Event) Command
 
 	// GetRect returns the current position of the primitive, x, y, width, and
 	// height.
 	GetRect() (int, int, int, int)
 	// SetRect sets a new position of the primitive.
 	SetRect(x, y, width, height int)
-
-	// InputHandler receives key events when this primitive has focus.
-	InputHandler(event *tcell.EventKey) Command
-	// MouseHandler receives mouse events.
-	// The returned capture primitive (if non-nil) receives follow-up mouse events until the capture is released.
-	MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command)
-	// PasteHandler receives pasted text.
-	PasteHandler(text string) Command
 
 	// HasFocus determines if the primitive has focus. This function must return
 	// true also if one of this primitive's child elements has focus.

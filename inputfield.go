@@ -272,70 +272,51 @@ func (i *InputField) Draw(screen tcell.Screen) {
 	i.textArea.Draw(screen)
 }
 
-// InputHandler returns the handler for this primitive.
-func (i *InputField) InputHandler(event *tcell.EventKey) Command {
+// HandleEvent handles input events for this primitive.
+func (i *InputField) HandleEvent(event tcell.Event) Command {
 	if i.textArea.GetDisabled() {
 		return nil
 	}
 
-	// Finish up.
-	finish := func(key tcell.Key) {
-		if i.done != nil {
-			i.done(key)
+	switch event := event.(type) {
+	case *KeyEvent:
+		// Finish up.
+		finish := func(key tcell.Key) {
+			if i.done != nil {
+				i.done(key)
+			}
+			if i.finished != nil {
+				i.finished(key)
+			}
 		}
-		if i.finished != nil {
-			i.finished(key)
+
+		// Process special key events for the input field.
+		switch key := event.Key(); key {
+		case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
+			finish(key)
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		default:
+			// Forward other key events to the text area.
+			return i.textArea.HandleEvent(event)
 		}
+	case *MouseEvent:
+		// Is mouse event within the input field?
+		x, y := event.Position()
+		if !i.InRect(x, y) {
+			return nil
+		}
+
+		// Forward mouse event to the text area.
+		cmd := i.textArea.HandleEvent(event)
+
+		// Focus in any case.
+		if event.Action == MouseLeftDown && cmd == nil {
+			cmd = BatchCommand{SetFocusCommand{Target: i}, ConsumeEventCommand{}}
+		}
+		return cmd
+	case *PasteEvent:
+		// Forward the pasted text to the text area.
+		return i.textArea.HandleEvent(event)
 	}
-
-	// Process special key events for the input field.
-	switch key := event.Key(); key {
-	case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
-		finish(key)
-		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-	case tcell.KeyCtrlV:
-		return i.textArea.InputHandler(event)
-	default:
-		// Forward other key events to the text area.
-		return i.textArea.InputHandler(event)
-	}
-}
-
-// MouseHandler returns the mouse handler for this primitive.
-func (i *InputField) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var (
-		capture Primitive
-		cmd     Command
-	)
-	if i.textArea.GetDisabled() {
-		return nil, nil
-	}
-
-	// Is mouse event within the input field?
-	x, y := event.Position()
-	if !i.InRect(x, y) {
-		return nil, nil
-	}
-
-	// Forward mouse event to the text area.
-	capture, cmd = i.textArea.MouseHandler(action, event)
-
-	// Focus in any case.
-	if action == MouseLeftDown && cmd == nil {
-		cmd = AppendCommand(cmd, SetFocusCommand{Target: i})
-		cmd = AppendCommand(cmd, ConsumeEventCommand{})
-	}
-
-	return capture, cmd
-}
-
-// PasteHandler handles pasted text for this primitive.
-func (i *InputField) PasteHandler(pastedText string) Command {
-	// Input field may be disabled.
-	if i.textArea.GetDisabled() {
-		return nil
-	}
-
-	// Forward the pasted text to the text area.
-	return i.textArea.PasteHandler(pastedText)
+	return nil
 }

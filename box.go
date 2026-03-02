@@ -144,24 +144,15 @@ func (b *Box) SetRect(x, y, width, height int) {
 	}
 }
 
-// InputHandler returns a no-op input handler.
-func (b *Box) InputHandler(event *tcell.EventKey) Command {
-	return nil
-}
-
-// PasteHandler handles pasted text for this primitive.
-func (b *Box) PasteHandler(pastedText string) Command {
-	return nil
-}
-
-// MouseHandler handles mouse events for this primitive.
-func (b *Box) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var cmd Command
-	if action == MouseLeftDown && b.InRect(event.Position()) {
-		cmd = AppendCommand(cmd, SetFocusCommand{Target: b})
-		cmd = AppendCommand(cmd, ConsumeEventCommand{})
+// HandleEvent handles input events for this primitive.
+func (b *Box) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *MouseEvent:
+		if event.Action == MouseLeftDown && b.InRect(event.Position()) {
+			return BatchCommand{SetFocusCommand{Target: b}, ConsumeEventCommand{}}
+		}
 	}
-	return nil, cmd
+	return nil
 }
 
 // InRect returns true if the given coordinate is within the bounds of the box's

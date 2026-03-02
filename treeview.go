@@ -1005,20 +1005,20 @@ func mergeStyle(base, overlay tcell.Style) tcell.Style {
 	return base
 }
 
-// InputHandler returns the handler for this primitive.
-func (t *TreeView) InputHandler(event *tcell.EventKey) Command {
-	selectNode := func() {
-		node := t.currentNode
-		if node != nil {
-			if t.selected != nil {
-				t.selected(node)
-			}
-			if node.selected != nil {
-				node.selected()
-			}
-		}
+func (t *TreeView) selectCurrentNode() {
+	node := t.currentNode
+	if node == nil {
+		return
 	}
+	if t.selected != nil {
+		t.selected(node)
+	}
+	if node.selected != nil {
+		node.selected()
+	}
+}
 
+func (t *TreeView) handleKeyEvent(event *KeyEvent) Command {
 	// Because the tree is flattened into a list only at drawing time, we also
 	// postpone the (cursor) movement to drawing time.
 	switch key := event.Key(); key {
@@ -1061,40 +1061,39 @@ func (t *TreeView) InputHandler(event *tcell.EventKey) Command {
 		case "K":
 			t.movement = treeParent
 		case " ":
-			selectNode()
+			t.selectCurrentNode()
 		}
 	case tcell.KeyEnter:
-		selectNode()
+		t.selectCurrentNode()
 	}
 
 	t.process(true)
 	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 }
 
-// MouseHandler returns the mouse handler for this primitive.
-func (t *TreeView) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var cmd Command
+func (t *TreeView) handleMouseEvent(event *MouseEvent) Command {
+	var cmd BatchCommand
 	x, y := event.Position()
 	if !t.InRect(x, y) {
-		return nil, nil
+		return nil
 	}
 
-	switch action {
+	switch event.Action {
 	case MouseLeftDown:
 		t.lastMouseY = y
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
+		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
 	case MouseMove:
 		if event.Buttons()&tcell.Button1 != 0 && t.lastMouseY != -1 {
 			t.movement = treeScroll
 			t.step = t.lastMouseY - y
 			t.lastMouseY = y
 		}
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
+		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
 	case MouseLeftUp:
 		t.lastMouseY = -1
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
+		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
 	case MouseLeftClick:
-		cmd = AppendCommand(cmd, SetFocusCommand{Target: t})
+		cmd = append(cmd, SetFocusCommand{Target: t})
 		_, rectY, _, _ := t.GetInnerRect()
 		y += t.offsetY - rectY
 		if t.lastMouseY != -1 {
@@ -1118,15 +1117,29 @@ func (t *TreeView) MouseHandler(action MouseAction, event *tcell.EventMouse) (Pr
 				}
 			}
 		}
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
+		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
 	case MouseScrollUp:
 		t.movement = treeScroll
 		t.step = -1
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
+		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
 	case MouseScrollDown:
 		t.movement = treeScroll
 		t.step = 1
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
+		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
 	}
-	return nil, cmd
+	if len(cmd) == 0 {
+		return nil
+	}
+	return cmd
+}
+
+// HandleEvent handles input events for this primitive.
+func (t *TreeView) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *KeyEvent:
+		return t.handleKeyEvent(event)
+	case *MouseEvent:
+		return t.handleMouseEvent(event)
+	}
+	return nil
 }

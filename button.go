@@ -170,48 +170,41 @@ func (b *Button) Draw(screen tcell.Screen) {
 	}
 }
 
-// InputHandler returns the handler for this primitive.
-func (b *Button) InputHandler(event *tcell.EventKey) Command {
+// HandleEvent handles input events for this primitive.
+func (b *Button) HandleEvent(event tcell.Event) Command {
 	if b.disabled {
 		return nil
 	}
 
-	// Process key event.
-	switch key := event.Key(); key {
-	case tcell.KeyEnter: // Selected.
-		if b.selected != nil {
-			b.selected()
+	switch event := event.(type) {
+	case *KeyEvent:
+		// Process key event.
+		switch key := event.Key(); key {
+		case tcell.KeyEnter: // Selected.
+			if b.selected != nil {
+				b.selected()
+			}
+		case tcell.KeyBacktab, tcell.KeyTab, tcell.KeyEscape: // Leave. No action.
+			if b.exit != nil {
+				b.exit(key)
+			}
 		}
-	case tcell.KeyBacktab, tcell.KeyTab, tcell.KeyEscape: // Leave. No action.
-		if b.exit != nil {
-			b.exit(key)
+		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+	case *MouseEvent:
+		if !b.InRect(event.Position()) {
+			return nil
+		}
+
+		// Process mouse event.
+		switch event.Action {
+		case MouseLeftDown:
+			return BatchCommand{SetFocusCommand{Target: b}, ConsumeEventCommand{}}
+		case MouseLeftClick:
+			if b.selected != nil {
+				b.selected()
+			}
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		}
 	}
-	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-}
-
-// MouseHandler returns the mouse handler for this primitive.
-func (b *Button) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var cmd Command
-	if b.disabled {
-		return nil, nil
-	}
-
-	if !b.InRect(event.Position()) {
-		return nil, nil
-	}
-
-	// Process mouse event.
-	switch action {
-	case MouseLeftDown:
-		cmd = AppendCommand(cmd, SetFocusCommand{Target: b})
-		cmd = AppendCommand(cmd, ConsumeEventCommand{})
-	case MouseLeftClick:
-		if b.selected != nil {
-			b.selected()
-		}
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-	}
-
-	return nil, cmd
+	return nil
 }

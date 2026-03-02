@@ -309,54 +309,47 @@ func (c *Checkbox) Draw(screen tcell.Screen) {
 	printWithStyle(screen, str, x, y, 0, width, AlignmentLeft, style, c.disabled)
 }
 
-// InputHandler returns the handler for this primitive.
-func (c *Checkbox) InputHandler(event *tcell.EventKey) Command {
+// HandleEvent handles input events for this primitive.
+func (c *Checkbox) HandleEvent(event tcell.Event) Command {
 	if c.disabled {
 		return nil
 	}
 
-	// Process key event.
-	switch key := event.Key(); key {
-	case tcell.KeyRune, tcell.KeyEnter: // Check.
-		if key == tcell.KeyRune && event.Str() != " " {
-			break
-		}
-		c.SetChecked(!c.checked)
-	case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape: // We're done.
-		if c.done != nil {
-			c.done(key)
-		}
-		if c.finished != nil {
-			c.finished(key)
-		}
-	}
-	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-}
-
-// MouseHandler returns the mouse handler for this primitive.
-func (c *Checkbox) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var cmd Command
-	if c.disabled {
-		return nil, nil
-	}
-
-	x, y := event.Position()
-	_, rectY, _, _ := c.GetInnerRect()
-	if !c.InRect(x, y) {
-		return nil, nil
-	}
-
-	// Process mouse event.
-	if y == rectY {
-		switch action {
-		case MouseLeftDown:
-			cmd = AppendCommand(cmd, SetFocusCommand{Target: c})
-			cmd = AppendCommand(cmd, ConsumeEventCommand{})
-		case MouseLeftClick:
+	switch event := event.(type) {
+	case *KeyEvent:
+		// Process key event.
+		switch key := event.Key(); key {
+		case tcell.KeyRune, tcell.KeyEnter: // Check.
+			if key == tcell.KeyRune && event.Str() != " " {
+				break
+			}
 			c.SetChecked(!c.checked)
-			cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
+		case tcell.KeyTab, tcell.KeyBacktab, tcell.KeyEscape: // We're done.
+			if c.done != nil {
+				c.done(key)
+			}
+			if c.finished != nil {
+				c.finished(key)
+			}
+		}
+		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+	case *MouseEvent:
+		x, y := event.Position()
+		_, rectY, _, _ := c.GetInnerRect()
+		if !c.InRect(x, y) {
+			return nil
+		}
+
+		// Process mouse event.
+		if y == rectY {
+			switch event.Action {
+			case MouseLeftDown:
+				return BatchCommand{SetFocusCommand{Target: c}, ConsumeEventCommand{}}
+			case MouseLeftClick:
+				c.SetChecked(!c.checked)
+				return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			}
 		}
 	}
-
-	return nil, cmd
+	return nil
 }

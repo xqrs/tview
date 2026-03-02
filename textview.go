@@ -877,116 +877,117 @@ func (t *TextView) Draw(screen tcell.Screen) {
 	}
 }
 
-// InputHandler returns the handler for this primitive.
-func (t *TextView) InputHandler(event *tcell.EventKey) Command {
-	previousLineOffset, previousColumnOffset, previousTrackEnd := t.lineOffset, t.columnOffset, t.trackEnd
-	key := event.Key()
+// HandleEvent handles input events for this primitive.
+func (t *TextView) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *KeyEvent:
+		previousLineOffset, previousColumnOffset, previousTrackEnd := t.lineOffset, t.columnOffset, t.trackEnd
+		key := event.Key()
 
-	if key == tcell.KeyEscape || key == tcell.KeyEnter || key == tcell.KeyTab || key == tcell.KeyBacktab {
-		if t.done != nil {
-			t.done(key)
+		if key == tcell.KeyEscape || key == tcell.KeyEnter || key == tcell.KeyTab || key == tcell.KeyBacktab {
+			if t.done != nil {
+				t.done(key)
+			}
+			if t.finished != nil {
+				t.finished(key)
+			}
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		}
-		if t.finished != nil {
-			t.finished(key)
+
+		if !t.scrollable {
+			return nil
 		}
-		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-	}
 
-	if !t.scrollable {
-		return nil
-	}
-
-	switch key {
-	case tcell.KeyRune:
-		switch event.Str() {
-		case "g":
+		switch key {
+		case tcell.KeyRune:
+			switch event.Str() {
+			case "g":
+				t.trackEnd = false
+				t.lineOffset = 0
+				t.columnOffset = 0
+			case "G":
+				t.trackEnd = true
+				t.columnOffset = 0
+			case "j":
+				t.lineOffset++
+			case "k":
+				t.trackEnd = false
+				t.lineOffset--
+			case "h":
+				t.columnOffset--
+			case "l":
+				t.columnOffset++
+			}
+		case tcell.KeyHome:
 			t.trackEnd = false
 			t.lineOffset = 0
 			t.columnOffset = 0
-		case "G":
+		case tcell.KeyEnd:
 			t.trackEnd = true
 			t.columnOffset = 0
-		case "j":
-			t.lineOffset++
-		case "k":
+		case tcell.KeyUp:
 			t.trackEnd = false
 			t.lineOffset--
-		case "h":
+		case tcell.KeyDown:
+			t.lineOffset++
+		case tcell.KeyLeft:
 			t.columnOffset--
-		case "l":
+		case tcell.KeyRight:
 			t.columnOffset++
+		case tcell.KeyPgDn, tcell.KeyCtrlF:
+			_, _, _, pageSize := t.GetInnerRect()
+			t.lineOffset += pageSize
+		case tcell.KeyPgUp, tcell.KeyCtrlB:
+			_, _, _, pageSize := t.GetInnerRect()
+			t.trackEnd = false
+			t.lineOffset -= pageSize
 		}
-	case tcell.KeyHome:
-		t.trackEnd = false
-		t.lineOffset = 0
-		t.columnOffset = 0
-	case tcell.KeyEnd:
-		t.trackEnd = true
-		t.columnOffset = 0
-	case tcell.KeyUp:
-		t.trackEnd = false
-		t.lineOffset--
-	case tcell.KeyDown:
-		t.lineOffset++
-	case tcell.KeyLeft:
-		t.columnOffset--
-	case tcell.KeyRight:
-		t.columnOffset++
-	case tcell.KeyPgDn, tcell.KeyCtrlF:
-		_, _, _, pageSize := t.GetInnerRect()
-		t.lineOffset += pageSize
-	case tcell.KeyPgUp, tcell.KeyCtrlB:
-		_, _, _, pageSize := t.GetInnerRect()
-		t.trackEnd = false
-		t.lineOffset -= pageSize
-	}
-	if t.lineOffset != previousLineOffset || t.columnOffset != previousColumnOffset || t.trackEnd != previousTrackEnd {
-		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		if t.lineOffset != previousLineOffset || t.columnOffset != previousColumnOffset || t.trackEnd != previousTrackEnd {
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		}
+	case *MouseEvent:
+		var cmd BatchCommand
+		x, y := event.Position()
+		if !t.InRect(x, y) {
+			return nil
+		}
+
+		_, _, width, _ := t.GetInnerRect()
+		switch event.Action {
+		case MouseLeftDown:
+			cmd = append(cmd, SetFocusCommand{Target: t}, RedrawCommand{}, ConsumeEventCommand{})
+		case MouseLeftClick:
+			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		case MouseScrollUp:
+			if !t.scrollable {
+				break
+			}
+			t.trackEnd = false
+			t.lineOffset--
+			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		case MouseScrollDown:
+			if !t.scrollable {
+				break
+			}
+			t.lineOffset++
+			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		case MouseScrollLeft:
+			if !t.scrollable {
+				break
+			}
+			t.columnOffset -= width / 2
+			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		case MouseScrollRight:
+			if !t.scrollable {
+				break
+			}
+			t.columnOffset += width / 2
+			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		}
+		if len(cmd) == 0 {
+			return nil
+		}
+		return cmd
 	}
 	return nil
-}
-
-// MouseHandler returns the mouse handler for this primitive.
-func (t *TextView) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var cmd Command
-	x, y := event.Position()
-	if !t.InRect(x, y) {
-		return nil, nil
-	}
-
-	_, _, width, _ := t.GetInnerRect()
-	switch action {
-	case MouseLeftDown:
-		cmd = AppendCommand(cmd, SetFocusCommand{Target: t})
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-	case MouseLeftClick:
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-	case MouseScrollUp:
-		if !t.scrollable {
-			break
-		}
-		t.trackEnd = false
-		t.lineOffset--
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-	case MouseScrollDown:
-		if !t.scrollable {
-			break
-		}
-		t.lineOffset++
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-	case MouseScrollLeft:
-		if !t.scrollable {
-			break
-		}
-		t.columnOffset -= width / 2
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-	case MouseScrollRight:
-		if !t.scrollable {
-			break
-		}
-		t.columnOffset += width / 2
-		cmd = AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-	}
-
-	return nil, cmd
 }

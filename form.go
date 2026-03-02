@@ -759,72 +759,45 @@ func (f *Form) HasFocus() bool {
 	return f.Box.HasFocus()
 }
 
-// MouseHandler returns the mouse handler for this primitive.
-func (f *Form) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var (
-		capture Primitive
-		cmd     Command
-	)
-	// Determine items to pass mouse events to.
-	for _, item := range f.items {
-		if item.GetDisabled() {
-			continue
+// HandleEvent handles input events for this primitive.
+func (f *Form) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *MouseEvent:
+		// Determine items to pass mouse events to.
+		for _, item := range f.items {
+			if item.GetDisabled() {
+				continue
+			}
+			childCmds := item.HandleEvent(event)
+			if childCmds != nil {
+				return childCmds
+			}
 		}
-		var childCmds Command
-		capture, childCmds = item.MouseHandler(action, event)
-		cmd = AppendCommand(cmd, childCmds)
-		if childCmds != nil {
-			return capture, cmd
+		for _, button := range f.buttons {
+			if button.GetDisabled() {
+				continue
+			}
+			childCmds := button.HandleEvent(event)
+			if childCmds != nil {
+				return childCmds
+			}
 		}
-	}
-	for _, button := range f.buttons {
-		if button.GetDisabled() {
-			continue
-		}
-		var childCmds Command
-		capture, childCmds = button.MouseHandler(action, event)
-		cmd = AppendCommand(cmd, childCmds)
-		if childCmds != nil {
-			return capture, cmd
-		}
-	}
 
-	// A mouse down anywhere else will focus this form.
-	if action == MouseLeftDown && f.InRect(event.Position()) {
-		cmd = AppendCommand(cmd, SetFocusCommand{Target: f})
-		cmd = AppendCommand(cmd, ConsumeEventCommand{})
-	}
-
-	return capture, cmd
-}
-
-// InputHandler returns the handler for this primitive.
-func (f *Form) InputHandler(event *tcell.EventKey) Command {
-	for _, item := range f.items {
-		if item.HasFocus() {
-			return item.InputHandler(event)
+		// A mouse down anywhere else will focus this form.
+		if event.Action == MouseLeftDown && f.InRect(event.Position()) {
+			return BatchCommand{SetFocusCommand{Target: f}, ConsumeEventCommand{}}
 		}
-	}
-
-	for _, button := range f.buttons {
-		if button.HasFocus() {
-			return button.InputHandler(event)
+	case *KeyEvent, *PasteEvent:
+		for _, item := range f.items {
+			if item.HasFocus() {
+				return item.HandleEvent(event)
+			}
 		}
-	}
-	return nil
-}
 
-// PasteHandler handles pasted text for this primitive.
-func (f *Form) PasteHandler(pastedText string) Command {
-	for _, item := range f.items {
-		if item.HasFocus() {
-			return item.PasteHandler(pastedText)
-		}
-	}
-
-	for _, button := range f.buttons {
-		if button.HasFocus() {
-			return button.PasteHandler(pastedText)
+		for _, button := range f.buttons {
+			if button.HasFocus() {
+				return button.HandleEvent(event)
+			}
 		}
 	}
 	return nil

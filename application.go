@@ -82,7 +82,7 @@ type Application struct {
 	// Functions queued from goroutines, used to serialize updates to primitives.
 	updates chan queuedUpdate
 
-	mouseCapturingPrimitive Primitive        // A Primitive returned by a MouseHandler which will capture future mouse events.
+	mouseCapturingPrimitive Primitive        // A primitive requested via SetMouseCaptureCommand to capture future mouse events.
 	lastMouseX, lastMouseY  int              // The last position of the mouse.
 	mouseDownX, mouseDownY  int              // The position of the mouse when its button was last pressed.
 	lastMouseClick          time.Time        // The time when a mouse button was last clicked.
@@ -194,7 +194,7 @@ EventLoop:
 
 				// Pass other key events to the root primitive.
 				if root != nil && root.HasFocus() {
-					cmd := root.InputHandler(event)
+					cmd := root.HandleEvent(event)
 					if a.executeCommand(cmd) {
 						a.draw()
 					}
@@ -210,7 +210,7 @@ EventLoop:
 					a.RUnlock()
 					if root != nil && root.HasFocus() && pasteBuffer.Len() > 0 {
 						// Pass paste event to the root primitive.
-						cmd := root.PasteHandler(pasteBuffer.String())
+						cmd := root.HandleEvent(NewPasteEvent(pasteBuffer.String()))
 						if a.executeCommand(cmd) {
 							a.draw()
 						}
@@ -272,7 +272,7 @@ func (a *Application) fireMouseActions(event *tcell.EventMouse) (handled, isMous
 		}
 
 		// Determine the target primitive.
-		var primitive, capturingPrimitive Primitive
+		var primitive Primitive
 		if a.mouseCapturingPrimitive != nil {
 			primitive = a.mouseCapturingPrimitive
 			targetPrimitive = a.mouseCapturingPrimitive
@@ -282,13 +282,11 @@ func (a *Application) fireMouseActions(event *tcell.EventMouse) (handled, isMous
 			primitive = a.root
 		}
 		if primitive != nil {
-			var cmd Command
-			capturingPrimitive, cmd = primitive.MouseHandler(action, event)
+			cmd := primitive.HandleEvent(NewMouseEvent(*event, action))
 			if a.executeCommand(cmd) {
 				handled = true
 			}
 		}
-		a.mouseCapturingPrimitive = capturingPrimitive
 	}
 
 	x, y := event.Position()
@@ -595,6 +593,9 @@ func (a *Application) executeCommand(cmd Command) bool {
 		a.RUnlock()
 		a.SetFocus(c.Target)
 		return changed
+	case SetMouseCaptureCommand:
+		a.mouseCapturingPrimitive = c.Target
+		return false
 	case SetClipboardCommand:
 		if screen != nil && screen.HasClipboard() {
 			screen.SetClipboard([]byte(string(c)))
@@ -613,6 +614,11 @@ func (a *Application) executeCommand(cmd Command) bool {
 		// The clipboard contents will arrive as terminal paste input events.
 		screen.GetClipboard()
 		return true
+	case NotifyCommand:
+		if screen != nil {
+			screen.ShowNotification(c.Title, c.Body)
+		}
+		return false
 	case ConsumeEventCommand:
 		return false
 	}

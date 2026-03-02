@@ -843,121 +843,120 @@ func (l *List) endScrollState(width int, height int) (int, int) {
 	return 0, 0
 }
 
-// InputHandler returns the handler for this primitive.
-func (l *List) InputHandler(event *tcell.EventKey) Command {
-	switch event.Key() {
-	case tcell.KeyDown:
-		l.NextItem()
-	case tcell.KeyUp:
-		l.PrevItem()
-	case tcell.KeyPgDn:
-		_, _, width, height := l.GetInnerRect()
-		if l.snapToItems {
-			l.scrollByItems(1, l.visibleItemCount(width, height), width, height)
-		} else {
-			if height < 1 {
-				height = 1
+// HandleEvent handles input events for this primitive.
+func (l *List) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *KeyEvent:
+		switch event.Key() {
+		case tcell.KeyDown:
+			l.NextItem()
+		case tcell.KeyUp:
+			l.PrevItem()
+		case tcell.KeyPgDn:
+			_, _, width, height := l.GetInnerRect()
+			if l.snapToItems {
+				l.scrollByItems(1, l.visibleItemCount(width, height), width, height)
+			} else {
+				if height < 1 {
+					height = 1
+				}
+				l.scroll.pending += height
 			}
-			l.scroll.pending += height
-		}
-	case tcell.KeyPgUp:
-		_, _, width, height := l.GetInnerRect()
-		if l.snapToItems {
-			l.scrollByItems(-1, l.visibleItemCount(width, height), width, height)
-		} else {
-			if height < 1 {
-				height = 1
+		case tcell.KeyPgUp:
+			_, _, width, height := l.GetInnerRect()
+			if l.snapToItems {
+				l.scrollByItems(-1, l.visibleItemCount(width, height), width, height)
+			} else {
+				if height < 1 {
+					height = 1
+				}
+				l.scroll.pending -= height
 			}
-			l.scroll.pending -= height
 		}
-	}
-	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-}
+		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+	case *MouseEvent:
+		var cmd Command
+		x, y := event.Position()
+		if l.scrollBarInteraction.dragDelta >= 0 {
+			_, innerY, innerWidth, innerHeight := l.GetInnerRect()
+			contentWidth, _ := l.scrollBarLayout(0, innerWidth)
+			row := y - innerY
+			switch event.Action {
+			case MouseMove:
+				l.dragScrollBarTo(row, innerHeight, contentWidth)
+				return BatchCommand{SetMouseCaptureCommand{Target: l}, RedrawCommand{}, ConsumeEventCommand{}}
+			case MouseLeftUp:
+				l.scrollBarInteraction.dragDelta = listScrollBarNoDrag
+				return BatchCommand{SetMouseCaptureCommand{Target: nil}, RedrawCommand{}, ConsumeEventCommand{}}
+			case MouseLeftClick:
+				if l.scrollBarInteraction.dragMoved {
+					l.scrollBarInteraction.dragMoved = false
+					return BatchCommand{SetMouseCaptureCommand{Target: nil}, RedrawCommand{}, ConsumeEventCommand{}}
+				}
+			}
+		}
 
-// MouseHandler returns the mouse handler for this primitive.
-func (l *List) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var cmd Command
-	x, y := event.Position()
-	if l.scrollBarInteraction.dragDelta >= 0 {
-		_, innerY, innerWidth, innerHeight := l.GetInnerRect()
-		contentWidth, _ := l.scrollBarLayout(0, innerWidth)
-		row := y - innerY
-		switch action {
-		case MouseMove:
-			l.dragScrollBarTo(row, innerHeight, contentWidth)
-			return l, AppendCommand(nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-		case MouseLeftUp:
-			l.scrollBarInteraction.dragDelta = listScrollBarNoDrag
-			return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		if !l.InRect(x, y) {
+			return nil
+		}
+
+		innerX, innerY, innerWidth, innerHeight := l.GetInnerRect()
+		contentWidth, scrollBarX := l.scrollBarLayout(innerX, innerWidth)
+		drawScrollBar := l.shouldDrawScrollBar(innerWidth, innerHeight)
+		if drawScrollBar && x == scrollBarX && y >= innerY && y < innerY+innerHeight {
+			row := y - innerY
+			switch event.Action {
+			case MouseLeftDown:
+				cmd = BatchCommand{SetFocusCommand{Target: l}}
+				if l.startScrollBarDrag(row, innerHeight, contentWidth) {
+					return BatchCommand{cmd, SetMouseCaptureCommand{Target: l}, RedrawCommand{}, ConsumeEventCommand{}}
+				}
+				return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			case MouseLeftClick:
+				if l.scrollBarInteraction.dragMoved {
+					l.scrollBarInteraction.dragMoved = false
+					return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+				}
+			}
+			if l.handleScrollBarMouse(event.Action, row, innerHeight, contentWidth) {
+				return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			}
+			if event.Action == MouseLeftClick {
+				return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			}
+		}
+
+		switch event.Action {
 		case MouseLeftClick:
-			if l.scrollBarInteraction.dragMoved {
-				l.scrollBarInteraction.dragMoved = false
-				return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			index := l.indexAtPoint(x, y)
+			if index >= 0 {
+				previous := l.cursor
+				l.cursor = index
+				l.ensureScroll()
+				if l.changed != nil && l.cursor != previous {
+					l.changed(l.cursor)
+				}
 			}
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		case MouseScrollUp:
+			_, _, width, height := l.GetInnerRect()
+			if l.snapToItems {
+				l.scrollByItems(-1, 1, width, height)
+			} else {
+				l.scroll.pending -= l.mouseScrollStep()
+			}
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		case MouseScrollDown:
+			_, _, width, height := l.GetInnerRect()
+			if l.snapToItems {
+				l.scrollByItems(1, 1, width, height)
+			} else {
+				l.scroll.pending += l.mouseScrollStep()
+			}
+			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
 		}
 	}
-
-	if !l.InRect(x, y) {
-		return nil, nil
-	}
-
-	innerX, innerY, innerWidth, innerHeight := l.GetInnerRect()
-	contentWidth, scrollBarX := l.scrollBarLayout(innerX, innerWidth)
-	drawScrollBar := l.shouldDrawScrollBar(innerWidth, innerHeight)
-	if drawScrollBar && x == scrollBarX && y >= innerY && y < innerY+innerHeight {
-		row := y - innerY
-		switch action {
-		case MouseLeftDown:
-			cmd = AppendCommand(cmd, SetFocusCommand{Target: l})
-			if l.startScrollBarDrag(row, innerHeight, contentWidth) {
-				return l, AppendCommand(cmd, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}})
-			}
-			return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-		case MouseLeftClick:
-			if l.scrollBarInteraction.dragMoved {
-				l.scrollBarInteraction.dragMoved = false
-				return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-			}
-		}
-		if l.handleScrollBarMouse(action, row, innerHeight, contentWidth) {
-			return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-		}
-		if action == MouseLeftClick {
-			return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-		}
-	}
-
-	switch action {
-	case MouseLeftClick:
-		index := l.indexAtPoint(x, y)
-		if index >= 0 {
-			previous := l.cursor
-			l.cursor = index
-			l.ensureScroll()
-			if l.changed != nil && l.cursor != previous {
-				l.changed(l.cursor)
-			}
-		}
-		return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-	case MouseScrollUp:
-		_, _, width, height := l.GetInnerRect()
-		if l.snapToItems {
-			l.scrollByItems(-1, 1, width, height)
-		} else {
-			l.scroll.pending -= l.mouseScrollStep()
-		}
-		return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-	case MouseScrollDown:
-		_, _, width, height := l.GetInnerRect()
-		if l.snapToItems {
-			l.scrollByItems(1, 1, width, height)
-		} else {
-			l.scroll.pending += l.mouseScrollStep()
-		}
-		return nil, BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
-	}
-
-	return nil, nil
+	return nil
 }
 
 func (l *List) startScrollBarDrag(row int, height int, contentWidth int) bool {

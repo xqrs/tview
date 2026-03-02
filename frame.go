@@ -189,47 +189,31 @@ func (f *Frame) HasFocus() bool {
 	return f.primitive.HasFocus()
 }
 
-// MouseHandler returns the mouse handler for this primitive.
-func (f *Frame) MouseHandler(action MouseAction, event *tcell.EventMouse) (Primitive, Command) {
-	var (
-		capture Primitive
-		cmd     Command
-	)
-	if !f.InRect(event.Position()) {
-		return nil, nil
-	}
-
-	// Pass mouse events on to contained primitive.
-	if f.primitive != nil {
-		var childCmds Command
-		capture, childCmds = f.primitive.MouseHandler(action, event)
-		cmd = AppendCommand(cmd, childCmds)
-		if childCmds != nil {
-			return capture, AppendCommand(cmd, ConsumeEventCommand{})
+// HandleEvent handles input events for this primitive.
+func (f *Frame) HandleEvent(event tcell.Event) Command {
+	switch event := event.(type) {
+	case *MouseEvent:
+		if !f.InRect(event.Position()) {
+			return nil
 		}
-	}
 
-	// Clicking on the frame parts.
-	if action == MouseLeftDown {
-		cmd = AppendCommand(cmd, SetFocusCommand{Target: f})
-		cmd = AppendCommand(cmd, ConsumeEventCommand{})
-	}
+		// Pass mouse events on to contained primitive.
+		if f.primitive != nil {
+			childCmds := f.primitive.HandleEvent(event)
+			if childCmds != nil {
+				return BatchCommand{childCmds, ConsumeEventCommand{}}
+			}
+		}
 
-	return capture, cmd
-}
-
-// InputHandler returns the handler for this primitive.
-func (f *Frame) InputHandler(event *tcell.EventKey) Command {
-	if f.primitive == nil {
-		return nil
+		// Clicking on the frame parts.
+		if event.Action == MouseLeftDown {
+			return BatchCommand{SetFocusCommand{Target: f}, ConsumeEventCommand{}}
+		}
+	case *KeyEvent, *PasteEvent:
+		if f.primitive == nil {
+			return nil
+		}
+		return f.primitive.HandleEvent(event)
 	}
-	return f.primitive.InputHandler(event)
-}
-
-// PasteHandler handles pasted text for this primitive.
-func (f *Frame) PasteHandler(pastedText string) Command {
-	if f.primitive == nil {
-		return nil
-	}
-	return f.primitive.PasteHandler(pastedText)
+	return nil
 }
