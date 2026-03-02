@@ -619,8 +619,6 @@ func (a *Application) executeCommand(cmd Command) bool {
 			screen.ShowNotification(c.Title, c.Body)
 		}
 		return false
-	case ConsumeEventCommand:
-		return false
 	}
 
 	return false

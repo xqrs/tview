@@ -294,7 +294,7 @@ func (i *InputField) HandleEvent(event tcell.Event) Command {
 		switch key := event.Key(); key {
 		case tcell.KeyEnter, tcell.KeyEscape, tcell.KeyTab, tcell.KeyBacktab:
 			finish(key)
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		default:
 			// Forward other key events to the text area.
 			return i.textArea.HandleEvent(event)
@@ -311,7 +311,7 @@ func (i *InputField) HandleEvent(event tcell.Event) Command {
 
 		// Focus in any case.
 		if event.Action == MouseLeftDown && cmd == nil {
-			cmd = BatchCommand{SetFocusCommand{Target: i}, ConsumeEventCommand{}}
+			cmd = SetFocusCommand{Target: i}
 		}
 		return cmd
 	case *PasteEvent:

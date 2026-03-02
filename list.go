@@ -873,7 +873,7 @@ func (l *List) HandleEvent(event tcell.Event) Command {
 				l.scroll.pending -= height
 			}
 		}
-		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		return RedrawCommand{}
 	case *MouseEvent:
 		var cmd Command
 		x, y := event.Position()
@@ -884,14 +884,14 @@ func (l *List) HandleEvent(event tcell.Event) Command {
 			switch event.Action {
 			case MouseMove:
 				l.dragScrollBarTo(row, innerHeight, contentWidth)
-				return BatchCommand{SetMouseCaptureCommand{Target: l}, RedrawCommand{}, ConsumeEventCommand{}}
+				return BatchCommand{SetMouseCaptureCommand{Target: l}, RedrawCommand{}}
 			case MouseLeftUp:
 				l.scrollBarInteraction.dragDelta = listScrollBarNoDrag
-				return BatchCommand{SetMouseCaptureCommand{Target: nil}, RedrawCommand{}, ConsumeEventCommand{}}
+				return BatchCommand{SetMouseCaptureCommand{Target: nil}, RedrawCommand{}}
 			case MouseLeftClick:
 				if l.scrollBarInteraction.dragMoved {
 					l.scrollBarInteraction.dragMoved = false
-					return BatchCommand{SetMouseCaptureCommand{Target: nil}, RedrawCommand{}, ConsumeEventCommand{}}
+					return BatchCommand{SetMouseCaptureCommand{Target: nil}, RedrawCommand{}}
 				}
 			}
 		}
@@ -909,20 +909,20 @@ func (l *List) HandleEvent(event tcell.Event) Command {
 			case MouseLeftDown:
 				cmd = BatchCommand{SetFocusCommand{Target: l}}
 				if l.startScrollBarDrag(row, innerHeight, contentWidth) {
-					return BatchCommand{cmd, SetMouseCaptureCommand{Target: l}, RedrawCommand{}, ConsumeEventCommand{}}
+					return BatchCommand{cmd, SetMouseCaptureCommand{Target: l}, RedrawCommand{}}
 				}
-				return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+				return RedrawCommand{}
 			case MouseLeftClick:
 				if l.scrollBarInteraction.dragMoved {
 					l.scrollBarInteraction.dragMoved = false
-					return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+					return RedrawCommand{}
 				}
 			}
 			if l.handleScrollBarMouse(event.Action, row, innerHeight, contentWidth) {
-				return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+				return RedrawCommand{}
 			}
 			if event.Action == MouseLeftClick {
-				return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+				return RedrawCommand{}
 			}
 		}
 
@@ -937,7 +937,7 @@ func (l *List) HandleEvent(event tcell.Event) Command {
 					l.changed(l.cursor)
 				}
 			}
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		case MouseScrollUp:
 			_, _, width, height := l.GetInnerRect()
 			if l.snapToItems {
@@ -945,7 +945,7 @@ func (l *List) HandleEvent(event tcell.Event) Command {
 			} else {
 				l.scroll.pending -= l.mouseScrollStep()
 			}
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		case MouseScrollDown:
 			_, _, width, height := l.GetInnerRect()
 			if l.snapToItems {
@@ -953,7 +953,7 @@ func (l *List) HandleEvent(event tcell.Event) Command {
 			} else {
 				l.scroll.pending += l.mouseScrollStep()
 			}
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		}
 	}
 	return nil

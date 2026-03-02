@@ -2110,7 +2110,7 @@ func (t *TextArea) handleKeyEvent(event *tcell.EventKey) Command {
 		// But forwarding takes precedence.
 		if t.finished != nil {
 			t.finished(key)
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		}
 
 		from, to, row := t.getSelection()
@@ -2123,7 +2123,7 @@ func (t *TextArea) handleKeyEvent(event *tcell.EventKey) Command {
 	case tcell.KeyBacktab, tcell.KeyEscape: // Only used in forms.
 		if t.finished != nil {
 			t.finished(key)
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		}
 	case tcell.KeyRune:
 		if event.Modifiers()&tcell.ModAlt > 0 {
@@ -2323,7 +2323,7 @@ func (t *TextArea) handleKeyEvent(event *tcell.EventKey) Command {
 			defer t.changed()
 		}
 	}
-	return BatchCommand{cmd, RedrawCommand{}, ConsumeEventCommand{}}
+	return BatchCommand{cmd, RedrawCommand{}}
 }
 
 func (t *TextArea) handleMouseEvent(event *MouseEvent) Command {
@@ -2373,17 +2373,17 @@ func (t *TextArea) handleMouseEvent(event *MouseEvent) Command {
 		if event.Modifiers()&tcell.ModShift == 0 {
 			t.selectionStart = t.cursor
 		}
-		cmd = append(cmd, SetFocusCommand{Target: t}, SetMouseCaptureCommand{Target: t}, RedrawCommand{}, ConsumeEventCommand{})
+		cmd = append(cmd, SetFocusCommand{Target: t}, SetMouseCaptureCommand{Target: t}, RedrawCommand{})
 		t.dragging = true
 	case MouseMove:
 		if !t.dragging {
 			break
 		}
 		t.moveCursor(row, column)
-		cmd = append(cmd, SetMouseCaptureCommand{Target: t}, RedrawCommand{}, ConsumeEventCommand{})
+		cmd = append(cmd, SetMouseCaptureCommand{Target: t}, RedrawCommand{})
 	case MouseLeftUp:
 		t.moveCursor(row, column)
-		cmd = append(cmd, SetMouseCaptureCommand{Target: nil}, RedrawCommand{}, ConsumeEventCommand{})
+		cmd = append(cmd, SetMouseCaptureCommand{Target: nil}, RedrawCommand{})
 		t.dragging = false
 	case MouseLeftDoubleClick: // Select word.
 		// Left down/up was already triggered so we are at the correct
@@ -2391,29 +2391,29 @@ func (t *TextArea) handleMouseEvent(event *MouseEvent) Command {
 		t.moveWordLeft(false)
 		t.selectionStart = t.cursor
 		t.moveWordRight(true, false)
-		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		cmd = append(cmd, RedrawCommand{})
 	case MouseScrollUp:
 		if t.rowOffset > 0 {
 			t.rowOffset--
 		}
-		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		cmd = append(cmd, RedrawCommand{})
 	case MouseScrollDown:
 		t.rowOffset++
 		if t.rowOffset >= len(t.lineStarts) {
 			t.rowOffset = max(len(t.lineStarts)-1, 0)
 		}
-		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		cmd = append(cmd, RedrawCommand{})
 	case MouseScrollLeft:
 		if t.columnOffset > 0 {
 			t.columnOffset--
 		}
-		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		cmd = append(cmd, RedrawCommand{})
 	case MouseScrollRight:
 		t.columnOffset++
 		if t.columnOffset >= t.widestLine {
 			t.columnOffset = max(t.widestLine-1, 0)
 		}
-		cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+		cmd = append(cmd, RedrawCommand{})
 	}
 
 	if len(cmd) == 0 {
@@ -2429,7 +2429,7 @@ func (t *TextArea) handlePasteEvent(event *PasteEvent) Command {
 	t.truncateLines(row - 1)
 	t.findCursor(true, row)
 	t.selectionStart = t.cursor
-	return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+	return RedrawCommand{}
 }
 
 // HandleEvent handles input events for this primitive.

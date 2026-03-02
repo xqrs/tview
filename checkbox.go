@@ -332,7 +332,7 @@ func (c *Checkbox) HandleEvent(event tcell.Event) Command {
 				c.finished(key)
 			}
 		}
-		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		return RedrawCommand{}
 	case *MouseEvent:
 		x, y := event.Position()
 		_, rectY, _, _ := c.GetInnerRect()
@@ -344,10 +344,10 @@ func (c *Checkbox) HandleEvent(event tcell.Event) Command {
 		if y == rectY {
 			switch event.Action {
 			case MouseLeftDown:
-				return BatchCommand{SetFocusCommand{Target: c}, ConsumeEventCommand{}}
+				return SetFocusCommand{Target: c}
 			case MouseLeftClick:
 				c.SetChecked(!c.checked)
-				return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+				return RedrawCommand{}
 			}
 		}
 	}

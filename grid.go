@@ -742,7 +742,7 @@ func (g *Grid) HandleEvent(event tcell.Event) Command {
 			g.columnOffset++
 		}
 		if g.rowOffset != previousRowOffset || g.columnOffset != previousColumnOffset {
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		}
 	case *PasteEvent:
 		for _, item := range g.items {

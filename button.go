@@ -189,7 +189,7 @@ func (b *Button) HandleEvent(event tcell.Event) Command {
 				b.exit(key)
 			}
 		}
-		return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+		return RedrawCommand{}
 	case *MouseEvent:
 		if !b.InRect(event.Position()) {
 			return nil
@@ -198,12 +198,12 @@ func (b *Button) HandleEvent(event tcell.Event) Command {
 		// Process mouse event.
 		switch event.Action {
 		case MouseLeftDown:
-			return BatchCommand{SetFocusCommand{Target: b}, ConsumeEventCommand{}}
+			return SetFocusCommand{Target: b}
 		case MouseLeftClick:
 			if b.selected != nil {
 				b.selected()
 			}
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		}
 	}
 	return nil

@@ -415,7 +415,7 @@ func (l *Layers) HandleEvent(event tcell.Event) tview.Command {
 		// If an overlay layer is active, block input to layers behind it even if
 		// the top layer didn't consume the event.
 		if overlayIndex >= 0 {
-			return tview.BatchCommand{tview.ConsumeEventCommand{}}
+			return nil
 		}
 		return nil
 	case *tview.KeyEvent, *tview.PasteEvent:

@@ -11,8 +11,6 @@ type SetFocusCommand struct {
 	Target Primitive
 }
 
-type ConsumeEventCommand struct{}
-
 type SetMouseCaptureCommand struct {
 	Target Primitive
 }

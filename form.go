@@ -785,7 +785,7 @@ func (f *Form) HandleEvent(event tcell.Event) Command {
 
 		// A mouse down anywhere else will focus this form.
 		if event.Action == MouseLeftDown && f.InRect(event.Position()) {
-			return BatchCommand{SetFocusCommand{Target: f}, ConsumeEventCommand{}}
+			return SetFocusCommand{Target: f}
 		}
 	case *KeyEvent, *PasteEvent:
 		for _, item := range f.items {

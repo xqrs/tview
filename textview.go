@@ -891,7 +891,7 @@ func (t *TextView) HandleEvent(event tcell.Event) Command {
 			if t.finished != nil {
 				t.finished(key)
 			}
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		}
 
 		if !t.scrollable {
@@ -943,7 +943,7 @@ func (t *TextView) HandleEvent(event tcell.Event) Command {
 			t.lineOffset -= pageSize
 		}
 		if t.lineOffset != previousLineOffset || t.columnOffset != previousColumnOffset || t.trackEnd != previousTrackEnd {
-			return BatchCommand{RedrawCommand{}, ConsumeEventCommand{}}
+			return RedrawCommand{}
 		}
 	case *MouseEvent:
 		var cmd BatchCommand
@@ -955,34 +955,34 @@ func (t *TextView) HandleEvent(event tcell.Event) Command {
 		_, _, width, _ := t.GetInnerRect()
 		switch event.Action {
 		case MouseLeftDown:
-			cmd = append(cmd, SetFocusCommand{Target: t}, RedrawCommand{}, ConsumeEventCommand{})
+			cmd = append(cmd, SetFocusCommand{Target: t}, RedrawCommand{})
 		case MouseLeftClick:
-			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+			cmd = append(cmd, RedrawCommand{})
 		case MouseScrollUp:
 			if !t.scrollable {
 				break
 			}
 			t.trackEnd = false
 			t.lineOffset--
-			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+			cmd = append(cmd, RedrawCommand{})
 		case MouseScrollDown:
 			if !t.scrollable {
 				break
 			}
 			t.lineOffset++
-			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+			cmd = append(cmd, RedrawCommand{})
 		case MouseScrollLeft:
 			if !t.scrollable {
 				break
 			}
 			t.columnOffset -= width / 2
-			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+			cmd = append(cmd, RedrawCommand{})
 		case MouseScrollRight:
 			if !t.scrollable {
 				break
 			}
 			t.columnOffset += width / 2
-			cmd = append(cmd, RedrawCommand{}, ConsumeEventCommand{})
+			cmd = append(cmd, RedrawCommand{})
 		}
 		if len(cmd) == 0 {
 			return nil
