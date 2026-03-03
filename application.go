@@ -422,11 +422,11 @@ func (a *Application) ForceDraw() *Application {
 
 // draw actually does what Draw() promises to do.
 func (a *Application) draw() *Application {
-	a.Lock()
+	a.RLock()
 	screen := a.screen
 	root := a.root
 	forceRedraw := a.forceRedraw
-	a.Unlock()
+	a.RUnlock()
 
 	// Maybe we're not ready yet or not anymore.
 	if screen == nil || root == nil {
@@ -594,7 +594,9 @@ func (a *Application) executeCommand(cmd Command) bool {
 		a.SetFocus(c.Target)
 		return changed
 	case SetMouseCaptureCommand:
+		a.Lock()
 		a.mouseCapturingPrimitive = c.Target
+		a.Unlock()
 		return false
 	case SetClipboardCommand:
 		if screen != nil && screen.HasClipboard() {
