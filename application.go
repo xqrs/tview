@@ -124,9 +124,9 @@ func (a *Application) Run() error {
 		lastRedraw  time.Time   // The time the screen was last redrawn.
 		redrawTimer *time.Timer // A timer to schedule the next redraw.
 	)
-	a.Lock()
 
 	// Make a screen if there is none yet.
+	a.Lock()
 	if a.screen == nil {
 		screen, err := tcell.NewScreen()
 		if err != nil {
@@ -139,6 +139,7 @@ func (a *Application) Run() error {
 		}
 		a.screen = screen
 	}
+	a.Unlock()
 
 	// We catch panics to clean up because they mess up the terminal.
 	defer func() {
@@ -149,14 +150,10 @@ func (a *Application) Run() error {
 	}()
 
 	// Draw the screen for the first time.
-	a.Unlock()
 	a.draw()
 
-	a.RLock()
-	screen := a.screen
-	a.RUnlock()
 	a.Lock()
-	a.events = screen.EventQ()
+	a.events = a.screen.EventQ()
 	a.Unlock()
 
 	// Start event loop.
@@ -312,8 +309,8 @@ func (a *Application) fireMouseActions(event *tcell.EventMouse) (handled, isMous
 			if buttons&buttonEvent.button != 0 {
 				fire(buttonEvent.down)
 			} else {
-				fire(buttonEvent.up) // A user override might set event to nil.
-				if !clickMoved && event != nil {
+				fire(buttonEvent.up)
+				if !clickMoved {
 					if a.lastMouseClick.Add(DoubleClickInterval).Before(time.Now()) {
 						fire(buttonEvent.click)
 						a.lastMouseClick = time.Now()
